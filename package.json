@@ -1,0 +1,29 @@
+{
+  "name": "alphalend-sdk",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@types/node": "^20.14.10",
+    "axios": "^1.7.7",
+    "bech32": "^2.0.0",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.14",
+    "jest": "^29.7.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.2"
+  },
+  "peerDependencies": {
+    "@mysten/dapp-kit": "^0.14.49",
+    "@mysten/sui": "^1.21.1",
+    "@mysten/wallet-standard": "^0.13.25"
+  }
+}
