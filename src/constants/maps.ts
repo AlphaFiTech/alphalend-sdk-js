@@ -1,6 +1,8 @@
+import { getConstants } from "./prodConstants";
+
 /**
  * Mapping Constants
- * 
+ *
  * Contains various mapping objects used in the protocol:
  * - Asset symbol to object ID mappings
  * - Network ID to RPC URL mappings
@@ -9,3 +11,10 @@
  * - Token decimal precision mappings
  * - Asset risk parameter mappings
  */
+const constants = getConstants();
+
+export const coinNameToCoinType: { [key: string]: string } = {
+  SUI: constants.SUI_COIN_TYPE,
+  USDC: constants.USDC_COIN_TYPE,
+  USDT: constants.USDT_COIN_TYPE,
+};
