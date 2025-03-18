@@ -1,12 +1,3 @@
-import { devConstants } from "./devConstants";
-
-export const CONF_ENV: string = "development";
-
-export const getConstants = () => {
-  if (CONF_ENV === "production") return prodConstants;
-  else return devConstants;
-};
-
 export const prodConstants = {
   SUI_CLOCK_OBJECT_ID: "0x6",
   ORACLE_PACKAGE_ID: "",
