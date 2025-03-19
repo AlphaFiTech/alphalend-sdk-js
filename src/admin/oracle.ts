@@ -1,4 +1,4 @@
-import { Transaction } from "@mysten/sui/transactions";
+import { Transaction, TransactionResult } from "@mysten/sui/transactions";
 import { getConstants } from "../constants/index.js";
 import {
   SuiPriceServiceConnection,
@@ -6,6 +6,7 @@ import {
 } from "@pythnetwork/pyth-sui-js";
 import { pythPriceFeedIds } from "../utils/priceFeedIds.js";
 import { coinNameToCoinType } from "../constants/maps.js";
+import { getPriceInfoObjectIds } from "../utils/oracle.js";
 
 const constants = getConstants();
 
@@ -36,6 +37,31 @@ export function updateOracleMaxAge(
   return tx;
 }
 
+async function getPriceIdentifier(
+  tx: Transaction,
+  coinName: string,
+  pythClient: SuiPythClient,
+  pythConnection: SuiPriceServiceConnection,
+): Promise<{ transaction: Transaction; priceIdentifier: TransactionResult }> {
+  const priceInfoObjectId = await getPriceInfoObjectIds(
+    tx,
+    [pythPriceFeedIds[coinName]],
+    pythClient,
+    pythConnection,
+  );
+
+  const priceInfo = tx.moveCall({
+    target: `${constants.PYTH_PACKAGE_ID}::price_info::get_price_info_from_price_info_object`,
+    arguments: [tx.object(priceInfoObjectId[0])],
+  });
+  const priceIdentifier = tx.moveCall({
+    target: `${constants.PYTH_PACKAGE_ID}::price_info::get_price_identifier`,
+    arguments: [priceInfo],
+  });
+
+  return { transaction: tx, priceIdentifier };
+}
+
 export async function addCoinToOracle(
   tx: Transaction,
   adminCapId: string,
@@ -50,73 +76,79 @@ export async function addCoinToOracle(
   });
 
   // getting identifier in move
-  const priceFeedUpdateData = await pythConnection.getPriceFeedsUpdateData([
-    pythPriceFeedIds[coinName],
-  ]);
-  const priceInfoObjectId = await pythClient.updatePriceFeeds(
+  const { transaction, priceIdentifier } = await getPriceIdentifier(
     tx,
-    priceFeedUpdateData,
-    [pythPriceFeedIds[coinName]],
+    coinName,
+    pythClient,
+    pythConnection,
   );
-  const priceInfo = tx.moveCall({
-    target: `${constants.PYTH_PACKAGE_ID}::price_info::get_price_info_from_price_info_object`,
-    arguments: [tx.object(priceInfoObjectId[0])],
-  });
-  const identifier = tx.moveCall({
-    target: `${constants.PYTH_PACKAGE_ID}::price_info::get_price_identifier`,
-    arguments: [priceInfo],
-  });
 
-  const [dependentObject] = tx.moveCall({
+  const [dependentPriceIdentifier] = transaction.moveCall({
     target: `0x1::option::none`,
     typeArguments: [constants.PYTH_PRICE_INDENTIFIER_TYPE],
     arguments: [],
   });
 
   // making final moveCall
-  tx.moveCall({
+  transaction.moveCall({
     target: `${constants.ORACLE_PACKAGE_ID}::oracle::add_coin_to_oracle`,
     arguments: [
-      tx.object(constants.ORACLE_OBJECT_ID),
-      tx.object(adminCapId),
+      transaction.object(constants.ORACLE_OBJECT_ID),
+      transaction.object(adminCapId),
       coinTypeName,
-      identifier,
-      dependentObject,
+      priceIdentifier,
+      dependentPriceIdentifier,
     ],
   });
-  return tx;
+  return transaction;
 }
 
 // function updateIdentifierForCoin(
 //   tx: Transaction,
-//   oracleId: string,
 //   adminCapId: string,
-//   coinType: string,
-//   identifier: string,
-//   dependent?: string
+//   coinName: string,
+//   pythClient: SuiPythClient,
+//   pythConnection: SuiPriceServiceConnection
 // ): Transaction {
+//   // getting coinType in move
+//   const coinTypeName = tx.moveCall({
+//     target: `0x1::type_name::get`,
+//     typeArguments: [coinNameToCoinType[coinName]],
+//   });
+
 //   tx.moveCall({
 //     target: `${constants.ORACLE_PACKAGE_ID}::oracle::update_identifier_for_coin`,
 //     arguments: [
-//       tx.object(oracleId),
+//       tx.object(constants.ORACLE_OBJECT_ID),
 //       tx.object(adminCapId),
-//       tx.pure(coinType),
+//       coinTypeName,
 //       tx.pure("TypeName", identifier),
 //       dependent ? tx.pure.option(dependent) : tx.pure.option(),
 //     ],
 //   });
+
 //   return tx;
 // }
 
-// function removeCoinFromOracle(
-//   tx: Transaction,
-//   oracleId: string,
-//   adminCapId: string,
-//   coinType: string
-// ): Transaction {
-//   tx.moveCall({
-//     target: `${constants.ORACLE_PACKAGE_ID}::oracle::remove_coin_type`,
-//     arguments: [tx.object(oracleId), tx.object(adminCapId), tx.pure(coinType)],
-//   });
-//   return tx;
-// }
+export function removeCoinFromOracle(
+  tx: Transaction,
+  adminCapId: string,
+  coinName: string,
+): Transaction {
+  // getting coinType in move
+  const coinTypeName = tx.moveCall({
+    target: `0x1::type_name::get`,
+    typeArguments: [coinNameToCoinType[coinName]],
+  });
+
+  tx.moveCall({
+    target: `${constants.ORACLE_PACKAGE_ID}::oracle::remove_coin_type`,
+    arguments: [
+      tx.object(constants.ORACLE_OBJECT_ID),
+      tx.object(adminCapId),
+      coinTypeName,
+    ],
+  });
+
+  return tx;
+}

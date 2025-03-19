@@ -26,7 +26,7 @@ export async function getPriceInfoObjectIds(
   priceIDs: string[],
   pythClient: SuiPythClient,
   pythConnection: SuiPriceServiceConnection,
-) {
+): Promise<string[]> {
   const priceFeedUpdateData =
     await pythConnection.getPriceFeedsUpdateData(priceIDs);
   const priceInfoObjectIds = await pythClient.updatePriceFeeds(

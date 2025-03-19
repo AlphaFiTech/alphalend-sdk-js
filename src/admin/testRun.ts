@@ -9,6 +9,7 @@ import {
 import * as dotenv from "dotenv";
 import { getConstants } from "../constants/index.js";
 import { addCoinToOracle } from "./oracle.js";
+import { AlphalendClient } from "../core/client.js";
 
 dotenv.config();
 
@@ -36,26 +37,35 @@ export function getExecStuff() {
   return { address, keypair, suiClient };
 }
 
-async function run() {
+async function addCoinToOracleCaller() {
   let tx = new Transaction();
-  const { suiClient, keypair } = getExecStuff();
+  const { suiClient } = getExecStuff();
   const pythClient = new SuiPythClient(
     suiClient,
     constants.PYTH_STATE_ID,
     constants.WORMHOLE_STATE_ID,
   );
   const pythConnection = new SuiPriceServiceConnection(
-    // "https://hermes.pyth.network"
-    "https://hermes-beta.pyth.network",
+    "https://hermes.pyth.network",
+    // "https://hermes-beta.pyth.network"
   );
   const adminCapId = constants.ADMIN_CAP_ID;
-  tx = await addCoinToOracle(
-    tx,
-    adminCapId,
-    "CETUS",
-    pythClient,
-    pythConnection,
-  );
+  tx = await addCoinToOracle(tx, adminCapId, "SUI", pythClient, pythConnection);
+
+  return tx;
+}
+
+async function updatePricesCaller() {
+  const { suiClient } = getExecStuff();
+  const alphalendClient = new AlphalendClient(suiClient);
+  const tx = await alphalendClient.updatePrices(["SUI"]);
+
+  return tx;
+}
+
+async function run() {
+  const { suiClient, keypair } = getExecStuff();
+  const tx = await updatePricesCaller();
   tx.setGasBudget(100_000_000);
 
   suiClient
@@ -65,7 +75,6 @@ async function run() {
       requestType: "WaitForLocalExecution",
       options: {
         showEffects: true,
-        showBalanceChanges: true,
         showObjectChanges: true,
       },
     })
@@ -76,5 +85,7 @@ async function run() {
       console.error(error);
     });
 }
-
+addCoinToOracleCaller();
 run();
+
+//0x2e4a789fc4620614e6b6b3d9962bdb4dec12506e4c30f97972a29f47b6dc87bc
