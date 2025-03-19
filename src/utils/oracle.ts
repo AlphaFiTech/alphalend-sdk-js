@@ -7,7 +7,7 @@
  * - Manages oracle configuration (admin functions)
  */
 import { Transaction } from "@mysten/sui/transactions";
-import { getConstants } from "../constants/prodConstants";
+import { getConstants } from "../constants/index.js";
 import {
   SuiPriceServiceConnection,
   SuiPythClient,
@@ -25,15 +25,14 @@ export async function getPriceInfoObjectIds(
   tx: Transaction,
   priceIDs: string[],
   pythClient: SuiPythClient,
-  pythConnection: SuiPriceServiceConnection
+  pythConnection: SuiPriceServiceConnection,
 ) {
-  const priceFeedUpdateData = await pythConnection.getPriceFeedsUpdateData(
-    priceIDs
-  );
+  const priceFeedUpdateData =
+    await pythConnection.getPriceFeedsUpdateData(priceIDs);
   const priceInfoObjectIds = await pythClient.updatePriceFeeds(
     tx,
     priceFeedUpdateData,
-    priceIDs
+    priceIDs,
   );
 
   return priceInfoObjectIds;
@@ -41,7 +40,7 @@ export async function getPriceInfoObjectIds(
 
 export function updatePriceTransaction(
   tx: Transaction,
-  args: UpdatePriceTransactionArgs
+  args: UpdatePriceTransactionArgs,
 ): Transaction {
   tx.moveCall({
     target: `${constants.ORACLE_PACKAGE_ID}::oracle::update_price`,

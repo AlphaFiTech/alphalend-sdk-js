@@ -1,6 +1,6 @@
 /**
  * Event Types
- * 
+ *
  * Defines all event types emitted by the AlphaLend protocol:
  * - Supply, borrow, withdraw, and repay events
  * - Liquidation events

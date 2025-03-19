@@ -7,8 +7,8 @@ import {
   SuiPythClient,
 } from "@pythnetwork/pyth-sui-js";
 import * as dotenv from "dotenv";
-import { getConstants } from "../constants/prodConstants";
-import { addCoinToOracle } from "./oracle";
+import { getConstants } from "../constants/index.js";
+import { addCoinToOracle } from "./oracle.js";
 
 dotenv.config();
 
@@ -29,7 +29,7 @@ export function getExecStuff() {
 
   const suiClient = new SuiClient({
     url: getFullnodeUrl(
-      process.env.NETWORK as "mainnet" | "testnet" | "devnet" | "localnet"
+      process.env.NETWORK as "mainnet" | "testnet" | "devnet" | "localnet",
     ),
   });
 
@@ -42,14 +42,20 @@ async function run() {
   const pythClient = new SuiPythClient(
     suiClient,
     constants.PYTH_STATE_ID,
-    constants.WORMHOLE_STATE_ID
+    constants.WORMHOLE_STATE_ID,
   );
   const pythConnection = new SuiPriceServiceConnection(
     // "https://hermes.pyth.network"
-    "https://hermes-beta.pyth.network"
+    "https://hermes-beta.pyth.network",
   );
   const adminCapId = constants.ADMIN_CAP_ID;
-  tx = await addCoinToOracle(tx, adminCapId, "CETUS", pythClient, pythConnection);
+  tx = await addCoinToOracle(
+    tx,
+    adminCapId,
+    "CETUS",
+    pythClient,
+    pythConnection,
+  );
   tx.setGasBudget(100_000_000);
 
   suiClient

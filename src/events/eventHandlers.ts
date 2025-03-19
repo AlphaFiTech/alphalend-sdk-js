@@ -1,6 +1,6 @@
 /**
  * Event Handlers
- * 
+ *
  * Implements handlers for all protocol events:
  * - Event parsing and normalization
  * - Event subscription mechanisms

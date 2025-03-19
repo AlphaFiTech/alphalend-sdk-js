@@ -3,10 +3,13 @@ import {
   SuiPriceServiceConnection,
   SuiPythClient,
 } from "@pythnetwork/pyth-sui-js";
-import { getConstants } from "../constants/prodConstants";
+import { getConstants } from "../constants/index.js";
 import { Transaction } from "@mysten/sui/transactions";
-import { getPriceInfoObjectIds, updatePriceTransaction } from "../utils/oracle";
-import { pythPriceFeedIds } from "../utils/priceFeedIds";
+import {
+  getPriceInfoObjectIds,
+  updatePriceTransaction,
+} from "../utils/oracle.js";
+import { pythPriceFeedIds } from "../utils/priceFeedIds.js";
 
 /**
  * AlphaLend Client
@@ -31,10 +34,10 @@ export class AlphalendClient {
     this.pythClient = new SuiPythClient(
       client,
       constants.PYTH_STATE_ID,
-      constants.WORMHOLE_STATE_ID
+      constants.WORMHOLE_STATE_ID,
     );
     this.pythConnection = new SuiPriceServiceConnection(
-      "https://hermes.pyth.network"
+      "https://hermes.pyth.network",
     );
   }
 
@@ -48,7 +51,7 @@ export class AlphalendClient {
       tx,
       priceIDs,
       this.pythClient,
-      this.pythConnection
+      this.pythConnection,
     );
     priceInfoObjectIds.forEach((priceInfoObjectId) => {
       tx = updatePriceTransaction(tx, {

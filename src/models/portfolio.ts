@@ -1,6 +1,6 @@
 /**
  * Portfolio Model
- * 
+ *
  * Represents a user's lending and borrowing positions across all markets:
  * - Tracks supplied assets and their quantities
  * - Tracks borrowed assets and their quantities

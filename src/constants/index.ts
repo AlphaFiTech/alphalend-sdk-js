@@ -1,6 +1,6 @@
-import { devConstants } from "./devConstants";
+import { devConstants } from "./devConstants.js";
 
-import { prodConstants } from "./prodConstants";
+import { prodConstants } from "./prodConstants.js";
 
 const CONF_ENV = process.env.NODE_ENV || "development";
 

@@ -1,17 +1,17 @@
 import { Transaction } from "@mysten/sui/transactions";
-import { getConstants } from "../constants/prodConstants";
+import { getConstants } from "../constants/index.js";
 import {
   SuiPriceServiceConnection,
   SuiPythClient,
 } from "@pythnetwork/pyth-sui-js";
-import { pythPriceFeedIds } from "../utils/priceFeedIds";
-import { coinNameToCoinType } from "../constants/maps";
+import { pythPriceFeedIds } from "../utils/priceFeedIds.js";
+import { coinNameToCoinType } from "../constants/maps.js";
 
 const constants = getConstants();
 
-function createAdditionalAdminCap(
+export function createAdditionalAdminCap(
   tx: Transaction,
-  adminCapId: string
+  adminCapId: string,
 ): Transaction {
   tx.moveCall({
     target: `${constants.ORACLE_PACKAGE_ID}::oracle::create_additional_admin_cap`,
@@ -20,10 +20,10 @@ function createAdditionalAdminCap(
   return tx;
 }
 
-function updateOracleMaxAge(
+export function updateOracleMaxAge(
   tx: Transaction,
   adminCapId: string,
-  newAge: number
+  newAge: number,
 ): Transaction {
   tx.moveCall({
     target: `${constants.ORACLE_PACKAGE_ID}::oracle::update_max_age`,
@@ -41,7 +41,7 @@ export async function addCoinToOracle(
   adminCapId: string,
   coinName: string,
   pythClient: SuiPythClient,
-  pythConnection: SuiPriceServiceConnection
+  pythConnection: SuiPriceServiceConnection,
 ): Promise<Transaction> {
   // getting coinType in move
   const coinTypeName = tx.moveCall({
@@ -56,7 +56,7 @@ export async function addCoinToOracle(
   const priceInfoObjectId = await pythClient.updatePriceFeeds(
     tx,
     priceFeedUpdateData,
-    [pythPriceFeedIds[coinName]]
+    [pythPriceFeedIds[coinName]],
   );
   const priceInfo = tx.moveCall({
     target: `${constants.PYTH_PACKAGE_ID}::price_info::get_price_info_from_price_info_object`,
@@ -67,7 +67,7 @@ export async function addCoinToOracle(
     arguments: [priceInfo],
   });
 
-  let [dependentObject] = tx.moveCall({
+  const [dependentObject] = tx.moveCall({
     target: `0x1::option::none`,
     typeArguments: [constants.PYTH_PRICE_INDENTIFIER_TYPE],
     arguments: [],

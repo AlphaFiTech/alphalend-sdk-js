@@ -1,4 +1,4 @@
-import { getConstants } from "./prodConstants";
+import { getConstants } from "./index.js";
 
 /**
  * Mapping Constants

@@ -1,6 +1,6 @@
 /**
  * Core Types
- * 
+ *
  * Contains all type definitions used throughout the AlphaLend SDK:
  * - Protocol-specific types and interfaces
  * - Transaction parameter types
