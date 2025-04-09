@@ -9,3 +9,210 @@
  * - Enums for protocol states and options
  * - Blockchain-specific type mappings
  */
+
+/**
+ * Special constant for maximum u64 value (2^64 - 1)
+ * Used to indicate withdrawing all collateral when passed as the amount parameter
+ * in withdraw operations.
+ */
+export const MAX_U64 = BigInt("18446744073709551615");
+
+/**
+ * Parameter interfaces for protocol operations
+ */
+
+/**
+ * Parameters for supplying assets as collateral to a lending market
+ * Used with the `supply` method
+ */
+export interface SupplyParams {
+  /** Market ID where collateral is being added */
+  marketId: string | number;
+  /** Amount to supply as collateral in base units */
+  amount: bigint;
+  /** Fully qualified coin type (e.g., "0x2::sui::SUI") */
+  coinType: string;
+  /** Object ID of the position capability object */
+  positionCapId: string;
+  /** Object ID of the coin to use for supplying */
+  coinObjectId: string;
+}
+
+/**
+ * Parameters for withdrawing collateral from a lending market
+ * Used with the `withdraw` method
+ */
+export interface WithdrawParams {
+  /** Market ID from which to withdraw */
+  marketId: string | number;
+  /** Amount to withdraw (use MAX_U64 constant to withdraw all) */
+  amount: bigint;
+  /** Fully qualified coin type to withdraw */
+  coinType: string;
+  /** Object ID of the position capability object */
+  positionCapId: string;
+}
+
+/**
+ * Parameters for borrowing assets from a lending market
+ * Used with the `borrow` method
+ */
+export interface BorrowParams {
+  /** Market ID to borrow from */
+  marketId: string | number;
+  /** Amount to borrow in base units */
+  amount: bigint;
+  /** Fully qualified coin type to borrow */
+  coinType: string;
+  /** Object ID of the position capability object */
+  positionCapId: string;
+}
+
+/**
+ * Parameters for repaying borrowed assets to a lending market
+ * Used with the `repay` method
+ */
+export interface RepayParams {
+  /** Market ID where the debt exists */
+  marketId: string | number;
+  /** Amount to repay in base units */
+  amount: bigint;
+  /** Fully qualified coin type to repay */
+  coinType: string;
+  /** Object ID of the position capability object */
+  positionCapId: string;
+  /** Object ID of the coin to use for repayment */
+  coinObjectId: string;
+}
+
+/**
+ * Parameters for claiming rewards accrued from lending or borrowing
+ * Used with the `claimRewards` method
+ */
+export interface ClaimRewardsParams {
+  /** Market ID to claim rewards from */
+  marketId: string | number;
+  /** Fully qualified coin type of the reward */
+  coinType: string;
+  /** Object ID of the position capability object */
+  positionCapId: string;
+}
+
+/**
+ * Parameters for liquidating an unhealthy position
+ * Used with the `liquidate` method
+ */
+export interface LiquidateParams {
+  /** Object ID of the position to liquidate */
+  liquidatePositionId: string;
+  /** Market ID where debt is repaid */
+  borrowMarketId: string | number;
+  /** Market ID where collateral is seized */
+  withdrawMarketId: string | number;
+  /** Amount of debt to repay in base units */
+  repayAmount: bigint;
+  /** Fully qualified coin type for debt repayment */
+  borrowCoinType: string;
+  /** Fully qualified coin type for collateral to seize */
+  withdrawCoinType: string;
+  /** Object ID of the coin to use for repayment */
+  coinObjectId: string;
+}
+
+/**
+ * Response structure for transaction operations
+ */
+export interface TransactionResponse {
+  /** Transaction hash/digest */
+  txDigest: string;
+  /** Status of the transaction */
+  status: "success" | "failure";
+  /** Gas fee paid for the transaction */
+  gasFee?: bigint;
+  /** Timestamp when the transaction completed */
+  timestamp?: number;
+}
+
+/**
+ * Data models for market information 
+ */
+
+/**
+ * Represents a lending market in the protocol
+ */
+export interface Market {
+  /** Unique identifier for the market */
+  marketId: string | number;
+  /** Fully qualified coin type handled by this market */
+  coinType: string;
+  /** Total token supply in the market */
+  totalSupply: bigint;
+  /** Total tokens borrowed from the market */
+  totalBorrow: bigint;
+  /** Current utilization rate (0.0 to 1.0) */
+  utilizationRate: number;
+  /** Annual percentage rate for suppliers */
+  supplyApr: number;
+  /** Annual percentage rate for borrowers */
+  borrowApr: number;
+  /** Loan-to-value ratio (0.0 to 1.0) */
+  ltv: number;
+  /** Liquidation threshold (0.0 to 1.0) */
+  liquidationThreshold: number;
+  /** Maximum amount that can be deposited into the market */
+  depositLimit: bigint;
+}
+
+/**
+ * Represents an outstanding loan
+ */
+export interface Loan {
+  /** Fully qualified coin type of the borrowed asset */
+  coinType: string;
+  /** Market ID where the loan exists */
+  marketId: string | number;
+  /** Amount borrowed in base units */
+  amount: bigint;
+  /** USD value of the borrowed amount */
+  amountUsd: number;
+}
+
+/**
+ * Represents a user position in the protocol
+ */
+export interface Position {
+  /** Position identifier */
+  id: string;
+  /** Map of market IDs to collateral amounts */
+  collaterals: { [marketId: string]: bigint };
+  /** List of outstanding loans */
+  loans: Loan[];
+  /** Total USD value of all collateral */
+  totalCollateralUsd: number;
+  /** Total USD value of all loans */
+  totalLoanUsd: number;
+  /** Health factor (safe when > 1.0) */
+  healthFactor: number;
+  /** Whether this position is eligible for liquidation */
+  isLiquidatable: boolean;
+}
+
+/**
+ * Represents a user's complete portfolio in the protocol
+ */
+export interface Portfolio {
+  /** Address of the portfolio owner */
+  userAddress: string;
+  /** Total value of assets minus liabilities (USD) */
+  netWorth: number;
+  /** Total value of supplied assets (USD) */
+  totalSuppliedUsd: number;
+  /** Total value of borrowed assets (USD) */
+  totalBorrowedUsd: number;
+  /** Maximum amount that can be borrowed (USD) */
+  borrowLimitUsd: number;
+  /** Percentage of borrow limit currently used (0-100) */
+  borrowLimitUsed: number;
+  /** List of all positions owned by the user */
+  positions: Position[];
+}

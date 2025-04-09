@@ -11,6 +11,16 @@ export const devConstants = {
   ADMIN_CAP_ID:
     "0xd52c22044e8d6853f92d7d80e78a2136f73ed358c51be11dcfcb8e437c6792d8",
 
+  // AlphaLend constants
+  ALPHALEND_PACKAGE_ID:
+    "0x123456789abcdef123456789abcdef123456789abcdef123456789abcdef1234", // Replace with actual package ID
+
+  LENDING_PROTOCOL_ID:
+    "0x123456789abcdef123456789abcdef123456789abcdef123456789abcdef1234", // Replace with actual protocol object ID
+
+  LENDING_PROTOCOL_CAP_ID:
+    "0x123456789abcdef123456789abcdef123456789abcdef123456789abcdef1234", // Replace with actual protocol cap ID
+
   // Pyth Constants
   PYTH_PACKAGE_ID:
     "0xabf837e98c26087cba0883c0a7a28326b1fa3c5e1e2c5abdb486f9e8f594c837",
