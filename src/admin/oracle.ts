@@ -39,13 +39,13 @@ export function updateOracleMaxAge(
 
 async function getPriceIdentifier(
   tx: Transaction,
-  coinName: string,
+  coinType: string,
   pythClient: SuiPythClient,
   pythConnection: SuiPriceServiceConnection,
 ): Promise<{ transaction: Transaction; priceIdentifier: TransactionResult }> {
   const priceInfoObjectId = await getPriceInfoObjectIdsWithUpdate(
     tx,
-    [pythPriceFeedIds[coinName]],
+    [pythPriceFeedIds[coinType]],
     pythClient,
     pythConnection,
   );
@@ -65,20 +65,20 @@ async function getPriceIdentifier(
 export async function addCoinToOracle(
   tx: Transaction,
   adminCapId: string,
-  coinName: string,
+  coinType: string,
   pythClient: SuiPythClient,
   pythConnection: SuiPriceServiceConnection,
 ): Promise<Transaction> {
   // getting coinType in move
   const coinTypeName = tx.moveCall({
     target: `0x1::type_name::get`,
-    typeArguments: [coinNameToCoinType[coinName]],
+    typeArguments: [coinType],
   });
 
   // getting identifier in move
   const { transaction, priceIdentifier } = await getPriceIdentifier(
     tx,
-    coinName,
+    coinType,
     pythClient,
     pythConnection,
   );

@@ -10,6 +10,7 @@ import {
   TransactionResult,
 } from "@mysten/sui/transactions";
 import {
+  getPriceInfoObjectIdsWithoutUpdate,
   getPriceInfoObjectIdsWithUpdate,
   updatePriceTransaction,
 } from "../utils/oracle.js";
@@ -69,28 +70,48 @@ export class AlphalendClient {
     coinTypes: string[],
   ): Promise<Transaction> {
     // Get price feed IDs for the coin types, filtering out undefined ones
-    const priceIDs = coinTypes
+    const priceFeedIds = coinTypes
       .map((coinType) => pythPriceFeedIds[coinType])
       .filter((id): id is string => id !== undefined);
 
-    if (priceIDs.length === 0) {
+    if (priceFeedIds.length === 0) {
       return tx; // Return empty transaction if no valid price feeds found
     }
 
-    const priceInfoObjectIds = await getPriceInfoObjectIdsWithUpdate(
-      tx,
-      priceIDs,
-      this.pythClient,
-      this.pythConnection,
+    const priceFeedToInfoIdMap = new Map<string, string>();
+    (
+      await getPriceInfoObjectIdsWithoutUpdate(priceFeedIds, this.pythClient)
+    ).forEach((infoId, index) => {
+      if (infoId) {
+        priceFeedToInfoIdMap.set(priceFeedIds[index], infoId);
+      }
+    });
+
+    const current_timestamp = (new Date().getTime() / 1000).toFixed(0);
+    const priceFeedIdsToUpdate = await this.getPriceIdsToUpdate(
+      priceFeedToInfoIdMap,
+      current_timestamp,
     );
 
-    priceInfoObjectIds.forEach((priceInfoObjectId) => {
+    if (priceFeedIdsToUpdate.length > 0) {
+      const updatedPriceInfoObjectIds = await getPriceInfoObjectIdsWithUpdate(
+        tx,
+        priceFeedIdsToUpdate,
+        this.pythClient,
+        this.pythConnection,
+      );
+      priceFeedIdsToUpdate.forEach((priceFeedId, index) => {
+        priceFeedToInfoIdMap.set(priceFeedId, updatedPriceInfoObjectIds[index]);
+      });
+    }
+
+    for (const [_, priceInfoObjectId] of priceFeedToInfoIdMap.entries()) {
       tx = updatePriceTransaction(tx, {
         oracle: constants.ORACLE_OBJECT_ID,
         priceInfoObject: priceInfoObjectId,
         clock: constants.SUI_CLOCK_OBJECT_ID,
       });
-    });
+    }
 
     return tx;
   }
@@ -620,5 +641,27 @@ export class AlphalendClient {
       );
       return { tx, coin };
     }
+  }
+
+  private async getPriceIdsToUpdate(
+    priceFeedToInfoIdMap: Map<string, string>,
+    current_timestamp: string,
+  ): Promise<string[]> {
+    const priceIdsToUpdate: string[] = [];
+    for (const [priceFeedId, infoObjectId] of priceFeedToInfoIdMap.entries()) {
+      const res = await this.client.getObject({
+        id: infoObjectId,
+        options: {
+          showContent: true,
+        },
+      });
+      const attestation_time = (res.data?.content as any).fields.price_info
+        .fields.attestation_time;
+      if (parseFloat(current_timestamp) - attestation_time > 20) {
+        priceIdsToUpdate.push(priceFeedId);
+      }
+    }
+
+    return priceIdsToUpdate;
   }
 }

@@ -13,16 +13,16 @@ export const prodConstants = {
 
   // AlphaLend constants
   ALPHALEND_PACKAGE_ID:
-    "0x123456789abcdef123456789abcdef123456789abcdef123456789abcdef1234", // Replace with actual package ID
+    "", // Replace with actual package ID
 
   LENDING_PROTOCOL_ID:
-    "0x123456789abcdef123456789abcdef123456789abcdef123456789abcdef1234", // Replace with actual protocol object ID
+    "", // Replace with actual protocol object ID
 
   LENDING_PROTOCOL_CAP_ID:
-    "0x123456789abcdef123456789abcdef123456789abcdef123456789abcdef1234", // Replace with actual protocol cap ID
+    "", // Replace with actual protocol cap ID
 
   // Pyth Constants
-  PYTH_PACKAGE_ID:
+  PYTH_PACKAGE_ID: 
     "0x04e20ddf36af412a4096f9014f4a565af9e812db9a05cc40254846cf6ed0ad91",
 
   PYTH_STATE_ID:
