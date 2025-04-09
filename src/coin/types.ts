@@ -1,5 +1,3 @@
-import BN from "bn.js";
-
 /**
  * Type definition for supported coin names in the Sui ecosystem
  *
@@ -127,21 +125,3 @@ export interface Coin {
   icon: Icon;
   expo: number;
 }
-
-/**
- * Type definition for representing amounts of two different coins
- * Used in operations involving two coins (e.g., swaps, liquidity)
- *
- * @property coinA - Amount of the first coin (using BN for big number support)
- * @property coinB - Amount of the second coin (using BN for big number support)
- *
- * @example
- * const amounts: CoinAmounts = {
- *   coinA: new BN("1000000000"), // 1 SUI (9 decimals)
- *   coinB: new BN("1000000")     // 1 USDC (6 decimals)
- * };
- */
-export type CoinAmounts = {
-  coinA: BN;
-  coinB: BN;
-};
