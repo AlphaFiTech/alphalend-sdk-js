@@ -38,6 +38,7 @@ export class AlphalendClient {
     );
     this.pythConnection = new SuiPriceServiceConnection(
       "https://hermes.pyth.network",
+      // "https://hermes-beta.pyth.network",
     );
   }
 
@@ -53,6 +54,7 @@ export class AlphalendClient {
       this.pythClient,
       this.pythConnection,
     );
+    console.log("priceInfoObjectIds", priceInfoObjectIds);
     priceInfoObjectIds.forEach((priceInfoObjectId) => {
       tx = updatePriceTransaction(tx, {
         oracle: constants.ORACLE_OBJECT_ID,
