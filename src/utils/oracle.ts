@@ -21,7 +21,7 @@ export interface UpdatePriceTransactionArgs {
   clock: string;
 }
 
-export async function getPriceInfoObjectIds(
+export async function getPriceInfoObjectIdsWithUpdate(
   tx: Transaction,
   priceIDs: string[],
   pythClient: SuiPythClient,
@@ -29,12 +29,25 @@ export async function getPriceInfoObjectIds(
 ): Promise<string[]> {
   const priceFeedUpdateData =
     await pythConnection.getPriceFeedsUpdateData(priceIDs);
+
   const priceInfoObjectIds = await pythClient.updatePriceFeeds(
     tx,
     priceFeedUpdateData,
     priceIDs,
   );
 
+  return priceInfoObjectIds;
+}
+
+export async function getPriceInfoObjectIdsWithoutUpdate(
+  priceIDs: string[],
+  pythClient: SuiPythClient,
+): Promise<(string | undefined)[]> {
+  const priceInfoObjectIds = await Promise.all(
+    priceIDs.map((priceId) => {
+      return pythClient.getPriceFeedObjectId(priceId);
+    }),
+  );
   return priceInfoObjectIds;
 }
 

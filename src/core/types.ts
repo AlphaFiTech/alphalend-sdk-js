@@ -27,15 +27,17 @@ export const MAX_U64 = BigInt("18446744073709551615");
  */
 export interface SupplyParams {
   /** Market ID where collateral is being added */
-  marketId: string | number;
+  marketId: string;
   /** Amount to supply as collateral in base units */
   amount: bigint;
-  /** Fully qualified coin type (e.g., "0x2::sui::SUI") */
-  coinType: string;
+  /** Supply coin type (e.g., "0x2::sui::SUI") */
+  supplyCoinType: string;
   /** Object ID of the position capability object */
-  positionCapId: string;
-  /** Object ID of the coin to use for supplying */
-  coinObjectId: string;
+  positionCapId?: string;
+  /** Address of the user supplying collateral */
+  address: string;
+  /** Coin types of the coins whose price needs to be updated */
+  priceUpdateCoinTypes: string[];
 }
 
 /**
@@ -44,13 +46,15 @@ export interface SupplyParams {
  */
 export interface WithdrawParams {
   /** Market ID from which to withdraw */
-  marketId: string | number;
+  marketId: string;
   /** Amount to withdraw (use MAX_U64 constant to withdraw all) */
   amount: bigint;
-  /** Fully qualified coin type to withdraw */
-  coinType: string;
+  /** Withdraw coin type (e.g., "0x2::sui::SUI") */
+  withdrawCoinType: string;
   /** Object ID of the position capability object */
   positionCapId: string;
+  /** Coin types of the coins whose price needs to be updated */
+  priceUpdateCoinTypes: string[];
 }
 
 /**
@@ -59,13 +63,15 @@ export interface WithdrawParams {
  */
 export interface BorrowParams {
   /** Market ID to borrow from */
-  marketId: string | number;
+  marketId: string;
   /** Amount to borrow in base units */
   amount: bigint;
-  /** Fully qualified coin type to borrow */
-  coinType: string;
+  /** Borrow coin type (e.g., "0x2::sui::SUI") */
+  borrowCoinType: string;
   /** Object ID of the position capability object */
   positionCapId: string;
+  /** Coin types of the coins whose price needs to be updated */
+  priceUpdateCoinTypes: string[];
 }
 
 /**
@@ -74,15 +80,17 @@ export interface BorrowParams {
  */
 export interface RepayParams {
   /** Market ID where the debt exists */
-  marketId: string | number;
+  marketId: string;
   /** Amount to repay in base units */
   amount: bigint;
-  /** Fully qualified coin type to repay */
-  coinType: string;
+  /** Repay coin type (e.g., "0x2::sui::SUI") */
+  repayCoinType: string;
   /** Object ID of the position capability object */
   positionCapId: string;
-  /** Object ID of the coin to use for repayment */
-  coinObjectId: string;
+  /** Address of the user repaying the debt */
+  address: string;
+  /** Coin types of the coins whose price needs to be updated */
+  priceUpdateCoinTypes: string[];
 }
 
 /**
@@ -91,11 +99,13 @@ export interface RepayParams {
  */
 export interface ClaimRewardsParams {
   /** Market ID to claim rewards from */
-  marketId: string | number;
+  marketId: string;
   /** Fully qualified coin type of the reward */
   coinType: string;
   /** Object ID of the position capability object */
   positionCapId: string;
+  /** Coin types of the coins whose price needs to be updated */
+  priceUpdateCoinTypes: string[];
 }
 
 /**
@@ -106,9 +116,9 @@ export interface LiquidateParams {
   /** Object ID of the position to liquidate */
   liquidatePositionId: string;
   /** Market ID where debt is repaid */
-  borrowMarketId: string | number;
+  borrowMarketId: string;
   /** Market ID where collateral is seized */
-  withdrawMarketId: string | number;
+  withdrawMarketId: string;
   /** Amount of debt to repay in base units */
   repayAmount: bigint;
   /** Fully qualified coin type for debt repayment */
@@ -117,6 +127,8 @@ export interface LiquidateParams {
   withdrawCoinType: string;
   /** Object ID of the coin to use for repayment */
   coinObjectId: string;
+  /** Coin types of the coins whose price needs to be updated */
+  priceUpdateCoinTypes: string[];
 }
 
 /**
@@ -142,7 +154,7 @@ export interface TransactionResponse {
  */
 export interface Market {
   /** Unique identifier for the market */
-  marketId: string | number;
+  marketId: string;
   /** Fully qualified coin type handled by this market */
   coinType: string;
   /** Total token supply in the market */
@@ -170,7 +182,7 @@ export interface Loan {
   /** Fully qualified coin type of the borrowed asset */
   coinType: string;
   /** Market ID where the loan exists */
-  marketId: string | number;
+  marketId: string;
   /** Amount borrowed in base units */
   amount: bigint;
   /** USD value of the borrowed amount */

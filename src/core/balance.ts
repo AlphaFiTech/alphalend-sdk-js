@@ -1,4 +1,4 @@
-import { coins } from "../coin";
+import { coins } from "../coin/constants.js";
 import { SuiClient } from "@mysten/sui/client";
 
 /**
