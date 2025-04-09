@@ -41,4 +41,7 @@ export const devConstants = {
 
   VSUI_COIN_TYPE:
     "0x549e8b69270defbfafd4f94e17ec44cdbdd99820b33bda2278dea3b9a32d3f55::cert::CERT",
+
+  STSUI_COIN_TYPE:
+    "0xd1b72982e40348d069bb1ff701e634c117bb5f741f44dff91e472d3b01461e55::stsui::STSUI",
 };

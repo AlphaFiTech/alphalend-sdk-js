@@ -38,6 +38,7 @@ export class AlphalendClient {
     );
     this.pythConnection = new SuiPriceServiceConnection(
       "https://hermes.pyth.network",
+      // "https://hermes-beta.pyth.network",
     );
   }
 

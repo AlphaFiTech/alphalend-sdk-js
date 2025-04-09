@@ -7,6 +7,8 @@ export const pythPriceFeedIds: { [key: string]: HexString } = {
   USDC: "eaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a",
   BTC: "e62df6c8b4a85fe1a67db44dc12de5db330f7ac66b72dc658afedf0f4a415b43",
   CETUS: "e5b274b2611143df055d6e7cd8d93fe1961716bcd4dca1cad87a83bc1e78c1ef",
+  STSUI: "0449948a9a210481464ea7030734fa79f59b751c2f411cfb1ba56b5f69e4a62a",
+  NS: "bb5ff26e47a3a6cc7ec2fce1db996c2a145300edc5acaabe43bf9ff7c5dd5d32",
 
   // testnet
   // SUI: "50c67b3fd225db8912a424dd4baed60ffdde625ed2feaaf283724f9608fea266",

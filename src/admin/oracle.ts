@@ -83,6 +83,7 @@ export async function addCoinToOracle(
     pythConnection,
   );
 
+  // to-do --> add dependentIdentifier for stSui case
   const [dependentPriceIdentifier] = transaction.moveCall({
     target: `0x1::option::none`,
     typeArguments: [constants.PYTH_PRICE_INDENTIFIER_TYPE],

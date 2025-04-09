@@ -17,4 +17,5 @@ export const coinNameToCoinType: { [key: string]: string } = {
   SUI: constants.SUI_COIN_TYPE,
   USDC: constants.USDC_COIN_TYPE,
   USDT: constants.USDT_COIN_TYPE,
+  STSUI: constants.STSUI_COIN_TYPE,
 };

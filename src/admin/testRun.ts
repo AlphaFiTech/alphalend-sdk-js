@@ -58,7 +58,7 @@ async function addCoinToOracleCaller() {
 async function updatePricesCaller() {
   const { suiClient } = getExecStuff();
   const alphalendClient = new AlphalendClient(suiClient);
-  const tx = await alphalendClient.updatePrices(["SUI"]);
+  const tx = await alphalendClient.updatePrices(["STSUI"]);
 
   return tx;
 }
