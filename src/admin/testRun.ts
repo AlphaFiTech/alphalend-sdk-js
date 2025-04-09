@@ -6,10 +6,10 @@ import {
   SuiPriceServiceConnection,
   SuiPythClient,
 } from "@pythnetwork/pyth-sui-js";
-import * as dotenv from "dotenv";
 import { getConstants } from "../constants/index.js";
 import { addCoinToOracle } from "./oracle.js";
 import { AlphalendClient } from "../core/client.js";
+import * as dotenv from "dotenv";
 
 dotenv.config();
 
@@ -50,7 +50,13 @@ async function addCoinToOracleCaller() {
     // "https://hermes-beta.pyth.network"
   );
   const adminCapId = constants.ADMIN_CAP_ID;
-  tx = await addCoinToOracle(tx, adminCapId, "SUI", pythClient, pythConnection);
+  tx = await addCoinToOracle(
+    tx,
+    adminCapId,
+    "0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC",
+    pythClient,
+    pythConnection,
+  );
 
   return tx;
 }
@@ -59,43 +65,37 @@ async function updatePricesCaller() {
   const { suiClient } = getExecStuff();
   const alphalendClient = new AlphalendClient(suiClient);
   let tx = new Transaction();
-  tx = await alphalendClient.updatePrices(tx, ["STSUI"]);
+  tx = await alphalendClient.updatePrices(tx, [
+    "0x2::sui::SUI",
+    "0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC",
+    // "0x356a26eb9e012a68958082340d4c4116e7f55615cf27affcff209cf0ae544f59::wal::WAL",
+  ]);
   return tx;
 }
 
 async function run() {
-  const { suiClient } = getExecStuff();
+  const { suiClient, keypair } = getExecStuff();
   const tx = await updatePricesCaller();
   tx.setGasBudget(100_000_000);
 
-  // suiClient
-  //   .signAndExecuteTransaction({
-  //     signer: keypair,
-  //     transaction: tx,
-  //     requestType: "WaitForLocalExecution",
-  //     options: {
-  //       showEffects: true,
-  //       showObjectChanges: true,
-  //     },
-  //   })
-  //   .then((res) => {
-  //     console.log(JSON.stringify(res, null, 2));
-  //   })
-  //   .catch((error) => {
-  //     console.error(error);
-  //   });
-  const wormholeStateId =
-    "0x5306f64e312b581766351c07af79c72fcb1cd25147157fdc2f8ad76de9a3fb6a";
-  const pythStateId =
-    "0x1f9310238ee9298fb703c3419030b35b22bb1cc37113e3bb5007c99aec79e5b8";
-
-  const client = new SuiPythClient(suiClient, pythStateId, wormholeStateId);
-  const object = await client.getPriceFeedObjectId(
-    "e62df6c8b4a85fe1a67db44dc12de5db330f7ac66b72dc658afedf0f4a415b43",
-  );
-  console.log(object);
+  suiClient
+    .signAndExecuteTransaction({
+      signer: keypair,
+      transaction: tx,
+      requestType: "WaitForLocalExecution",
+      options: {
+        showEffects: true,
+        showObjectChanges: true,
+      },
+    })
+    .then((res) => {
+      console.log(JSON.stringify(res, null, 2));
+    })
+    .catch((error) => {
+      console.error(error);
+    });
 }
-addCoinToOracleCaller();
+// addCoinToOracleCaller();
 run();
 
 //0x2e4a789fc4620614e6b6b3d9962bdb4dec12506e4c30f97972a29f47b6dc87bc
