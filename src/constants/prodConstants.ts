@@ -10,7 +10,7 @@ export const prodConstants = {
 
   ADMIN_CAP_ID:
     "0x16567b0eb680c5b3d3e1b707702880c230d313dc97e6a768d957c65c754602c8",
-    
+
   // AlphaLend constants
   ALPHALEND_PACKAGE_ID:
     "0x123456789abcdef123456789abcdef123456789abcdef123456789abcdef1234", // Replace with actual package ID

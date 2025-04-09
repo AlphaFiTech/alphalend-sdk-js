@@ -17,10 +17,9 @@ import {
   RepayParams,
   ClaimRewardsParams,
   LiquidateParams,
-  MAX_U64,
   Market,
   Position,
-  Portfolio
+  Portfolio,
 } from "./types.js";
 
 /**
@@ -56,29 +55,29 @@ export class AlphalendClient {
 
   /**
    * Updates price information for assets from Pyth oracle
-   * 
+   *
    * @param coinTypes Array of coin types or symbols
    * @returns Transaction object with price update calls
    */
   async updatePrices(coinTypes: string[]): Promise<Transaction> {
     let tx = new Transaction();
-    
+
     // Get price feed IDs for the coin types, filtering out undefined ones
     const priceIDs = coinTypes
-      .map(coinType => getPythPriceFeedId(coinType))
+      .map((coinType) => getPythPriceFeedId(coinType))
       .filter((id): id is string => id !== undefined);
-    
+
     if (priceIDs.length === 0) {
       return tx; // Return empty transaction if no valid price feeds found
     }
-    
+
     const priceInfoObjectIds = await getPriceInfoObjectIds(
       tx,
       priceIDs,
       this.pythClient,
       this.pythConnection,
     );
-    
+
     priceInfoObjectIds.forEach((priceInfoObjectId) => {
       tx = updatePriceTransaction(tx, {
         oracle: constants.ORACLE_OBJECT_ID,
@@ -86,205 +85,233 @@ export class AlphalendClient {
         clock: constants.SUI_CLOCK_OBJECT_ID,
       });
     });
-    
+
     return tx;
   }
 
   /**
    * Supplies token collateral to the AlphaLend protocol
-   * 
+   *
    * @param params Supply parameters - marketId, amount, coinType, positionCapId, coinObjectId
    * @returns Transaction object ready for signing and execution
    */
   async supply(params: SupplyParams): Promise<Transaction> {
     // Create transaction
     const tx = new Transaction();
-    
+
     // First update prices to ensure latest oracle values
     const coinTypes = [params.coinType];
     await this.updatePrices(coinTypes);
-    
+
     // Build add_collateral transaction
     tx.moveCall({
       target: `${constants.ALPHALEND_PACKAGE_ID}::alpha_lending::add_collateral`,
       typeArguments: [params.coinType],
       arguments: [
-        tx.object(constants.LENDING_PROTOCOL_ID),  // Protocol object
-        tx.object(params.positionCapId),          // Position capability
-        tx.pure(params.marketId),                 // Market ID
-        tx.object(params.coinObjectId),           // Coin to supply as collateral
+        tx.object(constants.LENDING_PROTOCOL_ID), // Protocol object
+        tx.object(params.positionCapId), // Position capability
+        tx.pure.u64(
+          typeof params.marketId === "string"
+            ? Number(params.marketId)
+            : params.marketId,
+        ), // Market ID
+        tx.object(params.coinObjectId), // Coin to supply as collateral
         tx.object(constants.SUI_CLOCK_OBJECT_ID), // Clock object
       ],
     });
-    
+
     return tx;
   }
 
   /**
    * Withdraws token collateral from the AlphaLend protocol
-   * 
+   *
    * @param params Withdraw parameters - marketId, amount, coinType, positionCapId
    * @returns Transaction object ready for signing and execution
    */
   async withdraw(params: WithdrawParams): Promise<Transaction> {
     const tx = new Transaction();
-    
+
     // First update prices
     const coinTypes = [params.coinType];
     await this.updatePrices(coinTypes);
-    
+
     // Build remove_collateral transaction
     tx.moveCall({
       target: `${constants.ALPHALEND_PACKAGE_ID}::alpha_lending::remove_collateral`,
       typeArguments: [params.coinType],
       arguments: [
-        tx.object(constants.LENDING_PROTOCOL_ID),  // Protocol object
-        tx.object(params.positionCapId),          // Position capability
-        tx.pure(params.marketId),                 // Market ID
-        tx.pure(params.amount),                   // Amount to withdraw
+        tx.object(constants.LENDING_PROTOCOL_ID), // Protocol object
+        tx.object(params.positionCapId), // Position capability
+        tx.pure.u64(
+          typeof params.marketId === "string"
+            ? Number(params.marketId)
+            : params.marketId,
+        ), // Market ID
+        tx.pure.u64(Number(params.amount)), // Amount to withdraw
         tx.object(constants.SUI_CLOCK_OBJECT_ID), // Clock object
       ],
     });
-    
+
     return tx;
   }
 
   /**
    * Borrows tokens from the AlphaLend protocol
-   * 
+   *
    * @param params Borrow parameters - marketId, amount, coinType, positionCapId
    * @returns Transaction object ready for signing and execution
    */
   async borrow(params: BorrowParams): Promise<Transaction> {
     const tx = new Transaction();
-    
+
     // First update prices
     const coinTypes = [params.coinType];
     await this.updatePrices(coinTypes);
-    
+
     // Build borrow transaction
     tx.moveCall({
       target: `${constants.ALPHALEND_PACKAGE_ID}::alpha_lending::borrow`,
       typeArguments: [params.coinType],
       arguments: [
-        tx.object(constants.LENDING_PROTOCOL_ID),  // Protocol object
-        tx.object(params.positionCapId),          // Position capability
-        tx.pure(params.marketId),                 // Market ID
-        tx.pure(params.amount),                   // Amount to borrow
+        tx.object(constants.LENDING_PROTOCOL_ID), // Protocol object
+        tx.object(params.positionCapId), // Position capability
+        tx.pure.u64(
+          typeof params.marketId === "string"
+            ? Number(params.marketId)
+            : params.marketId,
+        ), // Market ID
+        tx.pure.u64(Number(params.amount)), // Amount to borrow
         tx.object(constants.SUI_CLOCK_OBJECT_ID), // Clock object
       ],
     });
-    
+
     return tx;
   }
 
   /**
    * Repays borrowed tokens to the AlphaLend protocol
-   * 
+   *
    * @param params Repay parameters - marketId, amount, coinType, positionCapId, coinObjectId
    * @returns Transaction object ready for signing and execution
    */
   async repay(params: RepayParams): Promise<Transaction> {
     const tx = new Transaction();
-    
+
     // First update prices
     const coinTypes = [params.coinType];
     await this.updatePrices(coinTypes);
-    
+
     // Build repay transaction
     tx.moveCall({
       target: `${constants.ALPHALEND_PACKAGE_ID}::alpha_lending::repay`,
       typeArguments: [params.coinType],
       arguments: [
-        tx.object(constants.LENDING_PROTOCOL_ID),  // Protocol object
-        tx.object(params.positionCapId),          // Position capability
-        tx.pure(params.marketId),                 // Market ID
-        tx.object(params.coinObjectId),           // Coin to repay with
+        tx.object(constants.LENDING_PROTOCOL_ID), // Protocol object
+        tx.object(params.positionCapId), // Position capability
+        tx.pure.u64(
+          typeof params.marketId === "string"
+            ? Number(params.marketId)
+            : params.marketId,
+        ), // Market ID
+        tx.object(params.coinObjectId), // Coin to repay with
         tx.object(constants.SUI_CLOCK_OBJECT_ID), // Clock object
       ],
     });
-    
+
     return tx;
   }
 
   /**
    * Claims rewards from the AlphaLend protocol
-   * 
+   *
    * @param params ClaimRewards parameters - marketId, coinType, positionCapId
    * @returns Transaction object ready for signing and execution
    */
   async claimRewards(params: ClaimRewardsParams): Promise<Transaction> {
     const tx = new Transaction();
-    
+
     // Build collect_reward transaction
     tx.moveCall({
       target: `${constants.ALPHALEND_PACKAGE_ID}::alpha_lending::collect_reward`,
       typeArguments: [params.coinType],
       arguments: [
-        tx.object(constants.LENDING_PROTOCOL_ID),  // Protocol object
-        tx.pure(params.marketId),                 // Market ID
-        tx.object(params.positionCapId),          // Position capability
+        tx.object(constants.LENDING_PROTOCOL_ID), // Protocol object
+        tx.pure.u64(
+          typeof params.marketId === "string"
+            ? Number(params.marketId)
+            : params.marketId,
+        ), // Market ID
+        tx.object(params.positionCapId), // Position capability
         tx.object(constants.SUI_CLOCK_OBJECT_ID), // Clock object
       ],
     });
-    
+
     return tx;
   }
 
   /**
    * Liquidates an unhealthy position
-   * 
-   * @param params Liquidate parameters - liquidatePositionId, borrowMarketId, withdrawMarketId, 
+   *
+   * @param params Liquidate parameters - liquidatePositionId, borrowMarketId, withdrawMarketId,
    *               repayAmount, borrowCoinType, withdrawCoinType, coinObjectId
    * @returns Transaction object ready for signing and execution
    */
   async liquidate(params: LiquidateParams): Promise<Transaction> {
     const tx = new Transaction();
-    
+
     // First update prices for both coin types
     const coinTypes = [params.borrowCoinType, params.withdrawCoinType];
     await this.updatePrices(coinTypes);
-    
+
     // Build liquidate transaction
     tx.moveCall({
       target: `${constants.ALPHALEND_PACKAGE_ID}::alpha_lending::liquidate`,
       typeArguments: [params.borrowCoinType, params.withdrawCoinType],
       arguments: [
-        tx.object(constants.LENDING_PROTOCOL_ID),  // Protocol object
-        tx.pure(params.liquidatePositionId),      // Position ID to liquidate
-        tx.pure(params.borrowMarketId),           // Borrow market ID
-        tx.pure(params.withdrawMarketId),         // Withdraw market ID
-        tx.object(params.coinObjectId),           // Coin to repay with 
+        tx.object(constants.LENDING_PROTOCOL_ID), // Protocol object
+        tx.pure.address(params.liquidatePositionId), // Position ID to liquidate
+        tx.pure.u64(
+          typeof params.borrowMarketId === "string"
+            ? Number(params.borrowMarketId)
+            : params.borrowMarketId,
+        ), // Borrow market ID
+        tx.pure.u64(
+          typeof params.withdrawMarketId === "string"
+            ? Number(params.withdrawMarketId)
+            : params.withdrawMarketId,
+        ), // Withdraw market ID
+        tx.object(params.coinObjectId), // Coin to repay with
         tx.object(constants.SUI_CLOCK_OBJECT_ID), // Clock object
       ],
     });
-    
+
     return tx;
   }
 
   /**
    * Creates a new position in the protocol
-   * 
+   *
    * @returns Transaction object for creating a new position
    */
   async createPosition(): Promise<Transaction> {
     const tx = new Transaction();
-    
+
     tx.moveCall({
       target: `${constants.ALPHALEND_PACKAGE_ID}::alpha_lending::create_position`,
       arguments: [
         tx.object(constants.LENDING_PROTOCOL_ID), // Protocol object
       ],
     });
-    
+
     return tx;
   }
 
   // Query methods for interacting with on-chain data
-  
+
   /**
    * Gets all markets data from the protocol
-   * 
+   *
    * @returns Promise resolving to an array of Market objects
    */
   async getAllMarkets(): Promise<Market[]> {
@@ -295,17 +322,17 @@ export class AlphalendClient {
         options: {
           showContent: true,
           showType: true,
-        }
+        },
       });
 
       // Extract markets object ID from the protocol object
       const content = objects.data?.content;
-      if (!content || content.dataType !== 'moveObject') {
-        throw new Error('Invalid protocol object data');
+      if (!content || content.dataType !== "moveObject") {
+        throw new Error("Invalid protocol object data");
       }
 
-      const fields = content.fields as any;
-      const marketsTableId = fields.markets;
+      const fields = content.fields as Record<string, unknown>;
+      const marketsTableId = fields.markets as string;
 
       // Get all market entries from the markets table
       const marketsData = await this.client.getDynamicFields({
@@ -314,48 +341,55 @@ export class AlphalendClient {
 
       // Process each market's data by fetching its details
       const markets: Market[] = [];
-      
+
       for (const marketData of marketsData.data) {
         // Get the full market object data
         const marketObject = await this.client.getDynamicFieldObject({
           parentId: marketsTableId,
-          name: { type: 'u64', value: marketData.name }
+          name: { type: "u64", value: marketData.name },
         });
 
-        if (!marketObject.data?.content || marketObject.data.content.dataType !== 'moveObject') {
+        if (
+          !marketObject.data?.content ||
+          marketObject.data.content.dataType !== "moveObject"
+        ) {
           continue;
         }
 
-        const marketFields = marketObject.data.content.fields as any;
-        
+        const marketFields = marketObject.data.content.fields as Record<
+          string,
+          unknown
+        >;
+
         // Extract the market details and push to results
+        const config = (marketFields.config as Record<string, unknown>) || {};
         markets.push({
-          marketId: marketFields.market_id,
-          coinType: marketFields.coin_type,
-          totalSupply: BigInt(marketFields.xtoken_supply || 0),
-          totalBorrow: BigInt(marketFields.borrowed_amount || 0),
+          marketId: marketFields.market_id as string | number,
+          coinType: marketFields.coin_type as string,
+          totalSupply: BigInt(String(marketFields.xtoken_supply || 0)),
+          totalBorrow: BigInt(String(marketFields.borrowed_amount || 0)),
           utilizationRate: this.calculateUtilizationRate(
-            BigInt(marketFields.borrowed_amount || 0),
-            BigInt(marketFields.xtoken_supply || 0)
+            BigInt(String(marketFields.borrowed_amount || 0)),
+            BigInt(String(marketFields.xtoken_supply || 0)),
           ),
           supplyApr: 0, // Would require calculation based on interest rate model
           borrowApr: 0, // Would require calculation based on interest rate model
-          ltv: Number(marketFields.config?.safe_collateral_ratio || 0) / 100,
-          liquidationThreshold: Number(marketFields.config?.liquidation_threshold || 0) / 100,
-          depositLimit: BigInt(marketFields.config?.deposit_limit || 0)
+          ltv: Number(config.safe_collateral_ratio || 0) / 100,
+          liquidationThreshold: Number(config.liquidation_threshold || 0) / 100,
+          depositLimit: BigInt(String(config.deposit_limit || 0)),
         });
       }
 
       return markets;
     } catch (error) {
-      console.error('Error getting markets:', error);
+      console.error("Error getting markets:", error);
       return [];
     }
   }
 
   /**
    * Gets user position details
-   * 
+   *
    * @param positionId The ID of the position to query
    * @returns Promise resolving to Position object
    */
@@ -366,42 +400,53 @@ export class AlphalendClient {
         id: constants.LENDING_PROTOCOL_ID,
         options: {
           showContent: true,
-        }
+        },
       });
 
       // Extract positions object ID
       const content = protocolObject.data?.content;
-      if (!content || content.dataType !== 'moveObject') {
-        throw new Error('Invalid protocol object data');
+      if (!content || content.dataType !== "moveObject") {
+        throw new Error("Invalid protocol object data");
       }
 
-      const fields = content.fields as any;
-      const positionsTableId = fields.positions;
+      const fields = content.fields as Record<string, unknown>;
+      const positionsTableId = fields.positions as string;
 
       // Get the specific position from positions table
       const positionObject = await this.client.getDynamicFieldObject({
         parentId: positionsTableId,
-        name: { type: 'address', value: positionId }
+        name: { type: "address", value: positionId },
       });
 
-      if (!positionObject.data?.content || positionObject.data.content.dataType !== 'moveObject') {
+      if (
+        !positionObject.data?.content ||
+        positionObject.data.content.dataType !== "moveObject"
+      ) {
         return null;
       }
 
-      const positionFields = positionObject.data.content.fields as any;
-      
-      // Process collaterals 
+      const positionFields = positionObject.data.content.fields as Record<
+        string,
+        unknown
+      >;
+
+      // Process collaterals
       const collaterals: Record<string, bigint> = {};
-      for (const [marketId, amount] of Object.entries(positionFields.collaterals || {})) {
-        collaterals[marketId] = BigInt(amount);
+      const collateralObj =
+        (positionFields.collaterals as Record<string, unknown>) || {};
+      for (const [marketId, amount] of Object.entries(collateralObj)) {
+        collaterals[marketId] = BigInt(String(amount || 0));
       }
 
       // Process loans
-      const loans = (positionFields.loans || []).map((loan: any) => ({
-        coinType: loan.coin_type,
-        marketId: loan.market_id,
-        amount: BigInt(loan.amount),
-        amountUsd: 0 // Would need oracle price to calculate
+      const loansArray = Array.isArray(positionFields.loans)
+        ? positionFields.loans
+        : [];
+      const loans = loansArray.map((loan: Record<string, unknown>) => ({
+        coinType: loan.coin_type as string,
+        marketId: loan.market_id as string | number,
+        amount: BigInt(String(loan.amount || 0)),
+        amountUsd: 0, // Would need oracle price to calculate
       }));
 
       return {
@@ -412,19 +457,21 @@ export class AlphalendClient {
         totalLoanUsd: Number(positionFields.total_loan_usd || 0),
         healthFactor: this.calculateHealthFactor(
           Number(positionFields.safe_collateral_usd || 0),
-          Number(positionFields.weighted_total_loan_usd || 0)
+          Number(positionFields.weighted_total_loan_usd || 0),
         ),
-        isLiquidatable: positionFields.is_position_liquidatable || false
+        isLiquidatable: Boolean(
+          positionFields.is_position_liquidatable || false,
+        ),
       };
     } catch (error) {
-      console.error('Error getting position:', error);
+      console.error("Error getting position:", error);
       return null;
     }
   }
 
   /**
    * Gets user portfolio including all positions
-   * 
+   *
    * @param userAddress The user's address
    * @returns Promise resolving to Portfolio object
    */
@@ -434,11 +481,11 @@ export class AlphalendClient {
       const userObjects = await this.client.getOwnedObjects({
         owner: userAddress,
         filter: {
-          StructType: `${constants.ALPHALEND_PACKAGE_ID}::position::PositionCap`
+          StructType: `${constants.ALPHALEND_PACKAGE_ID}::position::PositionCap`,
         },
         options: {
           showContent: true,
-        }
+        },
       });
 
       // If no positions are found, return null
@@ -452,13 +499,13 @@ export class AlphalendClient {
       let totalBorrowed = 0;
 
       for (const obj of userObjects.data) {
-        if (!obj.data?.content || obj.data.content.dataType !== 'moveObject') {
+        if (!obj.data?.content || obj.data.content.dataType !== "moveObject") {
           continue;
         }
-        
-        const fields = obj.data.content.fields as any;
-        const positionId = fields.position_id;
-        
+
+        const fields = obj.data.content.fields as Record<string, unknown>;
+        const positionId = fields.position_id as string;
+
         // Get the full position details
         const position = await this.getUserPosition(positionId);
         if (position) {
@@ -471,7 +518,8 @@ export class AlphalendClient {
       // Calculate metrics
       const netWorth = totalSupplied - totalBorrowed;
       const borrowLimit = totalSupplied * 0.8; // Example factor, this would be based on collateral types
-      const borrowLimitUsed = borrowLimit > 0 ? (totalBorrowed / borrowLimit) * 100 : 0;
+      const borrowLimitUsed =
+        borrowLimit > 0 ? (totalBorrowed / borrowLimit) * 100 : 0;
 
       return {
         userAddress,
@@ -480,10 +528,10 @@ export class AlphalendClient {
         totalBorrowedUsd: totalBorrowed,
         borrowLimitUsd: borrowLimit,
         borrowLimitUsed,
-        positions
+        positions,
       };
     } catch (error) {
-      console.error('Error getting portfolio:', error);
+      console.error("Error getting portfolio:", error);
       return null;
     }
   }
@@ -491,7 +539,10 @@ export class AlphalendClient {
   /**
    * Calculate utilization rate based on borrowed amount and total supply
    */
-  private calculateUtilizationRate(borrowedAmount: bigint, totalSupply: bigint): number {
+  private calculateUtilizationRate(
+    borrowedAmount: bigint,
+    totalSupply: bigint,
+  ): number {
     if (totalSupply === 0n) return 0;
     return Number((borrowedAmount * 10000n) / totalSupply) / 10000;
   }
@@ -499,7 +550,10 @@ export class AlphalendClient {
   /**
    * Calculate health factor based on collateral and borrowed amounts
    */
-  private calculateHealthFactor(safeCollateralUsd: number, weightedTotalLoanUsd: number): number {
+  private calculateHealthFactor(
+    safeCollateralUsd: number,
+    weightedTotalLoanUsd: number,
+  ): number {
     if (weightedTotalLoanUsd === 0) return Number.POSITIVE_INFINITY;
     return safeCollateralUsd / weightedTotalLoanUsd;
   }

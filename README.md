@@ -24,13 +24,13 @@ npm install alphalend-sdk
 ### Creating an instance of the AlphaLend client
 
 ```typescript
-import { Connection } from '@mysten/sui.js';
-import { SuiClient } from '@mysten/sui/client';
-import { AlphalendClient } from 'alphalend-sdk';
+import { Connection } from "@mysten/sui.js";
+import { SuiClient } from "@mysten/sui/client";
+import { AlphalendClient } from "alphalend-sdk";
 
 // Connect to Sui network
 const connection = new Connection({
-  fullnode: 'https://rpc.mainnet.sui.io'
+  fullnode: "https://rpc.mainnet.sui.io",
 });
 const suiClient = new SuiClient(connection);
 
@@ -52,7 +52,7 @@ const positionCapId = result.objectId; // Store this to interact with your posit
 ### Supply Collateral
 
 ```typescript
-import { SupplyParams } from 'alphalend-sdk';
+import { SupplyParams } from "alphalend-sdk";
 
 // Supply tokens as collateral
 const supplyParams: SupplyParams = {
@@ -60,7 +60,7 @@ const supplyParams: SupplyParams = {
   amount: BigInt(1000000000), // Amount in lowest denomination
   coinType: "0x2::sui::SUI", // Coin type to supply
   positionCapId: "0xYOUR_POSITION_CAP_ID", // Your position capability
-  coinObjectId: "0xYOUR_COIN_OBJECT_ID" // Coin object to use
+  coinObjectId: "0xYOUR_COIN_OBJECT_ID", // Coin object to use
 };
 
 const supplyTx = await alphalendClient.supply(supplyParams);
@@ -72,14 +72,14 @@ await wallet.signAndExecuteTransaction(supplyTx);
 ### Borrow Assets
 
 ```typescript
-import { BorrowParams } from 'alphalend-sdk';
+import { BorrowParams } from "alphalend-sdk";
 
 // Borrow against your collateral
 const borrowParams: BorrowParams = {
   marketId: "2", // Market ID to borrow from
   amount: BigInt(500000000), // Amount to borrow
   coinType: "0x::usdc::USDC", // Coin type to borrow
-  positionCapId: "0xYOUR_POSITION_CAP_ID" // Your position capability
+  positionCapId: "0xYOUR_POSITION_CAP_ID", // Your position capability
 };
 
 const borrowTx = await alphalendClient.borrow(borrowParams);
@@ -91,7 +91,7 @@ await wallet.signAndExecuteTransaction(borrowTx);
 ### Repay Borrowed Assets
 
 ```typescript
-import { RepayParams } from 'alphalend-sdk';
+import { RepayParams } from "alphalend-sdk";
 
 // Repay borrowed assets
 const repayParams: RepayParams = {
@@ -99,7 +99,7 @@ const repayParams: RepayParams = {
   amount: BigInt(500000000), // Amount to repay
   coinType: "0x::usdc::USDC", // Coin type to repay
   positionCapId: "0xYOUR_POSITION_CAP_ID", // Your position capability
-  coinObjectId: "0xYOUR_COIN_OBJECT_ID" // Coin object to use for repayment
+  coinObjectId: "0xYOUR_COIN_OBJECT_ID", // Coin object to use for repayment
 };
 
 const repayTx = await alphalendClient.repay(repayParams);
@@ -111,14 +111,14 @@ await wallet.signAndExecuteTransaction(repayTx);
 ### Withdraw Collateral
 
 ```typescript
-import { WithdrawParams, MAX_U64 } from 'alphalend-sdk';
+import { WithdrawParams, MAX_U64 } from "alphalend-sdk";
 
 // Withdraw collateral (partial amount)
 const withdrawParams: WithdrawParams = {
   marketId: "1", // Market ID to withdraw from
   amount: BigInt(500000000), // Amount to withdraw
   coinType: "0x2::sui::SUI", // Coin type to withdraw
-  positionCapId: "0xYOUR_POSITION_CAP_ID" // Your position capability
+  positionCapId: "0xYOUR_POSITION_CAP_ID", // Your position capability
 };
 
 // To withdraw all collateral, use MAX_U64
@@ -126,7 +126,7 @@ const withdrawAllParams: WithdrawParams = {
   marketId: "1",
   amount: MAX_U64, // Special value to withdraw all collateral
   coinType: "0x2::sui::SUI",
-  positionCapId: "0xYOUR_POSITION_CAP_ID"
+  positionCapId: "0xYOUR_POSITION_CAP_ID",
 };
 
 const withdrawTx = await alphalendClient.withdraw(withdrawParams);
@@ -138,13 +138,13 @@ await wallet.signAndExecuteTransaction(withdrawTx);
 ### Claim Rewards
 
 ```typescript
-import { ClaimRewardsParams } from 'alphalend-sdk';
+import { ClaimRewardsParams } from "alphalend-sdk";
 
 // Claim earned rewards
 const claimParams: ClaimRewardsParams = {
   marketId: "1", // Market ID to claim rewards from
   coinType: "0x::reward::TOKEN", // Reward token type
-  positionCapId: "0xYOUR_POSITION_CAP_ID" // Your position capability
+  positionCapId: "0xYOUR_POSITION_CAP_ID", // Your position capability
 };
 
 const claimTx = await alphalendClient.claimRewards(claimParams);
@@ -156,7 +156,7 @@ await wallet.signAndExecuteTransaction(claimTx);
 ### Liquidating Positions
 
 ```typescript
-import { LiquidateParams } from 'alphalend-sdk';
+import { LiquidateParams } from "alphalend-sdk";
 
 // Liquidate an unhealthy position
 const liquidateParams: LiquidateParams = {
@@ -166,7 +166,7 @@ const liquidateParams: LiquidateParams = {
   repayAmount: BigInt(1000000), // Amount to repay
   borrowCoinType: "0x::usdc::USDC", // Type of coin to repay
   withdrawCoinType: "0x2::sui::SUI", // Type of collateral to seize
-  coinObjectId: "0xYOUR_COIN_OBJECT_ID" // Coin object to use for repayment
+  coinObjectId: "0xYOUR_COIN_OBJECT_ID", // Coin object to use for repayment
 };
 
 const liquidateTx = await alphalendClient.liquidate(liquidateParams);
@@ -193,13 +193,13 @@ const portfolio = await alphalendClient.getUserPortfolio("0xUSER_ADDRESS");
 ### Registering Custom Price Feeds
 
 ```typescript
-import { registerPriceFeed } from 'alphalend-sdk';
+import { registerPriceFeed } from "alphalend-sdk";
 
 // Register a new token price feed
 registerPriceFeed(
   "0x123::custom::TOKEN", // Coin type
   "CTOKEN", // Symbol
-  "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890" // Pyth price feed ID
+  "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890", // Pyth price feed ID
 );
 ```
 

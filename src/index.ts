@@ -6,9 +6,7 @@ export * from "./utils/oracle.js";
 export * from "./utils/priceFeedIds.js";
 
 // Re-export key types for easier access
-export {
-  AlphalendClient,
-} from "./core/client.js";
+export { AlphalendClient } from "./core/client.js";
 
 export {
   SupplyParams,
@@ -22,5 +20,5 @@ export {
   Position,
   Portfolio,
   Loan,
-  TransactionResponse
+  TransactionResponse,
 } from "./core/types.js";

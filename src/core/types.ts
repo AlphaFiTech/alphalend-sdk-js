@@ -134,7 +134,7 @@ export interface TransactionResponse {
 }
 
 /**
- * Data models for market information 
+ * Data models for market information
  */
 
 /**
