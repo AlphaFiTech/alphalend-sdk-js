@@ -1,15 +1,19 @@
-import { SuiClient } from "@mysten/sui/client";
+import { CoinStruct, SuiClient } from "@mysten/sui/client";
 import {
   SuiPriceServiceConnection,
   SuiPythClient,
 } from "@pythnetwork/pyth-sui-js";
 import { getConstants } from "../constants/index.js";
-import { Transaction } from "@mysten/sui/transactions";
 import {
-  getPriceInfoObjectIds,
+  Transaction,
+  TransactionObjectArgument,
+  TransactionResult,
+} from "@mysten/sui/transactions";
+import {
+  getPriceInfoObjectIdsWithUpdate,
   updatePriceTransaction,
 } from "../utils/oracle.js";
-import { getPythPriceFeedId } from "../utils/priceFeedIds.js";
+import { pythPriceFeedIds } from "../utils/priceFeedIds.js";
 import {
   SupplyParams,
   WithdrawParams,
@@ -20,6 +24,7 @@ import {
   Market,
   Position,
   Portfolio,
+  Loan,
 } from "./types.js";
 
 /**
@@ -59,19 +64,20 @@ export class AlphalendClient {
    * @param coinTypes Array of coin types or symbols
    * @returns Transaction object with price update calls
    */
-  async updatePrices(coinTypes: string[]): Promise<Transaction> {
-    let tx = new Transaction();
-
+  async updatePrices(
+    tx: Transaction,
+    coinTypes: string[],
+  ): Promise<Transaction> {
     // Get price feed IDs for the coin types, filtering out undefined ones
     const priceIDs = coinTypes
-      .map((coinType) => getPythPriceFeedId(coinType))
+      .map((coinType) => pythPriceFeedIds[coinType])
       .filter((id): id is string => id !== undefined);
 
     if (priceIDs.length === 0) {
       return tx; // Return empty transaction if no valid price feeds found
     }
 
-    const priceInfoObjectIds = await getPriceInfoObjectIds(
+    const priceInfoObjectIds = await getPriceInfoObjectIdsWithUpdate(
       tx,
       priceIDs,
       this.pythClient,
@@ -92,63 +98,84 @@ export class AlphalendClient {
   /**
    * Supplies token collateral to the AlphaLend protocol
    *
-   * @param params Supply parameters - marketId, amount, coinType, positionCapId, coinObjectId
+   * @param params Supply parameters - marketId, amount, supplyCoinType, positionCapId, address, priceUpdateCoinTypes
    * @returns Transaction object ready for signing and execution
    */
-  async supply(params: SupplyParams): Promise<Transaction> {
+  async supply(params: SupplyParams): Promise<Transaction | undefined> {
     // Create transaction
-    const tx = new Transaction();
+    let tx = new Transaction();
 
     // First update prices to ensure latest oracle values
-    const coinTypes = [params.coinType];
-    await this.updatePrices(coinTypes);
+    tx = await this.updatePrices(tx, params.priceUpdateCoinTypes);
 
-    // Build add_collateral transaction
-    tx.moveCall({
-      target: `${constants.ALPHALEND_PACKAGE_ID}::alpha_lending::add_collateral`,
-      typeArguments: [params.coinType],
-      arguments: [
-        tx.object(constants.LENDING_PROTOCOL_ID), // Protocol object
-        tx.object(params.positionCapId), // Position capability
-        tx.pure.u64(
-          typeof params.marketId === "string"
-            ? Number(params.marketId)
-            : params.marketId,
-        ), // Market ID
-        tx.object(params.coinObjectId), // Coin to supply as collateral
-        tx.object(constants.SUI_CLOCK_OBJECT_ID), // Clock object
-      ],
-    });
+    // Get coin object
+    const res = await this.getCoinObject(
+      tx,
+      params.supplyCoinType,
+      params.address,
+    );
+    if (!res) {
+      console.error("Coin object not found");
+      return undefined;
+    }
 
+    tx = res.tx;
+    const [supplyCoinA] = tx.splitCoins(res.coin, [params.amount]);
+
+    if (params.positionCapId) {
+      // Build add_collateral transaction
+      tx.moveCall({
+        target: `${constants.ALPHALEND_PACKAGE_ID}::alpha_lending::add_collateral`,
+        typeArguments: [params.supplyCoinType],
+        arguments: [
+          tx.object(constants.LENDING_PROTOCOL_ID), // Protocol object
+          tx.object(params.positionCapId), // Position capability
+          tx.pure.u64(params.marketId), // Market ID
+          supplyCoinA, // Coin to supply as collateral
+          tx.object(constants.SUI_CLOCK_OBJECT_ID), // Clock object
+        ],
+      });
+    } else {
+      const { tx: tx2, positionCap } = await this.createPosition(tx);
+      tx = tx2;
+      // Build add_collateral transaction
+      tx.moveCall({
+        target: `${constants.ALPHALEND_PACKAGE_ID}::alpha_lending::add_collateral`,
+        typeArguments: [params.supplyCoinType],
+        arguments: [
+          tx.object(constants.LENDING_PROTOCOL_ID), // Protocol object
+          positionCap, // Position capability
+          tx.pure.u64(params.marketId), // Market ID
+          supplyCoinA, // Coin to supply as collateral
+          tx.object(constants.SUI_CLOCK_OBJECT_ID), // Clock object
+        ],
+      });
+    }
+    tx.transferObjects([res.coin], params.address);
     return tx;
   }
 
   /**
    * Withdraws token collateral from the AlphaLend protocol
    *
-   * @param params Withdraw parameters - marketId, amount, coinType, positionCapId
+   * @param params Withdraw parameters - marketId, amount, withdrawCoinType, positionCapId, priceUpdateCoinTypes
    * @returns Transaction object ready for signing and execution
    */
   async withdraw(params: WithdrawParams): Promise<Transaction> {
-    const tx = new Transaction();
+    let tx = new Transaction();
 
-    // First update prices
-    const coinTypes = [params.coinType];
-    await this.updatePrices(coinTypes);
+    // First update prices to ensure latest oracle values
+    tx = await this.updatePrices(tx, params.priceUpdateCoinTypes);
 
     // Build remove_collateral transaction
     tx.moveCall({
       target: `${constants.ALPHALEND_PACKAGE_ID}::alpha_lending::remove_collateral`,
-      typeArguments: [params.coinType],
+      typeArguments: [params.withdrawCoinType],
       arguments: [
         tx.object(constants.LENDING_PROTOCOL_ID), // Protocol object
         tx.object(params.positionCapId), // Position capability
-        tx.pure.u64(
-          typeof params.marketId === "string"
-            ? Number(params.marketId)
-            : params.marketId,
-        ), // Market ID
-        tx.pure.u64(Number(params.amount)), // Amount to withdraw
+        tx.pure.u64(params.marketId), // Market ID
+        tx.pure.u64(params.amount), // Amount to withdraw
         tx.object(constants.SUI_CLOCK_OBJECT_ID), // Clock object
       ],
     });
@@ -159,29 +186,24 @@ export class AlphalendClient {
   /**
    * Borrows tokens from the AlphaLend protocol
    *
-   * @param params Borrow parameters - marketId, amount, coinType, positionCapId
+   * @param params Borrow parameters - marketId, amount, borrowCoinType, positionCapId, priceUpdateCoinTypes
    * @returns Transaction object ready for signing and execution
    */
   async borrow(params: BorrowParams): Promise<Transaction> {
-    const tx = new Transaction();
+    let tx = new Transaction();
 
-    // First update prices
-    const coinTypes = [params.coinType];
-    await this.updatePrices(coinTypes);
+    // First update prices to ensure latest oracle values
+    tx = await this.updatePrices(tx, params.priceUpdateCoinTypes);
 
     // Build borrow transaction
     tx.moveCall({
       target: `${constants.ALPHALEND_PACKAGE_ID}::alpha_lending::borrow`,
-      typeArguments: [params.coinType],
+      typeArguments: [params.borrowCoinType],
       arguments: [
         tx.object(constants.LENDING_PROTOCOL_ID), // Protocol object
         tx.object(params.positionCapId), // Position capability
-        tx.pure.u64(
-          typeof params.marketId === "string"
-            ? Number(params.marketId)
-            : params.marketId,
-        ), // Market ID
-        tx.pure.u64(Number(params.amount)), // Amount to borrow
+        tx.pure.u64(params.marketId), // Market ID
+        tx.pure.u64(params.amount), // Amount to borrow
         tx.object(constants.SUI_CLOCK_OBJECT_ID), // Clock object
       ],
     });
@@ -192,29 +214,38 @@ export class AlphalendClient {
   /**
    * Repays borrowed tokens to the AlphaLend protocol
    *
-   * @param params Repay parameters - marketId, amount, coinType, positionCapId, coinObjectId
+   * @param params Repay parameters - marketId, amount, repayCoinType, positionCapId, address, priceUpdateCoinTypes
    * @returns Transaction object ready for signing and execution
    */
-  async repay(params: RepayParams): Promise<Transaction> {
-    const tx = new Transaction();
+  async repay(params: RepayParams): Promise<Transaction | undefined> {
+    let tx = new Transaction();
 
-    // First update prices
-    const coinTypes = [params.coinType];
-    await this.updatePrices(coinTypes);
+    // First update prices to ensure latest oracle values
+    tx = await this.updatePrices(tx, params.priceUpdateCoinTypes);
+
+    // Get coin object
+    const res = await this.getCoinObject(
+      tx,
+      params.repayCoinType,
+      params.address,
+    );
+    if (!res) {
+      console.error("Coin object not found");
+      return undefined;
+    }
+
+    tx = res.tx;
+    const [repayCoinA] = tx.splitCoins(res.coin, [params.amount]);
 
     // Build repay transaction
     tx.moveCall({
       target: `${constants.ALPHALEND_PACKAGE_ID}::alpha_lending::repay`,
-      typeArguments: [params.coinType],
+      typeArguments: [params.repayCoinType],
       arguments: [
         tx.object(constants.LENDING_PROTOCOL_ID), // Protocol object
         tx.object(params.positionCapId), // Position capability
-        tx.pure.u64(
-          typeof params.marketId === "string"
-            ? Number(params.marketId)
-            : params.marketId,
-        ), // Market ID
-        tx.object(params.coinObjectId), // Coin to repay with
+        tx.pure.u64(params.marketId), // Market ID
+        repayCoinA, // Coin to repay with
         tx.object(constants.SUI_CLOCK_OBJECT_ID), // Clock object
       ],
     });
@@ -225,11 +256,14 @@ export class AlphalendClient {
   /**
    * Claims rewards from the AlphaLend protocol
    *
-   * @param params ClaimRewards parameters - marketId, coinType, positionCapId
+   * @param params ClaimRewards parameters - marketId, coinType, positionCapId, priceUpdateCoinTypes
    * @returns Transaction object ready for signing and execution
    */
   async claimRewards(params: ClaimRewardsParams): Promise<Transaction> {
-    const tx = new Transaction();
+    let tx = new Transaction();
+
+    // First update prices to ensure latest oracle values
+    tx = await this.updatePrices(tx, params.priceUpdateCoinTypes);
 
     // Build collect_reward transaction
     tx.moveCall({
@@ -237,11 +271,7 @@ export class AlphalendClient {
       typeArguments: [params.coinType],
       arguments: [
         tx.object(constants.LENDING_PROTOCOL_ID), // Protocol object
-        tx.pure.u64(
-          typeof params.marketId === "string"
-            ? Number(params.marketId)
-            : params.marketId,
-        ), // Market ID
+        tx.pure.u64(params.marketId), // Market ID
         tx.object(params.positionCapId), // Position capability
         tx.object(constants.SUI_CLOCK_OBJECT_ID), // Clock object
       ],
@@ -253,16 +283,15 @@ export class AlphalendClient {
   /**
    * Liquidates an unhealthy position
    *
-   * @param params Liquidate parameters - liquidatePositionId, borrowMarketId, withdrawMarketId,
-   *               repayAmount, borrowCoinType, withdrawCoinType, coinObjectId
+   * @param params Liquidate parameters - liquidatePositionId, borrowMarketId, withdrawMarketId, repayAmount,
+   *               borrowCoinType, withdrawCoinType, coinObjectId, priceUpdateCoinTypes
    * @returns Transaction object ready for signing and execution
    */
   async liquidate(params: LiquidateParams): Promise<Transaction> {
-    const tx = new Transaction();
+    let tx = new Transaction();
 
-    // First update prices for both coin types
-    const coinTypes = [params.borrowCoinType, params.withdrawCoinType];
-    await this.updatePrices(coinTypes);
+    // First update prices to ensure latest oracle values
+    tx = await this.updatePrices(tx, params.priceUpdateCoinTypes);
 
     // Build liquidate transaction
     tx.moveCall({
@@ -271,16 +300,8 @@ export class AlphalendClient {
       arguments: [
         tx.object(constants.LENDING_PROTOCOL_ID), // Protocol object
         tx.pure.address(params.liquidatePositionId), // Position ID to liquidate
-        tx.pure.u64(
-          typeof params.borrowMarketId === "string"
-            ? Number(params.borrowMarketId)
-            : params.borrowMarketId,
-        ), // Borrow market ID
-        tx.pure.u64(
-          typeof params.withdrawMarketId === "string"
-            ? Number(params.withdrawMarketId)
-            : params.withdrawMarketId,
-        ), // Withdraw market ID
+        tx.pure.u64(params.borrowMarketId), // Borrow market ID
+        tx.pure.u64(params.withdrawMarketId), // Withdraw market ID
         tx.object(params.coinObjectId), // Coin to repay with
         tx.object(constants.SUI_CLOCK_OBJECT_ID), // Clock object
       ],
@@ -294,17 +315,17 @@ export class AlphalendClient {
    *
    * @returns Transaction object for creating a new position
    */
-  async createPosition(): Promise<Transaction> {
-    const tx = new Transaction();
-
-    tx.moveCall({
+  async createPosition(
+    tx: Transaction,
+  ): Promise<{ tx: Transaction; positionCap: TransactionResult }> {
+    const positionCap = tx.moveCall({
       target: `${constants.ALPHALEND_PACKAGE_ID}::alpha_lending::create_position`,
       arguments: [
         tx.object(constants.LENDING_PROTOCOL_ID), // Protocol object
       ],
     });
 
-    return tx;
+    return { tx, positionCap };
   }
 
   // Query methods for interacting with on-chain data
@@ -364,7 +385,7 @@ export class AlphalendClient {
         // Extract the market details and push to results
         const config = (marketFields.config as Record<string, unknown>) || {};
         markets.push({
-          marketId: marketFields.market_id as string | number,
+          marketId: marketFields.market_id as string,
           coinType: marketFields.coin_type as string,
           totalSupply: BigInt(String(marketFields.xtoken_supply || 0)),
           totalBorrow: BigInt(String(marketFields.borrowed_amount || 0)),
@@ -442,12 +463,15 @@ export class AlphalendClient {
       const loansArray = Array.isArray(positionFields.loans)
         ? positionFields.loans
         : [];
-      const loans = loansArray.map((loan: Record<string, unknown>) => ({
-        coinType: loan.coin_type as string,
-        marketId: loan.market_id as string | number,
-        amount: BigInt(String(loan.amount || 0)),
-        amountUsd: 0, // Would need oracle price to calculate
-      }));
+      const loans: Loan[] = loansArray.map(
+        (loan: Record<string, unknown>) =>
+          ({
+            coinType: loan.coin_type as string,
+            marketId: loan.market_id as string | number,
+            amount: BigInt(String(loan.amount || 0)),
+            amountUsd: 0, // Would need oracle price to calculate
+          }) as Loan,
+      );
 
       return {
         id: positionId,
@@ -556,5 +580,45 @@ export class AlphalendClient {
   ): number {
     if (weightedTotalLoanUsd === 0) return Number.POSITIVE_INFINITY;
     return safeCollateralUsd / weightedTotalLoanUsd;
+  }
+
+  private async getCoinObject(
+    tx: Transaction,
+    type: string,
+    address: string,
+  ): Promise<
+    { tx: Transaction; coin: string | TransactionObjectArgument } | undefined
+  > {
+    let coins: CoinStruct[] = [];
+    let currentCursor: string | null | undefined = null;
+
+    do {
+      const response = await this.client.getCoins({
+        owner: address,
+        coinType: type,
+        cursor: currentCursor,
+      });
+
+      coins = coins.concat(response.data);
+
+      // Check if there's a next page
+      if (response.hasNextPage && response.nextCursor) {
+        currentCursor = response.nextCursor;
+      } else {
+        // No more pages available
+        // console.log("No more receipts available.");
+        break;
+      }
+    } while (currentCursor !== null);
+
+    if (coins.length >= 1) {
+      //coin1
+      const [coin] = tx.splitCoins(coins[0].coinObjectId, [0]);
+      tx.mergeCoins(
+        coin,
+        coins.map((c) => c.coinObjectId),
+      );
+      return { tx, coin };
+    }
   }
 }

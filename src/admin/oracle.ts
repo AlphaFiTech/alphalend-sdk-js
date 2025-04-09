@@ -6,7 +6,7 @@ import {
 } from "@pythnetwork/pyth-sui-js";
 import { pythPriceFeedIds } from "../utils/priceFeedIds.js";
 import { coinNameToCoinType } from "../constants/maps.js";
-import { getPriceInfoObjectIds } from "../utils/oracle.js";
+import { getPriceInfoObjectIdsWithUpdate } from "../utils/oracle.js";
 
 const constants = getConstants();
 
@@ -43,7 +43,7 @@ async function getPriceIdentifier(
   pythClient: SuiPythClient,
   pythConnection: SuiPriceServiceConnection,
 ): Promise<{ transaction: Transaction; priceIdentifier: TransactionResult }> {
-  const priceInfoObjectId = await getPriceInfoObjectIds(
+  const priceInfoObjectId = await getPriceInfoObjectIdsWithUpdate(
     tx,
     [pythPriceFeedIds[coinName]],
     pythClient,

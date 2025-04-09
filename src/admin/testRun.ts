@@ -58,32 +58,42 @@ async function addCoinToOracleCaller() {
 async function updatePricesCaller() {
   const { suiClient } = getExecStuff();
   const alphalendClient = new AlphalendClient(suiClient);
-  const tx = await alphalendClient.updatePrices(["STSUI"]);
-
+  let tx = new Transaction();
+  tx = await alphalendClient.updatePrices(tx, ["STSUI"]);
   return tx;
 }
 
 async function run() {
-  const { suiClient, keypair } = getExecStuff();
+  const { suiClient } = getExecStuff();
   const tx = await updatePricesCaller();
   tx.setGasBudget(100_000_000);
 
-  suiClient
-    .signAndExecuteTransaction({
-      signer: keypair,
-      transaction: tx,
-      requestType: "WaitForLocalExecution",
-      options: {
-        showEffects: true,
-        showObjectChanges: true,
-      },
-    })
-    .then((res) => {
-      console.log(JSON.stringify(res, null, 2));
-    })
-    .catch((error) => {
-      console.error(error);
-    });
+  // suiClient
+  //   .signAndExecuteTransaction({
+  //     signer: keypair,
+  //     transaction: tx,
+  //     requestType: "WaitForLocalExecution",
+  //     options: {
+  //       showEffects: true,
+  //       showObjectChanges: true,
+  //     },
+  //   })
+  //   .then((res) => {
+  //     console.log(JSON.stringify(res, null, 2));
+  //   })
+  //   .catch((error) => {
+  //     console.error(error);
+  //   });
+  const wormholeStateId =
+    "0x5306f64e312b581766351c07af79c72fcb1cd25147157fdc2f8ad76de9a3fb6a";
+  const pythStateId =
+    "0x1f9310238ee9298fb703c3419030b35b22bb1cc37113e3bb5007c99aec79e5b8";
+
+  const client = new SuiPythClient(suiClient, pythStateId, wormholeStateId);
+  const object = await client.getPriceFeedObjectId(
+    "e62df6c8b4a85fe1a67db44dc12de5db330f7ac66b72dc658afedf0f4a415b43",
+  );
+  console.log(object);
 }
 addCoinToOracleCaller();
 run();
