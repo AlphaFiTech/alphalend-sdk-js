@@ -150,6 +150,16 @@ export interface TransactionResponse {
  */
 
 /**
+ * Represents a statistics of a protocol
+ */
+export interface ProtocolStats {
+  /** Total token supply in the protocol */
+  totalSuppliedUsd: string;
+  /** Total tokens borrowed from the protocol */
+  totalBorrowedUsd: string;
+}
+
+/**
  * Represents a lending market in the protocol
  */
 export interface Market {
@@ -164,15 +174,66 @@ export interface Market {
   /** Current utilization rate (0.0 to 1.0) */
   utilizationRate: number;
   /** Annual percentage rate for suppliers */
-  supplyApr: number;
+  supplyApr: {
+    interestApr: number;
+    rewards: {
+      coinType: string;
+      rewardApr: number;
+    }[];
+  };
   /** Annual percentage rate for borrowers */
-  borrowApr: number;
+  borrowApr: {
+    interestApr: number;
+    rewards: {
+      coinType: string;
+      rewardApr: number;
+    }[];
+  };
   /** Loan-to-value ratio (0.0 to 1.0) */
   ltv: number;
   /** Liquidation threshold (0.0 to 1.0) */
   liquidationThreshold: number;
   /** Maximum amount that can be deposited into the market */
   depositLimit: bigint;
+}
+
+/**
+ * Represents a user's complete portfolio in the protocol
+ */
+export interface Portfolio {
+  /** Address of the portfolio owner */
+  userAddress: string;
+  /** Total value of assets minus liabilities (USD) */
+  netWorth: string;
+  /** Total value of supplied assets (USD) */
+  totalSuppliedUsd: string;
+  /** Total value of borrowed assets (USD) */
+  totalBorrowedUsd: string;
+  /** Maximum amount that can be borrowed (USD) */
+  safeBorrowLimit: string;
+  /** Limit for liquidation (USD) */
+  liquidationLimit: string;
+  /** Amount of rewards to claim (USD) */
+  rewardsToClaimUsd: string;
+  /** Rewards by token */
+  rewardsByToken: {
+    token: string;
+    amount: string;
+  }[];
+  /** Daily earnings (USD) */
+  dailyEarnings: string;
+  /** Net annual percentage rate (APR) */
+  netApr: string;
+  /** Aggregated supply APR */
+  aggregatedSupplyApr: string;
+  /** Aggregated borrow APR */
+  aggregatedBorrowApr: string;
+  /** User balances */
+  userBalances: {
+    marketId: string;
+    suppliedAmount: bigint;
+    borrowedAmount: bigint;
+  }[];
 }
 
 /**
@@ -207,24 +268,4 @@ export interface Position {
   healthFactor: number;
   /** Whether this position is eligible for liquidation */
   isLiquidatable: boolean;
-}
-
-/**
- * Represents a user's complete portfolio in the protocol
- */
-export interface Portfolio {
-  /** Address of the portfolio owner */
-  userAddress: string;
-  /** Total value of assets minus liabilities (USD) */
-  netWorth: number;
-  /** Total value of supplied assets (USD) */
-  totalSuppliedUsd: number;
-  /** Total value of borrowed assets (USD) */
-  totalBorrowedUsd: number;
-  /** Maximum amount that can be borrowed (USD) */
-  borrowLimitUsd: number;
-  /** Percentage of borrow limit currently used (0-100) */
-  borrowLimitUsed: number;
-  /** List of all positions owned by the user */
-  positions: Position[];
 }

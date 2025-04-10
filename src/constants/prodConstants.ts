@@ -18,6 +18,10 @@ export const prodConstants = {
 
   LENDING_PROTOCOL_CAP_ID: "", // Replace with actual protocol cap ID
 
+  POSITION_CAP_TYPE: "", // Replace with actual position cap type
+
+  ACTIVE_MARKETS: [""], // to-do: think of a way to store this outside sdk(db or seperate contract)
+
   // Pyth Constants
   PYTH_PACKAGE_ID:
     "0x04e20ddf36af412a4096f9014f4a565af9e812db9a05cc40254846cf6ed0ad91",
