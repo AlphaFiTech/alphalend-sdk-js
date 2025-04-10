@@ -23,11 +23,15 @@ import {
   ClaimRewardsParams,
   LiquidateParams,
   Market,
-  Position,
   Portfolio,
-  Loan,
+  ProtocolStats,
 } from "./types.js";
 import { PythPriceInfo } from "../coin/types.js";
+import {
+  getMarkets,
+  getProtocolStats,
+  getUserPortfolio,
+} from "../functions.js";
 
 /**
  * AlphaLend Client
@@ -349,255 +353,39 @@ export class AlphalendClient {
   // Query methods for interacting with on-chain data
 
   /**
+   * Gets statistics of the protocol
+   *
+   * @returns Promise resolving to a ProtocolStats object
+   */
+  async getProtocolStats(): Promise<ProtocolStats> {
+    const stats = await getProtocolStats(this.client);
+    return stats;
+  }
+
+  /**
    * Gets all markets data from the protocol
    *
    * @returns Promise resolving to an array of Market objects
    */
   async getAllMarkets(): Promise<Market[]> {
-    try {
-      // Retrieve the lending protocol object
-      const objects = await this.client.getObject({
-        id: constants.LENDING_PROTOCOL_ID,
-        options: {
-          showContent: true,
-          showType: true,
-        },
-      });
-
-      // Extract markets object ID from the protocol object
-      const content = objects.data?.content;
-      if (!content || content.dataType !== "moveObject") {
-        throw new Error("Invalid protocol object data");
-      }
-
-      const fields = content.fields as Record<string, unknown>;
-      const marketsTableId = fields.markets as string;
-
-      // Get all market entries from the markets table
-      const marketsData = await this.client.getDynamicFields({
-        parentId: marketsTableId,
-      });
-
-      // Process each market's data by fetching its details
-      const markets: Market[] = [];
-
-      for (const marketData of marketsData.data) {
-        // Get the full market object data
-        const marketObject = await this.client.getDynamicFieldObject({
-          parentId: marketsTableId,
-          name: { type: "u64", value: marketData.name },
-        });
-
-        if (
-          !marketObject.data?.content ||
-          marketObject.data.content.dataType !== "moveObject"
-        ) {
-          continue;
-        }
-
-        const marketFields = marketObject.data.content.fields as Record<
-          string,
-          unknown
-        >;
-
-        // Extract the market details and push to results
-        const config = (marketFields.config as Record<string, unknown>) || {};
-        markets.push({
-          marketId: marketFields.market_id as string,
-          coinType: marketFields.coin_type as string,
-          totalSupply: BigInt(String(marketFields.xtoken_supply || 0)),
-          totalBorrow: BigInt(String(marketFields.borrowed_amount || 0)),
-          utilizationRate: this.calculateUtilizationRate(
-            BigInt(String(marketFields.borrowed_amount || 0)),
-            BigInt(String(marketFields.xtoken_supply || 0)),
-          ),
-          supplyApr: 0, // Would require calculation based on interest rate model
-          borrowApr: 0, // Would require calculation based on interest rate model
-          ltv: Number(config.safe_collateral_ratio || 0) / 100,
-          liquidationThreshold: Number(config.liquidation_threshold || 0) / 100,
-          depositLimit: BigInt(String(config.deposit_limit || 0)),
-        });
-      }
-
-      return markets;
-    } catch (error) {
-      console.error("Error getting markets:", error);
-      return [];
-    }
+    const markets = await getMarkets(this.client);
+    return markets;
   }
 
   /**
-   * Gets user position details
-   *
-   * @param positionId The ID of the position to query
-   * @returns Promise resolving to Position object
-   */
-  async getUserPosition(positionId: string): Promise<Position | null> {
-    try {
-      // Get protocol object first to find positions table
-      const protocolObject = await this.client.getObject({
-        id: constants.LENDING_PROTOCOL_ID,
-        options: {
-          showContent: true,
-        },
-      });
-
-      // Extract positions object ID
-      const content = protocolObject.data?.content;
-      if (!content || content.dataType !== "moveObject") {
-        throw new Error("Invalid protocol object data");
-      }
-
-      const fields = content.fields as Record<string, unknown>;
-      const positionsTableId = fields.positions as string;
-
-      // Get the specific position from positions table
-      const positionObject = await this.client.getDynamicFieldObject({
-        parentId: positionsTableId,
-        name: { type: "address", value: positionId },
-      });
-
-      if (
-        !positionObject.data?.content ||
-        positionObject.data.content.dataType !== "moveObject"
-      ) {
-        return null;
-      }
-
-      const positionFields = positionObject.data.content.fields as Record<
-        string,
-        unknown
-      >;
-
-      // Process collaterals
-      const collaterals: Record<string, bigint> = {};
-      const collateralObj =
-        (positionFields.collaterals as Record<string, unknown>) || {};
-      for (const [marketId, amount] of Object.entries(collateralObj)) {
-        collaterals[marketId] = BigInt(String(amount || 0));
-      }
-
-      // Process loans
-      const loansArray = Array.isArray(positionFields.loans)
-        ? positionFields.loans
-        : [];
-      const loans: Loan[] = loansArray.map(
-        (loan: Record<string, unknown>) =>
-          ({
-            coinType: loan.coin_type as string,
-            marketId: loan.market_id as string | number,
-            amount: BigInt(String(loan.amount || 0)),
-            amountUsd: 0, // Would need oracle price to calculate
-          }) as Loan,
-      );
-
-      return {
-        id: positionId,
-        collaterals,
-        loans,
-        totalCollateralUsd: Number(positionFields.total_collateral_usd || 0),
-        totalLoanUsd: Number(positionFields.total_loan_usd || 0),
-        healthFactor: this.calculateHealthFactor(
-          Number(positionFields.safe_collateral_usd || 0),
-          Number(positionFields.weighted_total_loan_usd || 0),
-        ),
-        isLiquidatable: Boolean(
-          positionFields.is_position_liquidatable || false,
-        ),
-      };
-    } catch (error) {
-      console.error("Error getting position:", error);
-      return null;
-    }
-  }
-
-  /**
-   * Gets user portfolio including all positions
+   * Gets user portfolio data
    *
    * @param userAddress The user's address
    * @returns Promise resolving to Portfolio object
    */
-  async getUserPortfolio(userAddress: string): Promise<Portfolio | null> {
+  async getUserPortfolio(userAddress: string): Promise<Portfolio | undefined> {
     try {
-      // Fetch all position capabilities owned by the user
-      const userObjects = await this.client.getOwnedObjects({
-        owner: userAddress,
-        filter: {
-          StructType: `${constants.ALPHALEND_PACKAGE_ID}::position::PositionCap`,
-        },
-        options: {
-          showContent: true,
-        },
-      });
-
-      // If no positions are found, return null
-      if (!userObjects.data || userObjects.data.length === 0) {
-        return null;
-      }
-
-      // Process each position capability to get the actual positions
-      const positions: Position[] = [];
-      let totalSupplied = 0;
-      let totalBorrowed = 0;
-
-      for (const obj of userObjects.data) {
-        if (!obj.data?.content || obj.data.content.dataType !== "moveObject") {
-          continue;
-        }
-
-        const fields = obj.data.content.fields as Record<string, unknown>;
-        const positionId = fields.position_id as string;
-
-        // Get the full position details
-        const position = await this.getUserPosition(positionId);
-        if (position) {
-          positions.push(position);
-          totalSupplied += position.totalCollateralUsd;
-          totalBorrowed += position.totalLoanUsd;
-        }
-      }
-
-      // Calculate metrics
-      const netWorth = totalSupplied - totalBorrowed;
-      const borrowLimit = totalSupplied * 0.8; // Example factor, this would be based on collateral types
-      const borrowLimitUsed =
-        borrowLimit > 0 ? (totalBorrowed / borrowLimit) * 100 : 0;
-
-      return {
-        userAddress,
-        netWorth,
-        totalSuppliedUsd: totalSupplied,
-        totalBorrowedUsd: totalBorrowed,
-        borrowLimitUsd: borrowLimit,
-        borrowLimitUsed,
-        positions,
-      };
+      const portfolio = await getUserPortfolio(this.client, userAddress);
+      return portfolio;
     } catch (error) {
       console.error("Error getting portfolio:", error);
-      return null;
+      return undefined;
     }
-  }
-
-  /**
-   * Calculate utilization rate based on borrowed amount and total supply
-   */
-  private calculateUtilizationRate(
-    borrowedAmount: bigint,
-    totalSupply: bigint,
-  ): number {
-    if (totalSupply === 0n) return 0;
-    return Number((borrowedAmount * 10000n) / totalSupply) / 10000;
-  }
-
-  /**
-   * Calculate health factor based on collateral and borrowed amounts
-   */
-  private calculateHealthFactor(
-    safeCollateralUsd: number,
-    weightedTotalLoanUsd: number,
-  ): number {
-    if (weightedTotalLoanUsd === 0) return Number.POSITIVE_INFINITY;
-    return safeCollateralUsd / weightedTotalLoanUsd;
   }
 
   private async getCoinObject(
