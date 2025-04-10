@@ -5,7 +5,6 @@ import {
   SuiPythClient,
 } from "@pythnetwork/pyth-sui-js";
 import { pythPriceFeedIds } from "../utils/priceFeedIds.js";
-import { coinNameToCoinType } from "../constants/maps.js";
 import { getPriceInfoObjectIdsWithUpdate } from "../utils/oracle.js";
 
 const constants = getConstants();
@@ -134,12 +133,12 @@ export async function addCoinToOracle(
 export function removeCoinFromOracle(
   tx: Transaction,
   adminCapId: string,
-  coinName: string,
+  coinType: string,
 ): Transaction {
   // getting coinType in move
   const coinTypeName = tx.moveCall({
     target: `0x1::type_name::get`,
-    typeArguments: [coinNameToCoinType[coinName]],
+    typeArguments: [coinType],
   });
 
   tx.moveCall({
