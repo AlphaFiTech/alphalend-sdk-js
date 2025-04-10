@@ -12,14 +12,11 @@ export const devConstants = {
     "0xd52c22044e8d6853f92d7d80e78a2136f73ed358c51be11dcfcb8e437c6792d8",
 
   // AlphaLend constants
-  ALPHALEND_PACKAGE_ID:
-    "", // Replace with actual package ID
+  ALPHALEND_PACKAGE_ID: "", // Replace with actual package ID
 
-  LENDING_PROTOCOL_ID:
-    "", // Replace with actual protocol object ID
+  LENDING_PROTOCOL_ID: "", // Replace with actual protocol object ID
 
-  LENDING_PROTOCOL_CAP_ID:
-    "", // Replace with actual protocol cap ID
+  LENDING_PROTOCOL_CAP_ID: "", // Replace with actual protocol cap ID
 
   // Pyth Constants
   PYTH_PACKAGE_ID:

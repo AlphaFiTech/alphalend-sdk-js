@@ -95,7 +95,7 @@ async function run() {
       console.error(error);
     });
 }
-// addCoinToOracleCaller();
+addCoinToOracleCaller();
 run();
 
 //0x2e4a789fc4620614e6b6b3d9962bdb4dec12506e4c30f97972a29f47b6dc87bc

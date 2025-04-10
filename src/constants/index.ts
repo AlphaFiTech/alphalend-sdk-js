@@ -1,8 +1,5 @@
 import { devConstants } from "./devConstants.js";
 import { prodConstants } from "./prodConstants.js";
-import * as dotenv from "dotenv";
-
-dotenv.config();
 
 const CONF_ENV = process.env.NODE_ENV || "development";
 
