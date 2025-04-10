@@ -186,3 +186,130 @@ The SDK includes TypeScript definitions for all operations, making it easy to us
   - Parameters:
     - `tx`: Transaction object to add price update calls to
     - `coinTypes`: Array of coin types to update prices for
+
+## Query Methods
+
+### Get All Markets
+
+The SDK provides methods to query on-chain data from AlphaLend protocol:
+
+```typescript
+// Get all markets with their details
+const markets = await alphalendClient.getAllMarkets();
+
+// Example market data
+console.log(markets);
+// [
+//   {
+//     marketId: "0x123...",
+//     coinType: "0x2::sui::SUI",
+//     totalSupply: 1000000000n,
+//     totalBorrow: 500000000n,
+//     utilizationRate: 0.5,
+//     supplyApr: {
+//       interestApr: 0.04,
+//       rewards: []
+//     },
+//     borrowApr: {
+//       interestApr: 0.1,
+//       rewards: []
+//     },
+//     ltv: 0.7,
+//     liquidationThreshold: 0.8,
+//     depositLimit: 10000000000n
+//   },
+//   // ... more markets
+// ]
+```
+
+Each market object contains:
+
+- `marketId`: Unique identifier for the market
+- `coinType`: Type of the coin in the market (e.g., "0x2::sui::SUI")
+- `totalSupply`: Total supply in the market (BigInt)
+- `totalBorrow`: Total borrowed amount (BigInt)
+- `utilizationRate`: Current utilization rate (0.0 to 1.0)
+- `supplyApr`: Supply APR details including interest and rewards
+- `borrowApr`: Borrow APR details including interest and rewards
+- `ltv`: Loan-to-Value ratio (0.0 to 1.0)
+- `liquidationThreshold`: Threshold at which positions can be liquidated
+- `depositLimit`: Maximum amount that can be deposited
+
+### Get Protocol Stats
+
+Get aggregated statistics about the entire protocol:
+
+```typescript
+// Get protocol statistics
+const stats = await alphalendClient.getProtocolStats();
+
+// Example stats data
+console.log(stats);
+// {
+//   totalSuppliedUsd: "1000000", // Total value supplied across all markets (USD)
+//   totalBorrowedUsd: "500000"   // Total value borrowed across all markets (USD)
+// }
+```
+
+The protocol stats object contains:
+
+- `totalSuppliedUsd`: Total value of all supplied assets across all markets (USD as string)
+- `totalBorrowedUsd`: Total value of all borrowed assets across all markets (USD as string)
+
+### Get User Portfolio
+
+Get a user's complete portfolio information including balances, positions, and metrics:
+
+```typescript
+// Get user's portfolio data
+const userAddress = "0xYOUR_USER_ADDRESS";
+const portfolio = await alphalendClient.getUserPortfolio(userAddress);
+
+// Example portfolio data
+console.log(portfolio);
+// {
+//   userAddress: "0xYOUR_USER_ADDRESS",
+//   netWorth: "75000",
+//   totalSuppliedUsd: "100000",
+//   totalBorrowedUsd: "25000",
+//   safeBorrowLimit: "80000",
+//   liquidationLimit: "85000",
+//   rewardsToClaimUsd: "100",
+//   rewardsByToken: [
+//     { token: "0x2::sui::SUI", amount: "50" },
+//     { token: "0x::reward::TOKEN", amount: "25" }
+//   ],
+//   dailyEarnings: "10",
+//   netApr: "4.5",
+//   aggregatedSupplyApr: "5.0",
+//   aggregatedBorrowApr: "8.0",
+//   userBalances: [
+//     { 
+//       marketId: "1", 
+//       suppliedAmount: 1000000000n, 
+//       borrowedAmount: 0n 
+//     },
+//     { 
+//       marketId: "2", 
+//       suppliedAmount: 0n, 
+//       borrowedAmount: 500000000n 
+//     }
+//   ]
+// }
+```
+
+The portfolio object contains:
+
+- `userAddress`: The address of the portfolio owner
+- `netWorth`: Total value of assets minus liabilities (USD as string)
+- `totalSuppliedUsd`: Total value of supplied assets (USD as string)
+- `totalBorrowedUsd`: Total value of borrowed assets (USD as string)
+- `safeBorrowLimit`: Maximum amount that can be borrowed (USD as string)
+- `liquidationLimit`: Threshold at which positions can be liquidated (USD as string)
+- `rewardsToClaimUsd`: Value of unclaimed rewards (USD as string)
+- `rewardsByToken`: Array of rewards broken down by token
+- `dailyEarnings`: Estimated daily earnings (USD as string)
+- `netApr`: Net annual percentage rate (as string)
+- `aggregatedSupplyApr`: Aggregated supply APR across all positions (as string)
+- `aggregatedBorrowApr`: Aggregated borrow APR across all positions (as string)
+- `userBalances`: Array of user balances by market
