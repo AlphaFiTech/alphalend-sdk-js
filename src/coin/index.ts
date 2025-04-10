@@ -1,5 +1,4 @@
-import { Coin } from "./types.js";
-import { PaginatedCoins, SuiClient } from "@mysten/sui/client";
+import { CoinBalance, SuiClient } from "@mysten/sui/client";
 
 export * from "./types.js";
 export * from "./constants.js";
@@ -22,37 +21,20 @@ export * from "./constants.js";
  * and logs coin information to the console for debugging purposes
  */
 export async function getWalletCoins(
-  owner: string,
+  userAddress: string,
   suiClient: SuiClient,
-): Promise<Coin[]> {
-  const coins: Coin[] = [];
-  let currentCursor: string | null | undefined = null;
-  const coinTypes: string[] = [];
-
-  // Loop through all pages of coins using cursor-based pagination
-  while (true) {
-    // Fetch a page of coins for the owner
-    const paginatedCoins: PaginatedCoins = await suiClient.getAllCoins({
-      owner: owner,
-      cursor: currentCursor,
+): Promise<Map<string, string> | undefined> {
+  try {
+    const res = await suiClient.getAllBalances({
+      owner: userAddress,
     });
 
-    // Process each coin in the current page
-    paginatedCoins.data.forEach((coin) => {
-      // Log coin information for debugging
-      console.log(`Coin Name: ${coin.coinType}, Coin Value: ${coin.balance}`);
-      coinTypes.push(coin.coinType);
+    const resMap: Map<string, string> = new Map();
+    res.forEach((enrty: CoinBalance) => {
+      resMap.set(enrty.coinType, enrty.totalBalance);
     });
-
-    // Check if there are more pages to fetch
-    if (paginatedCoins.hasNextPage && paginatedCoins.nextCursor) {
-      currentCursor = paginatedCoins.nextCursor;
-    } else {
-      // No more pages available, exit the loop
-      console.log("No more coins available.");
-      break;
-    }
+    return resMap;
+  } catch (error) {
+    console.error("Error fetching tokenBalances!", error);
   }
-
-  return coins;
 }

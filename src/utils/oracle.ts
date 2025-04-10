@@ -54,7 +54,7 @@ export async function getPriceInfoObjectIdsWithoutUpdate(
 export function updatePriceTransaction(
   tx: Transaction,
   args: UpdatePriceTransactionArgs,
-): Transaction {
+) {
   tx.moveCall({
     target: `${constants.ORACLE_PACKAGE_ID}::oracle::update_price`,
     arguments: [
@@ -63,5 +63,4 @@ export function updatePriceTransaction(
       tx.object(args.clock),
     ],
   });
-  return tx;
 }

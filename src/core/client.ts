@@ -107,7 +107,7 @@ export class AlphalendClient {
     }
 
     for (const [, priceInfoObjectId] of priceFeedToInfoIdMap.entries()) {
-      tx = updatePriceTransaction(tx, {
+      updatePriceTransaction(tx, {
         oracle: constants.ORACLE_OBJECT_ID,
         priceInfoObject: priceInfoObjectId,
         clock: constants.SUI_CLOCK_OBJECT_ID,
@@ -124,25 +124,23 @@ export class AlphalendClient {
    * @returns Transaction object ready for signing and execution
    */
   async supply(params: SupplyParams): Promise<Transaction | undefined> {
-    // Create transaction
-    let tx = new Transaction();
+    const tx = new Transaction();
 
     // First update prices to ensure latest oracle values
-    tx = await this.updatePrices(tx, params.priceUpdateCoinTypes);
+    await this.updatePrices(tx, params.priceUpdateCoinTypes);
 
     // Get coin object
-    const res = await this.getCoinObject(
+    const coin = await this.getCoinObject(
       tx,
       params.supplyCoinType,
       params.address,
     );
-    if (!res) {
+    if (!coin) {
       console.error("Coin object not found");
       return undefined;
     }
 
-    tx = res.tx;
-    const [supplyCoinA] = tx.splitCoins(res.coin, [params.amount]);
+    const [supplyCoinA] = tx.splitCoins(coin, [params.amount]);
 
     if (params.positionCapId) {
       // Build add_collateral transaction
@@ -158,8 +156,7 @@ export class AlphalendClient {
         ],
       });
     } else {
-      const { tx: tx2, positionCap } = await this.createPosition(tx);
-      tx = tx2;
+      const positionCap = await this.createPosition(tx);
       // Build add_collateral transaction
       tx.moveCall({
         target: `${constants.ALPHALEND_PACKAGE_ID}::alpha_lending::add_collateral`,
@@ -174,7 +171,7 @@ export class AlphalendClient {
       });
       tx.transferObjects([positionCap], params.address);
     }
-    tx.transferObjects([res.coin], params.address);
+    tx.transferObjects([coin], params.address);
     return tx;
   }
 
@@ -185,10 +182,10 @@ export class AlphalendClient {
    * @returns Transaction object ready for signing and execution
    */
   async withdraw(params: WithdrawParams): Promise<Transaction> {
-    let tx = new Transaction();
+    const tx = new Transaction();
 
     // First update prices to ensure latest oracle values
-    tx = await this.updatePrices(tx, params.priceUpdateCoinTypes);
+    await this.updatePrices(tx, params.priceUpdateCoinTypes);
 
     // Build remove_collateral transaction
     tx.moveCall({
@@ -213,10 +210,10 @@ export class AlphalendClient {
    * @returns Transaction object ready for signing and execution
    */
   async borrow(params: BorrowParams): Promise<Transaction> {
-    let tx = new Transaction();
+    const tx = new Transaction();
 
     // First update prices to ensure latest oracle values
-    tx = await this.updatePrices(tx, params.priceUpdateCoinTypes);
+    await this.updatePrices(tx, params.priceUpdateCoinTypes);
 
     // Build borrow transaction
     tx.moveCall({
@@ -241,24 +238,23 @@ export class AlphalendClient {
    * @returns Transaction object ready for signing and execution
    */
   async repay(params: RepayParams): Promise<Transaction | undefined> {
-    let tx = new Transaction();
+    const tx = new Transaction();
 
     // First update prices to ensure latest oracle values
-    tx = await this.updatePrices(tx, params.priceUpdateCoinTypes);
+    await this.updatePrices(tx, params.priceUpdateCoinTypes);
 
     // Get coin object
-    const res = await this.getCoinObject(
+    const coin = await this.getCoinObject(
       tx,
       params.repayCoinType,
       params.address,
     );
-    if (!res) {
+    if (!coin) {
       console.error("Coin object not found");
       return undefined;
     }
 
-    tx = res.tx;
-    const [repayCoinA] = tx.splitCoins(res.coin, [params.amount]);
+    const [repayCoinA] = tx.splitCoins(coin, [params.amount]);
 
     // Build repay transaction
     tx.moveCall({
@@ -273,6 +269,7 @@ export class AlphalendClient {
       ],
     });
 
+    tx.transferObjects([coin], params.address);
     return tx;
   }
 
@@ -283,10 +280,10 @@ export class AlphalendClient {
    * @returns Transaction object ready for signing and execution
    */
   async claimRewards(params: ClaimRewardsParams): Promise<Transaction> {
-    let tx = new Transaction();
+    const tx = new Transaction();
 
     // First update prices to ensure latest oracle values
-    tx = await this.updatePrices(tx, params.priceUpdateCoinTypes);
+    await this.updatePrices(tx, params.priceUpdateCoinTypes);
 
     // Build collect_reward transaction
     tx.moveCall({
@@ -311,10 +308,10 @@ export class AlphalendClient {
    * @returns Transaction object ready for signing and execution
    */
   async liquidate(params: LiquidateParams): Promise<Transaction> {
-    let tx = new Transaction();
+    const tx = new Transaction();
 
     // First update prices to ensure latest oracle values
-    tx = await this.updatePrices(tx, params.priceUpdateCoinTypes);
+    await this.updatePrices(tx, params.priceUpdateCoinTypes);
 
     // Build liquidate transaction
     tx.moveCall({
@@ -338,9 +335,7 @@ export class AlphalendClient {
    *
    * @returns Transaction object for creating a new position
    */
-  async createPosition(
-    tx: Transaction,
-  ): Promise<{ tx: Transaction; positionCap: TransactionResult }> {
+  async createPosition(tx: Transaction): Promise<TransactionResult> {
     const positionCap = tx.moveCall({
       target: `${constants.ALPHALEND_PACKAGE_ID}::alpha_lending::create_position`,
       arguments: [
@@ -348,7 +343,7 @@ export class AlphalendClient {
       ],
     });
 
-    return { tx, positionCap };
+    return positionCap;
   }
 
   // Query methods for interacting with on-chain data
@@ -609,9 +604,7 @@ export class AlphalendClient {
     tx: Transaction,
     type: string,
     address: string,
-  ): Promise<
-    { tx: Transaction; coin: string | TransactionObjectArgument } | undefined
-  > {
+  ): Promise<string | TransactionObjectArgument | undefined> {
     let coins: CoinStruct[] = [];
     let currentCursor: string | null | undefined = null;
 
@@ -641,7 +634,7 @@ export class AlphalendClient {
         coin,
         coins.map((c) => c.coinObjectId),
       );
-      return { tx, coin };
+      return coin;
     }
   }
 
