@@ -27,6 +27,7 @@ import {
   Portfolio,
   Loan,
 } from "./types.js";
+import { PythPriceInfo } from "../coin/types.js";
 
 /**
  * AlphaLend Client
@@ -105,7 +106,7 @@ export class AlphalendClient {
       });
     }
 
-    for (const [_, priceInfoObjectId] of priceFeedToInfoIdMap.entries()) {
+    for (const [, priceInfoObjectId] of priceFeedToInfoIdMap.entries()) {
       tx = updatePriceTransaction(tx, {
         oracle: constants.ORACLE_OBJECT_ID,
         priceInfoObject: priceInfoObjectId,
@@ -171,6 +172,7 @@ export class AlphalendClient {
           tx.object(constants.SUI_CLOCK_OBJECT_ID), // Clock object
         ],
       });
+      tx.transferObjects([positionCap], params.address);
     }
     tx.transferObjects([res.coin], params.address);
     return tx;
@@ -655,10 +657,14 @@ export class AlphalendClient {
           showContent: true,
         },
       });
-      const attestation_time = (res.data?.content as any).fields.price_info
-        .fields.attestation_time;
-      if (parseFloat(current_timestamp) - attestation_time > 20) {
-        priceIdsToUpdate.push(priceFeedId);
+
+      if (res.data) {
+        const content = res.data.content as unknown as PythPriceInfo;
+        const attestation_time =
+          content.fields.price_info.fields.attestation_time;
+        if (parseFloat(current_timestamp) - parseFloat(attestation_time) > 20) {
+          priceIdsToUpdate.push(priceFeedId);
+        }
       }
     }
 

@@ -4,14 +4,11 @@ AlphaLend SDK for JavaScript/TypeScript applications built on the Sui blockchain
 
 ## Features
 
-- Create lending positions
 - Supply assets as collateral
 - Borrow assets against your collateral
 - Repay borrowed assets
 - Withdraw collateral
-- Claim earned rewards
-- Liquidate unhealthy positions
-- Query protocol and user information
+- Update price information from oracles
 
 ## Installation
 
@@ -38,15 +35,22 @@ const suiClient = new SuiClient(connection);
 const alphalendClient = new AlphalendClient(suiClient);
 ```
 
-### Creating a Position
+### Update Prices
 
 ```typescript
-// Create a position to use the protocol
-const createPositionTx = await alphalendClient.createPosition();
+import { Transaction } from "@mysten/sui/transactions";
 
-// Sign and execute the transaction (with wallet provider)
-const result = await wallet.signAndExecuteTransaction(createPositionTx);
-const positionCapId = result.objectId; // Store this to interact with your position
+// Update price information for assets from Pyth oracle
+const tx = new Transaction();
+const updatedTx = await alphalendClient.updatePrices(tx, [
+  "0x2::sui::SUI",
+  "0x::usdc::USDC",
+  // Add other coin types as needed
+]);
+
+// Sign and execute the transaction
+updatedTx.setGasBudget(100_000_000);
+await wallet.signAndExecuteTransaction(updatedTx);
 ```
 
 ### Supply Collateral
@@ -58,9 +62,10 @@ import { SupplyParams } from "alphalend-sdk";
 const supplyParams: SupplyParams = {
   marketId: "1", // Market ID to supply to
   amount: BigInt(1000000000), // Amount in lowest denomination
-  coinType: "0x2::sui::SUI", // Coin type to supply
-  positionCapId: "0xYOUR_POSITION_CAP_ID", // Your position capability
-  coinObjectId: "0xYOUR_COIN_OBJECT_ID", // Coin object to use
+  supplyCoinType: "0x2::sui::SUI", // Coin type to supply
+  positionCapId: "0xYOUR_POSITION_CAP_ID", // Your position capability (optional)
+  address: "0xYOUR_ADDRESS", // Address of the user supplying collateral
+  priceUpdateCoinTypes: ["0x2::sui::SUI"], // Coin types to update prices for
 };
 
 const supplyTx = await alphalendClient.supply(supplyParams);
@@ -78,8 +83,9 @@ import { BorrowParams } from "alphalend-sdk";
 const borrowParams: BorrowParams = {
   marketId: "2", // Market ID to borrow from
   amount: BigInt(500000000), // Amount to borrow
-  coinType: "0x::usdc::USDC", // Coin type to borrow
+  borrowCoinType: "0x::usdc::USDC", // Coin type to borrow
   positionCapId: "0xYOUR_POSITION_CAP_ID", // Your position capability
+  priceUpdateCoinTypes: ["0x::usdc::USDC", "0x2::sui::SUI"], // Coin types to update prices for
 };
 
 const borrowTx = await alphalendClient.borrow(borrowParams);
@@ -97,9 +103,10 @@ import { RepayParams } from "alphalend-sdk";
 const repayParams: RepayParams = {
   marketId: "2", // Market ID where debt exists
   amount: BigInt(500000000), // Amount to repay
-  coinType: "0x::usdc::USDC", // Coin type to repay
+  repayCoinType: "0x::usdc::USDC", // Coin type to repay
   positionCapId: "0xYOUR_POSITION_CAP_ID", // Your position capability
-  coinObjectId: "0xYOUR_COIN_OBJECT_ID", // Coin object to use for repayment
+  address: "0xYOUR_ADDRESS", // Address of the user repaying the debt
+  priceUpdateCoinTypes: ["0x::usdc::USDC"], // Coin types to update prices for
 };
 
 const repayTx = await alphalendClient.repay(repayParams);
@@ -117,16 +124,18 @@ import { WithdrawParams, MAX_U64 } from "alphalend-sdk";
 const withdrawParams: WithdrawParams = {
   marketId: "1", // Market ID to withdraw from
   amount: BigInt(500000000), // Amount to withdraw
-  coinType: "0x2::sui::SUI", // Coin type to withdraw
+  withdrawCoinType: "0x2::sui::SUI", // Coin type to withdraw
   positionCapId: "0xYOUR_POSITION_CAP_ID", // Your position capability
+  priceUpdateCoinTypes: ["0x2::sui::SUI"], // Coin types to update prices for
 };
 
 // To withdraw all collateral, use MAX_U64
 const withdrawAllParams: WithdrawParams = {
   marketId: "1",
   amount: MAX_U64, // Special value to withdraw all collateral
-  coinType: "0x2::sui::SUI",
+  withdrawCoinType: "0x2::sui::SUI",
   positionCapId: "0xYOUR_POSITION_CAP_ID",
+  priceUpdateCoinTypes: ["0x2::sui::SUI"], // Coin types to update prices for
 };
 
 const withdrawTx = await alphalendClient.withdraw(withdrawParams);
@@ -135,88 +144,45 @@ const withdrawTx = await alphalendClient.withdraw(withdrawParams);
 await wallet.signAndExecuteTransaction(withdrawTx);
 ```
 
-### Claim Rewards
-
-```typescript
-import { ClaimRewardsParams } from "alphalend-sdk";
-
-// Claim earned rewards
-const claimParams: ClaimRewardsParams = {
-  marketId: "1", // Market ID to claim rewards from
-  coinType: "0x::reward::TOKEN", // Reward token type
-  positionCapId: "0xYOUR_POSITION_CAP_ID", // Your position capability
-};
-
-const claimTx = await alphalendClient.claimRewards(claimParams);
-
-// Sign and execute the transaction
-await wallet.signAndExecuteTransaction(claimTx);
-```
-
-### Liquidating Positions
-
-```typescript
-import { LiquidateParams } from "alphalend-sdk";
-
-// Liquidate an unhealthy position
-const liquidateParams: LiquidateParams = {
-  liquidatePositionId: "0xUNHEALTHY_POSITION_ID", // Position to liquidate
-  borrowMarketId: "2", // Market ID where debt is repaid
-  withdrawMarketId: "1", // Market ID for seizing collateral
-  repayAmount: BigInt(1000000), // Amount to repay
-  borrowCoinType: "0x::usdc::USDC", // Type of coin to repay
-  withdrawCoinType: "0x2::sui::SUI", // Type of collateral to seize
-  coinObjectId: "0xYOUR_COIN_OBJECT_ID", // Coin object to use for repayment
-};
-
-const liquidateTx = await alphalendClient.liquidate(liquidateParams);
-
-// Sign and execute the transaction
-await wallet.signAndExecuteTransaction(liquidateTx);
-```
-
-### Query Information
-
-```typescript
-// Get all markets in the protocol
-const markets = await alphalendClient.getAllMarkets();
-
-// Get a specific user position
-const position = await alphalendClient.getUserPosition("0xPOSITION_ID");
-
-// Get user portfolio (all positions and summary)
-const portfolio = await alphalendClient.getUserPortfolio("0xUSER_ADDRESS");
-```
-
-## Advanced Usage
-
-### Registering Custom Price Feeds
-
-```typescript
-import { registerPriceFeed } from "alphalend-sdk";
-
-// Register a new token price feed
-registerPriceFeed(
-  "0x123::custom::TOKEN", // Coin type
-  "CTOKEN", // Symbol
-  "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890", // Pyth price feed ID
-);
-```
-
 ## Types
 
 The SDK includes TypeScript definitions for all operations, making it easy to use in TypeScript projects:
 
 - `SupplyParams`: Parameters for supplying collateral
+
+  - `marketId`: Market ID where collateral is being added
+  - `amount`: Amount to supply as collateral in base units
+  - `supplyCoinType`: Supply coin type (e.g., "0x2::sui::SUI")
+  - `positionCapId?`: Object ID of the position capability object (optional)
+  - `address`: Address of the user supplying collateral
+  - `priceUpdateCoinTypes`: Coin types to update prices for
+
 - `WithdrawParams`: Parameters for withdrawing collateral
+
+  - `marketId`: Market ID from which to withdraw
+  - `amount`: Amount to withdraw (use MAX_U64 constant to withdraw all)
+  - `withdrawCoinType`: Withdraw coin type (e.g., "0x2::sui::SUI")
+  - `positionCapId`: Object ID of the position capability object
+  - `priceUpdateCoinTypes`: Coin types to update prices for
+
 - `BorrowParams`: Parameters for borrowing assets
+
+  - `marketId`: Market ID to borrow from
+  - `amount`: Amount to borrow in base units
+  - `borrowCoinType`: Borrow coin type (e.g., "0x2::sui::SUI")
+  - `positionCapId`: Object ID of the position capability object
+  - `priceUpdateCoinTypes`: Coin types to update prices for
+
 - `RepayParams`: Parameters for repaying borrowed assets
-- `ClaimRewardsParams`: Parameters for claiming rewards
-- `LiquidateParams`: Parameters for liquidating positions
-- `Market`: Market data model
-- `Position`: Position data model
-- `Portfolio`: User portfolio data model
 
-## License
+  - `marketId`: Market ID where the debt exists
+  - `amount`: Amount to repay in base units
+  - `repayCoinType`: Repay coin type (e.g., "0x2::sui::SUI")
+  - `positionCapId`: Object ID of the position capability object
+  - `address`: Address of the user repaying the debt
+  - `priceUpdateCoinTypes`: Coin types to update prices for
 
-MIT
+- `updatePrices`: Function to update price feeds
+  - Parameters:
+    - `tx`: Transaction object to add price update calls to
+    - `coinTypes`: Array of coin types to update prices for

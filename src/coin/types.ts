@@ -125,3 +125,13 @@ export interface Coin {
   icon: Icon;
   expo: number;
 }
+
+export interface PythPriceInfo {
+  fields: {
+    price_info: {
+      fields: {
+        attestation_time: string;
+      };
+    };
+  };
+}
