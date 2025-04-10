@@ -233,5 +233,6 @@ export const getUserPortfolio = async (
   suiClient: SuiClient,
   userAddress: string,
 ): Promise<Portfolio> => {
+  console.log(suiClient, userAddress);
   return {} as Portfolio;
 };

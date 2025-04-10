@@ -284,15 +284,15 @@ console.log(portfolio);
 //   aggregatedSupplyApr: "5.0",
 //   aggregatedBorrowApr: "8.0",
 //   userBalances: [
-//     { 
-//       marketId: "1", 
-//       suppliedAmount: 1000000000n, 
-//       borrowedAmount: 0n 
+//     {
+//       marketId: "1",
+//       suppliedAmount: 1000000000n,
+//       borrowedAmount: 0n
 //     },
-//     { 
-//       marketId: "2", 
-//       suppliedAmount: 0n, 
-//       borrowedAmount: 500000000n 
+//     {
+//       marketId: "2",
+//       suppliedAmount: 0n,
+//       borrowedAmount: 500000000n
 //     }
 //   ]
 // }
