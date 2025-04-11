@@ -73,6 +73,20 @@ export const getUserPositionId = async (
   }
 };
 
+// export const getUserPosition = async (
+//   suiClient: SuiClient,
+//   userAddress: string,
+// ): Promise<PositionQueryType> => {
+//   const positionId = await getUserPositionId(suiClient, userAddress);
+//   const response = await suiClient.getObject({
+//     id: positionId,
+//     options: {
+//       showContent: true,
+//     },
+//   });
+//   return response.data as unknown as PositionQueryType;
+// };
+
 export const getProtocolStats = async (
   suiClient: SuiClient,
 ): Promise<ProtocolStats> => {
@@ -121,84 +135,76 @@ export const getMarkets = async (suiClient: SuiClient): Promise<Market[]> => {
 
     // Fetch and process each market from the active market IDs
     const markets: Market[] = [];
+    const responses = await suiClient.multiGetObjects({
+      ids: activeMarketIds,
+      options: {
+        showContent: true,
+      },
+    });
 
-    for (const marketId of activeMarketIds) {
-      try {
-        // Get the specific market object from the dynamic field
-        const response = await suiClient.getObject({
-          id: marketId,
-          options: {
-            showContent: true,
-          },
-        });
-        const marketObject = response.data as unknown as MarketQueryType;
+    for (const response of responses) {
+      const marketObject = response.data as unknown as MarketQueryType;
 
-        if (
-          !marketObject.content ||
-          marketObject.content.dataType !== "moveObject"
-        ) {
-          console.warn(`Market ${marketId} data not found or invalid`);
-          continue;
-        }
-
-        const marketFields = marketObject.content.fields;
-
-        // Extract the market details and add to results
-        const marketConfig = marketFields.config.fields;
-
-        // Calculate utilization rate
-        const totalSupply = BigInt(marketFields.xtoken_supply);
-        const totalBorrow = BigInt(marketFields.borrowed_amount);
-        const utilizationRate =
-          totalSupply > 0
-            ? Number((totalBorrow * BigInt(100)) / totalSupply) / 100
-            : 0;
-
-        // Get the interest rate model from market config
-        const interestRateModel = {
-          baseRate: Number(marketConfig.interest_rates[0]) / 10000, // Base rate, convert from basis points
-          slope1:
-            (Number(marketConfig.interest_rates[1]) -
-              Number(marketConfig.interest_rates[0])) /
-            10000,
-          slope2:
-            (Number(marketConfig.interest_rates[2]) -
-              Number(marketConfig.interest_rates[1])) /
-            10000,
-          optimalUtilization: Number(marketConfig.interest_rate_kinks[0]) / 100,
-        };
-
-        // Calculate borrow APR
-        const borrowApr = calculateBorrowApr(
-          utilizationRate,
-          interestRateModel,
+      if (
+        !marketObject.content ||
+        marketObject.content.dataType !== "moveObject"
+      ) {
+        console.warn(
+          `Market ${marketObject.objectId} data not found or invalid`,
         );
-
-        // Calculate supply APR using borrow APR
-        const reserveFactor =
-          Number(marketConfig.protocol_fee_share_bps) / 10000;
-        const supplyApr = calculateSupplyApr(
-          borrowApr.interestApr,
-          utilizationRate,
-          reserveFactor,
-        );
-
-        markets.push({
-          marketId: marketFields.market_id,
-          coinType: marketFields.coin_type,
-          totalSupply,
-          totalBorrow,
-          utilizationRate,
-          supplyApr,
-          borrowApr,
-          ltv: Number(marketConfig.safe_collateral_ratio) / 100,
-          liquidationThreshold:
-            Number(marketConfig.liquidation_threshold) / 100,
-          depositLimit: BigInt(marketConfig.deposit_limit),
-        });
-      } catch (error) {
-        console.error(`Error fetching market ${marketId}:`, error);
+        continue;
       }
+
+      const marketFields = marketObject.content.fields.value.fields;
+
+      // Extract the market details and add to results
+      const marketConfig = marketFields.config.fields;
+
+      // Calculate utilization rate
+      const totalSupply = BigInt(marketFields.xtoken_supply);
+      const totalBorrow = BigInt(marketFields.borrowed_amount);
+      const utilizationRate =
+        totalSupply > 0
+          ? Number((totalBorrow * BigInt(100)) / totalSupply) / 100
+          : 0;
+
+      // Get the interest rate model from market config
+      const interestRateModel = {
+        baseRate: Number(marketConfig.interest_rates[0]) / 10000, // Base rate, convert from basis points
+        slope1:
+          (Number(marketConfig.interest_rates[1]) -
+            Number(marketConfig.interest_rates[0])) /
+          10000,
+        slope2:
+          (Number(marketConfig.interest_rates[2]) -
+            Number(marketConfig.interest_rates[1])) /
+          10000,
+        optimalUtilization: Number(marketConfig.interest_rate_kinks[0]) / 100,
+      };
+
+      // Calculate borrow APR
+      const borrowApr = calculateBorrowApr(utilizationRate, interestRateModel);
+
+      // Calculate supply APR using borrow APR
+      const reserveFactor = Number(marketConfig.protocol_fee_share_bps) / 10000;
+      const supplyApr = calculateSupplyApr(
+        borrowApr.interestApr,
+        utilizationRate,
+        reserveFactor,
+      );
+
+      markets.push({
+        marketId: marketFields.market_id,
+        coinType: marketFields.coin_type.fields.name,
+        totalSupply,
+        totalBorrow,
+        utilizationRate,
+        supplyApr,
+        borrowApr,
+        ltv: Number(marketConfig.safe_collateral_ratio) / 100,
+        liquidationThreshold: Number(marketConfig.liquidation_threshold) / 100,
+        depositLimit: BigInt(marketConfig.deposit_limit),
+      });
     }
 
     return markets;
@@ -260,8 +266,143 @@ export const getUserPortfolio = async (
   suiClient: SuiClient,
   userAddress: string,
 ): Promise<Portfolio> => {
-  console.log(suiClient, userAddress);
-  return {} as Portfolio;
+  try {
+    // Get user position ID
+    const positionId = await getUserPositionId(suiClient, userAddress);
+    if (!positionId) {
+      // Return empty portfolio if no position found
+      return {
+        userAddress,
+        netWorth: "0",
+        totalSuppliedUsd: "0",
+        totalBorrowedUsd: "0",
+        safeBorrowLimit: "0",
+        borrowLimitUsed: "0",
+        liquidationLimit: "0",
+        rewardsToClaimUsd: "0",
+        rewardsByToken: [],
+        dailyEarnings: "0",
+        netApr: "0",
+        aggregatedSupplyApr: "0",
+        aggregatedBorrowApr: "0",
+        userBalances: [],
+      };
+    }
+
+    // Get all markets to calculate APRs and limits
+    const markets = await getMarkets(suiClient);
+    const prices = await getPricesFromPyth(
+      markets.map((market) => market.coinType),
+    );
+
+    // Initialize portfolio metrics
+    let totalSuppliedUsd = 0;
+    let totalBorrowedUsd = 0;
+    let weightedSupplyApr = 0;
+    let weightedBorrowApr = 0;
+    let totalWeight = 0;
+    let liquidationLimit = 0;
+    let safeBorrowLimit = 0;
+    const userBalances: {
+      marketId: string;
+      suppliedAmount: bigint;
+      borrowedAmount: bigint;
+    }[] = [];
+
+    // Calculate portfolio metrics
+    for (const market of markets) {
+      const tokenPrice = prices.find(
+        (price) => price.coinType === market.coinType,
+      )?.price.price;
+      if (!tokenPrice) continue;
+
+      // Calculate supplied and borrowed values
+      const suppliedValue = Number(market.totalSupply) * Number(tokenPrice);
+      const borrowedValue = Number(market.totalBorrow) * Number(tokenPrice);
+
+      totalSuppliedUsd += suppliedValue;
+      totalBorrowedUsd += borrowedValue;
+
+      // Calculate weighted APRs
+      const weight = suppliedValue + borrowedValue;
+      totalWeight += weight;
+      weightedSupplyApr +=
+        (market.supplyApr.interestApr +
+          market.supplyApr.rewards.reduce(
+            (acc, reward) => acc + reward.rewardApr,
+            0,
+          )) *
+        suppliedValue;
+      weightedBorrowApr +=
+        (market.borrowApr.interestApr +
+          market.borrowApr.rewards.reduce(
+            (acc, reward) => acc + reward.rewardApr,
+            0,
+          )) *
+        borrowedValue;
+
+      // Calculate limits
+      liquidationLimit += suppliedValue * market.liquidationThreshold;
+      safeBorrowLimit += suppliedValue * market.ltv;
+
+      // Add to user balances
+      userBalances.push({
+        marketId: market.marketId,
+        suppliedAmount: market.totalSupply,
+        borrowedAmount: market.totalBorrow,
+      });
+    }
+
+    // Calculate final metrics
+    const netWorth = totalSuppliedUsd - totalBorrowedUsd;
+    const borrowLimitUsed =
+      safeBorrowLimit > 0 ? (totalBorrowedUsd / safeBorrowLimit) * 100 : 0;
+    const aggregatedSupplyApr =
+      totalSuppliedUsd > 0 ? weightedSupplyApr / totalSuppliedUsd : 0;
+    const aggregatedBorrowApr =
+      totalBorrowedUsd > 0 ? weightedBorrowApr / totalBorrowedUsd : 0;
+    const netApr =
+      totalWeight > 0
+        ? (weightedSupplyApr - weightedBorrowApr) / totalWeight
+        : 0;
+    const dailyEarnings = (netApr / 365) * netWorth;
+
+    return {
+      userAddress,
+      netWorth: netWorth.toString(),
+      totalSuppliedUsd: totalSuppliedUsd.toString(),
+      totalBorrowedUsd: totalBorrowedUsd.toString(),
+      safeBorrowLimit: safeBorrowLimit.toString(),
+      borrowLimitUsed: borrowLimitUsed.toString(),
+      liquidationLimit: liquidationLimit.toString(),
+      rewardsToClaimUsd: "0", // TODO: Implement rewards calculation
+      rewardsByToken: [], // TODO: Implement rewards by token
+      dailyEarnings: dailyEarnings.toString(),
+      netApr: netApr.toString(),
+      aggregatedSupplyApr: aggregatedSupplyApr.toString(),
+      aggregatedBorrowApr: aggregatedBorrowApr.toString(),
+      userBalances,
+    };
+  } catch (error) {
+    console.error("Error getting user portfolio:", error);
+    // Return empty portfolio on error
+    return {
+      userAddress,
+      netWorth: "0",
+      totalSuppliedUsd: "0",
+      totalBorrowedUsd: "0",
+      safeBorrowLimit: "0",
+      borrowLimitUsed: "0",
+      liquidationLimit: "0",
+      rewardsToClaimUsd: "0",
+      rewardsByToken: [],
+      dailyEarnings: "0",
+      netApr: "0",
+      aggregatedSupplyApr: "0",
+      aggregatedBorrowApr: "0",
+      userBalances: [],
+    };
+  }
 };
 
 export const getPricesFromPyth = async (
