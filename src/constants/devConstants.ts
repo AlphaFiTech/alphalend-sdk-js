@@ -38,6 +38,10 @@ export const devConstants = {
   PYTH_PRICE_INDENTIFIER_TYPE:
     "0xabf837e98c26087cba0883c0a7a28326b1fa3c5e1e2c5abdb486f9e8f594c837::price_identifier::PriceIdentifier",
 
+  PYTH_MAINNET_API_ENDPOINT: "https://hermes-beta.pyth.network",
+
+  PYTH_PRICE_PATH: "/api/latest_price_feeds",
+
   // Coin Types
   SUI_COIN_TYPE: "0x2::sui::SUI",
 

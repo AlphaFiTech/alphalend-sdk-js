@@ -2,7 +2,14 @@ import { SuiClient } from "@mysten/sui/client";
 import { isPositionCapObject } from "./utils/helper.js";
 import { getConstants } from "./constants/index.js";
 import { Market, Portfolio, ProtocolStats } from "./core/types.js";
-import { MarketQueryType, PositionCapQueryType } from "./utils/queryTypes.js";
+import {
+  MarketQueryType,
+  PositionCapQueryType,
+  PriceData,
+} from "./utils/queryTypes.js";
+import { pythPriceFeedIds } from "./utils/priceFeedIds.js";
+
+const constants = getConstants();
 
 // Function to fetch all owned objects and find the PositionCap
 export const getUserPositionCapId = async (
@@ -30,21 +37,83 @@ export const getUserPositionCapId = async (
       return (positionCapObject.data as unknown as PositionCapQueryType)
         .objectId;
     }
-
-    return undefined;
   } catch (error) {
     console.error("Error fetching user positionCap ID:", error);
   }
 };
 
-/**
- * Fetch all markets with their market IDs
- * This function uses the ACTIVE_MARKETS array from constants
- * and retrieves market details for each market ID
- *
- * @param suiClient - The SUI client instance
- * @returns Promise resolving to an array of Market objects
- */
+// Function to fetch all owned objects and find the PositionCap and return the positionId
+export const getUserPositionId = async (
+  suiClient: SuiClient,
+  userAddress: string,
+): Promise<string | undefined> => {
+  try {
+    // Fetch owned objects for the user
+    const response = await suiClient.getOwnedObjects({
+      owner: userAddress,
+      options: {
+        showContent: true, // Include object content to access fields
+      },
+    });
+
+    if (!response || !response.data || response.data.length === 0) {
+      return undefined;
+    }
+
+    // Find the first PositionCap object and extract the positionCap ID
+    const positionCapObject = response.data.find((data) =>
+      isPositionCapObject(data.data as unknown as PositionCapQueryType),
+    );
+    if (positionCapObject) {
+      return (positionCapObject.data as unknown as PositionCapQueryType).content
+        .fields.position_id;
+    }
+  } catch (error) {
+    console.error("Error fetching user position ID:", error);
+  }
+};
+
+export const getProtocolStats = async (
+  suiClient: SuiClient,
+): Promise<ProtocolStats> => {
+  try {
+    const markets = await getMarkets(suiClient);
+
+    let totalSuppliedUsd = 0;
+    let totalBorrowedUsd = 0;
+
+    const prices = await getPricesFromPyth(
+      markets.map((market) => market.coinType),
+    );
+
+    for (const market of markets) {
+      const tokenPrice = prices.find(
+        (price) => price.coinType === market.coinType,
+      )?.price.price;
+
+      if (!tokenPrice) {
+        console.error(`No price found for ${market.coinType}`);
+        continue;
+      }
+
+      // Add to total supplied and borrowed
+      totalSuppliedUsd += Number(market.totalSupply) * Number(tokenPrice);
+      totalBorrowedUsd += Number(market.totalBorrow) * Number(tokenPrice);
+    }
+
+    return {
+      totalSuppliedUsd: totalSuppliedUsd.toString(),
+      totalBorrowedUsd: totalBorrowedUsd.toString(),
+    };
+  } catch (error) {
+    console.error("Error calculating protocol stats:", error);
+    return {
+      totalSuppliedUsd: "0",
+      totalBorrowedUsd: "0",
+    };
+  }
+};
+
 export const getMarkets = async (suiClient: SuiClient): Promise<Market[]> => {
   try {
     const constants = getConstants();
@@ -139,48 +208,6 @@ export const getMarkets = async (suiClient: SuiClient): Promise<Market[]> => {
   }
 };
 
-/**
- * Get protocol statistics including total supplied and borrowed values
- * This function aggregates data across all markets
- *
- * @param suiClient - The SUI client instance
- * @returns Promise resolving to a ProtocolStats object
- */
-export const getProtocolStats = async (
-  suiClient: SuiClient,
-): Promise<ProtocolStats> => {
-  try {
-    const markets = await getMarkets(suiClient);
-
-    let totalSuppliedUsd = 0;
-    let totalBorrowedUsd = 0;
-
-    // Sum up the total supplied and borrowed across all markets
-    // Note: In a real implementation, we would convert the token amounts to USD
-    // using price feeds. For simplicity, assuming 1:1 conversion for now.
-    for (const market of markets) {
-      // To convert to USD, we would multiply by token price
-      // For example: const tokenPrice = await getPriceForToken(market.coinType);
-      const tokenPrice = 1; // Placeholder for actual price implementation
-
-      // Add to total supplied and borrowed
-      totalSuppliedUsd += Number(market.totalSupply) * tokenPrice;
-      totalBorrowedUsd += Number(market.totalBorrow) * tokenPrice;
-    }
-
-    return {
-      totalSuppliedUsd: totalSuppliedUsd.toString(),
-      totalBorrowedUsd: totalBorrowedUsd.toString(),
-    };
-  } catch (error) {
-    console.error("Error calculating protocol stats:", error);
-    return {
-      totalSuppliedUsd: "0",
-      totalBorrowedUsd: "0",
-    };
-  }
-};
-
 const calculateSupplyApr = (
   borrowApr = 0,
   utilizationRate = 0,
@@ -235,4 +262,63 @@ export const getUserPortfolio = async (
 ): Promise<Portfolio> => {
   console.log(suiClient, userAddress);
   return {} as Portfolio;
+};
+
+export const getPricesFromPyth = async (
+  coinTypes: string[],
+): Promise<PriceData[]> => {
+  try {
+    if (coinTypes.length === 0) {
+      return [];
+    }
+
+    const feedIds: string[] = [];
+    const feedIdToCoinType: Record<string, string> = {};
+    // Collect feed IDs for given coin IDs
+    coinTypes.forEach((coinType) => {
+      const id = pythPriceFeedIds[coinType];
+      if (!id) {
+        console.error(`Coin ID not supported: ${coinType}`);
+      }
+      feedIdToCoinType[id] = coinType;
+      feedIds.push(id);
+    });
+
+    if (feedIds.length === 0) {
+      console.error("No feed IDs found for the requested coin IDs");
+      return [];
+    }
+
+    // Construct URL with query parameters
+    const queryParams = feedIds.map((id) => `ids[]=${id}`).join("&");
+    const url = `${constants.PYTH_MAINNET_API_ENDPOINT}${constants.PYTH_PRICE_PATH}?${queryParams}`;
+
+    // Fetch data from Pyth Network
+    const response = await fetch(url);
+    if (!response.ok) {
+      console.error(
+        `Failed to fetch from Pyth Network: HTTP ${response.status}`,
+      );
+      return [];
+    }
+    const prices = await response.json();
+    if (!Array.isArray(prices)) {
+      console.error("Invalid response format from Pyth Network");
+      return [];
+    }
+
+    const result: PriceData[] = [];
+    for (const price of prices) {
+      result.push({
+        coinType: feedIdToCoinType[price.id],
+        price: price.price,
+        ema_price: price.ema_price,
+      });
+    }
+
+    return result;
+  } catch (error) {
+    console.error("Error fetching prices from Pyth Network:", error);
+    throw error;
+  }
 };

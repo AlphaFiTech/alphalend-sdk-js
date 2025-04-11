@@ -48,9 +48,15 @@ export interface MarketQueryType {
         type: string;
       };
       /// Distributor for deposit rewards
-      deposit_reward_distributor: RewardDistributorQueryType;
+      deposit_reward_distributor: {
+        fields: RewardDistributorQueryType;
+        type: string;
+      };
       /// Distributor for borrow rewards
-      borrow_reward_distributor: RewardDistributorQueryType;
+      borrow_reward_distributor: {
+        fields: RewardDistributorQueryType;
+        type: string;
+      };
       /// Flow limiter for deposits
       deposit_flow_limiter: {
         fields: FlowLimiterQueryType;
@@ -67,9 +73,25 @@ export interface MarketQueryType {
   };
 }
 
-// ******** to-do: add type ********
 interface RewardDistributorQueryType {
   id: string;
+  total_xtokens: string;
+  rewards: (Reward | undefined)[];
+  last_updated: string;
+  market_id: string;
+}
+
+interface Reward {
+  id: string;
+  coin_type: string;
+  distributor_id: string;
+  is_auto_compounded: boolean;
+  auto_compound_market_id: string;
+  total_rewards: string;
+  start_time: string;
+  end_time: string;
+  distributed_rewards: string;
+  cummulative_rewards_per_share: string;
 }
 
 interface FlowLimiterQueryType {
@@ -135,7 +157,33 @@ interface MarketConfigQueryType {
 // You should adjust these types according to your actual contract structure
 export interface PositionCapQueryType {
   objectId: string;
+  version: string;
+  digest: string;
   content: {
+    dataType: string;
     type: string;
+    fields: {
+      id: {
+        id: string;
+      };
+      /// Unique identifier for the position
+      position_id: string;
+    };
+  };
+}
+
+export interface PriceData {
+  coinType: string;
+  price: {
+    price: string;
+    conf: string;
+    expo: number;
+    publish_time: number;
+  };
+  ema_price: {
+    price: string;
+    conf: string;
+    expo: number;
+    publish_time: number;
   };
 }
