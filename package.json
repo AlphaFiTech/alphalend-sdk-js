@@ -13,20 +13,15 @@
     }
   },
   "scripts": {
-    "prebuild": "npm run pretty && npm run lint",
-    "build": "npm run build:cjs && npm run build:esm",
+    "clean": "rm -rf dist",
+    "build": "npm run clean && npm run build:cjs && npm run build:esm",
     "build:esm": "tsc --project tsconfig.esm.json && echo '{\"type\":\"module\"}' > dist/esm/package.json",
     "build:cjs": "tsc --project tsconfig.cjs.json && echo '{\"type\":\"commonjs\"}' > dist/cjs/package.json",
-    "postbuild": "npm link",
-    "pretty": "prettier . --write",
+    "build:docker": "npm run build",
     "lint": "eslint 'src/**/*.ts' --fix",
-    "prettier": "prettier --write 'src/**/*.ts'",
-    "gen": "node embed-graphql.js",
-    "docs": "typedoc",
-    "test:esm": "jest --config jest.config.esm.js",
-    "test:cjs": "jest --config jest.config.cjs.js",
-    "test": "npm run test:esm && npm run test:cjs",
-    "prepublish": "npm run docs"
+    "format": "prettier --write 'src/**/*.ts'",
+    "test": "jest --config jest.config.cjs.js",
+    "docs": "typedoc"
   },
   "keywords": [],
   "author": "",
