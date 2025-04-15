@@ -7,6 +7,7 @@ export * from "./core/types.js";
 export * from "./utils/oracle.js";
 export * from "./utils/priceFeedIds.js";
 export * from "./coin/index.js";
+export { getUserPositionCapId } from "./functions.js";
 
 // Re-export key types for easier access
 export { AlphalendClient } from "./core/client.js";

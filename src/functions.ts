@@ -3,8 +3,10 @@ import { isPositionCapObject } from "./utils/helper.js";
 import { getConstants } from "./constants/index.js";
 import { Market, Portfolio, ProtocolStats } from "./core/types.js";
 import {
+  BorrowQueryType,
   MarketQueryType,
   PositionCapQueryType,
+  PositionQueryType,
   PriceData,
 } from "./utils/queryTypes.js";
 import { pythPriceFeedIds } from "./utils/priceFeedIds.js";
@@ -73,19 +75,25 @@ export const getUserPositionId = async (
   }
 };
 
-// export const getUserPosition = async (
-//   suiClient: SuiClient,
-//   userAddress: string,
-// ): Promise<PositionQueryType> => {
-//   const positionId = await getUserPositionId(suiClient, userAddress);
-//   const response = await suiClient.getObject({
-//     id: positionId,
-//     options: {
-//       showContent: true,
-//     },
-//   });
-//   return response.data as unknown as PositionQueryType;
-// };
+export const getUserPosition = async (
+  suiClient: SuiClient,
+  userAddress: string,
+): Promise<PositionQueryType | undefined> => {
+  const positionId = await getUserPositionId(suiClient, userAddress);
+  if (!positionId) {
+    console.error("No position ID found");
+    return undefined;
+  }
+
+  const response = await suiClient.getObject({
+    id: positionId,
+    options: {
+      showContent: true,
+    },
+  });
+
+  return response.data as unknown as PositionQueryType;
+};
 
 export const getProtocolStats = async (
   suiClient: SuiClient,
@@ -268,8 +276,8 @@ export const getUserPortfolio = async (
 ): Promise<Portfolio> => {
   try {
     // Get user position ID
-    const positionId = await getUserPositionId(suiClient, userAddress);
-    if (!positionId) {
+    const position = await getUserPosition(suiClient, userAddress);
+    if (!position) {
       // Return empty portfolio if no position found
       return {
         userAddress,
@@ -288,12 +296,22 @@ export const getUserPortfolio = async (
         userBalances: [],
       };
     }
+    const positionFields = position.content.fields.value.fields;
 
     // Get all markets to calculate APRs and limits
     const markets = await getMarkets(suiClient);
     const prices = await getPricesFromPyth(
       markets.map((market) => market.coinType),
     );
+    const marketMap = createMarketMap(markets);
+    const priceMap = createPriceMap(prices);
+
+    const collaterals = positionFields.collaterals.fields.contents;
+    const loans = positionFields.loans;
+
+    const collateralMap = createCollateralMap(collaterals, marketMap, priceMap);
+
+    const loanMap = createLoanMap(loans, marketMap, priceMap);
 
     // Initialize portfolio metrics
     let totalSuppliedUsd = 0;
@@ -403,6 +421,79 @@ export const getUserPortfolio = async (
       userBalances: [],
     };
   }
+};
+
+const createMarketMap = (markets: Market[]) => {
+  return new Map(markets.map((market) => [market.marketId, market]));
+};
+
+const createPriceMap = (prices: PriceData[]) => {
+  return new Map(prices.map((price) => [price.coinType, price]));
+};
+
+const createCollateralMap = (
+  collaterals: {
+    fields: {
+      key: string;
+      value: string;
+    };
+    type: string;
+  }[],
+  marketMap: Map<string, Market>,
+  priceMap: Map<string, PriceData>,
+): Map<string, { amount: string; amountUsd: string }> => {
+  const collateralMap = new Map<
+    string,
+    {
+      amount: string;
+      amountUsd: string;
+    }
+  >();
+  for (const collateral of collaterals) {
+    const marketId = collateral.fields.key;
+    const collateralAmount = collateral.fields.value;
+
+    const market = marketMap.get(marketId);
+    if (!market) continue;
+
+    const tokenPrice = priceMap.get(market.coinType)?.price.price;
+    if (!tokenPrice) continue;
+
+    const suppliedValueUsd = Number(collateralAmount) * Number(tokenPrice);
+    collateralMap.set(marketId, {
+      amount: collateralAmount,
+      amountUsd: suppliedValueUsd.toString(),
+    });
+  }
+  return collateralMap;
+};
+
+const createLoanMap = (
+  loans: {
+    fields: BorrowQueryType;
+    type: string;
+  }[],
+  marketMap: Map<string, Market>,
+  priceMap: Map<string, PriceData>,
+): Map<string, { amount: string; amountUsd: string }> => {
+  const loanMap = new Map<string, { amount: string; amountUsd: string }>();
+  for (const loan of loans) {
+    const marketId = loan.fields.market_id;
+    const loanAmount = loan.fields.amount;
+
+    const market = marketMap.get(marketId);
+    if (!market) continue;
+
+    const tokenPrice = priceMap.get(market.coinType)?.price.price;
+    if (!tokenPrice) continue;
+
+    const loanValueUsd = Number(loanAmount) * Number(tokenPrice);
+    loanMap.set(marketId, {
+      amount: loanAmount,
+      amountUsd: loanValueUsd.toString(),
+    });
+  }
+  return loanMap;
 };
 
 export const getPricesFromPyth = async (
