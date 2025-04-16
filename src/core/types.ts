@@ -211,6 +211,8 @@ export interface Portfolio {
   totalBorrowedUsd: string;
   /** Maximum amount that can be borrowed (USD) */
   safeBorrowLimit: string;
+  /** Amount of borrowed assets multiplied by the borrow weight (USD) */
+  borrowLimitUsed: string;
   /** Limit for liquidation (USD) */
   liquidationLimit: string;
   /** Amount of rewards to claim (USD) */

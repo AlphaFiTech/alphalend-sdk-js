@@ -16,9 +16,8 @@ import {
 const constants = getConstants();
 
 export interface UpdatePriceTransactionArgs {
-  oracle: string;
   priceInfoObject: string;
-  clock: string;
+  coinType: string;
 }
 
 export async function getPriceInfoObjectIdsWithUpdate(
@@ -56,11 +55,29 @@ export function updatePriceTransaction(
   args: UpdatePriceTransactionArgs,
 ) {
   tx.moveCall({
-    target: `${constants.ORACLE_PACKAGE_ID}::oracle::update_price`,
+    target: `${constants.ALPHAFI_ORACLE_PACKAGE_ID}::oracle::update_price_from_pyth`,
     arguments: [
-      tx.object(args.oracle),
+      tx.object(constants.ALPHAFI_ORACLE_OBJECT_ID),
       tx.object(args.priceInfoObject),
-      tx.object(args.clock),
+      tx.object(constants.SUI_CLOCK_OBJECT_ID),
+    ],
+  });
+
+  const coinTypeName = tx.moveCall({
+    target: `0x2::type_name::get`,
+    typeArguments: [args.coinType],
+  });
+
+  const oraclePriceInfo = tx.moveCall({
+    target: `${constants.ALPHAFI_ORACLE_PACKAGE_ID}::oracle::get_price_info`,
+    arguments: [tx.object(constants.ALPHAFI_ORACLE_OBJECT_ID), coinTypeName],
+  });
+
+  tx.moveCall({
+    target: `${constants.ALPHALEND_PACKAGE_ID}::oracle::update_price`,
+    arguments: [
+      tx.object(constants.ALPHALEND_ORACLE_OBJECT_ID),
+      oraclePriceInfo,
     ],
   });
 }

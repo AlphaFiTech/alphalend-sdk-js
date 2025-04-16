@@ -1,3 +1,19 @@
+interface NumberQueryType {
+  fields: {
+    value: string;
+  };
+  type: string;
+}
+
+interface TypeNameQueryType {
+  fields: {
+    name: string;
+  };
+  type: string;
+}
+
+// Market Query Types
+
 export interface MarketQueryType {
   objectId: string;
   version: string;
@@ -9,133 +25,267 @@ export interface MarketQueryType {
       id: {
         id: string;
       };
-      /// Unique identifier for the market
-      market_id: string;
-      /// Type of coin handled by this market
-      coin_type: string;
-      /// Type of xToken (interest-bearing token) for this market
-      xtoken_type: string;
-      /// Total supply of xTokens in circulation
-      xtoken_supply: string;
-      /// Current exchange rate between xTokens and underlying tokens
-      xtoken_ratio: string;
-      /// Total amount of tokens borrowed from the market
-      borrowed_amount: string;
-      /// Amount of tokens written off due to liquidations
-      writeoff_amount: string;
-      /// Amount of tokens held in the market
-      balance_holding: string;
-      /// Unclaimed spread fee in the market
-      unclaimed_spread_fee: string;
-      /// Unclaimed spread fee to be shared with protocol
-      unclaimed_spread_fee_protocol: string;
-      /// Compounded interest rate for the market
-      compounded_interest: string;
-      /// Timestamp when the market was last updated
-      last_update: string;
-      /// Timestamp when the market was auto compounded
-      last_auto_compound: string;
-      /// Configuration parameters for the market
-      config: {
-        fields: MarketConfigQueryType;
-        type: string;
-      };
-      /// Price identifier for the market
-      price_identifier: {
+      name: string;
+      value: {
         fields: {
-          price_identifier: string;
+          balance_holding: string;
+          borrow_reward_distributor: {
+            fields: RewardDistributorQueryType;
+            type: string;
+          };
+          borrowed_amount: string;
+          coin_type: TypeNameQueryType;
+          compounded_interest: NumberQueryType;
+          config: {
+            fields: MarketConfigQueryType;
+            type: string;
+          };
+          decimal_digit: NumberQueryType;
+          deposit_flow_limiter: {
+            fields: FlowLimiterQueryType;
+            type: string;
+          };
+          deposit_reward_distributor: {
+            fields: RewardDistributorQueryType;
+            type: string;
+          };
+          id: {
+            id: string;
+          };
+          last_auto_compound: string;
+          last_update: string;
+          market_id: string;
+          outflow_limiter: {
+            fields: FlowLimiterQueryType;
+            type: string;
+          };
+          price_identifier: {
+            fields: {
+              coin_type: TypeNameQueryType;
+            };
+            type: string;
+          };
+          unclaimed_spread_fee: string;
+          unclaimed_spread_fee_protocol: string;
+          writeoff_amount: string;
+          xtoken_ratio: NumberQueryType;
+          xtoken_supply: string;
+          xtoken_type: TypeNameQueryType;
         };
         type: string;
       };
-      /// Distributor for deposit rewards
-      deposit_reward_distributor: RewardDistributorQueryType;
-      /// Distributor for borrow rewards
-      borrow_reward_distributor: RewardDistributorQueryType;
-      /// Flow limiter for deposits
-      deposit_flow_limiter: {
-        fields: FlowLimiterQueryType;
-        type: string;
-      };
-      /// Flow limiter for withdrawals
-      outflow_limiter: {
-        fields: FlowLimiterQueryType;
-        type: string;
-      };
-      /// Number of mist in one token
-      decimal_digit: string;
     };
   };
 }
 
-// ******** to-do: add type ********
 interface RewardDistributorQueryType {
-  id: string;
+  id: {
+    id: string;
+  };
+  last_updated: string;
+  market_id: string;
+  rewards: (RewardQueryType | null)[];
+  total_xtokens: string;
+}
+
+interface RewardQueryType {
+  id: {
+    id: string;
+  };
+  coin_type: TypeNameQueryType;
+  distributor_id: string;
+  is_auto_compounded: boolean;
+  auto_compound_market_id: string;
+  total_rewards: string;
+  start_time: string;
+  end_time: string;
+  distributed_rewards: string;
+  cummulative_rewards_per_share: string;
 }
 
 interface FlowLimiterQueryType {
-  // Current flow amount in the window
-  flow_delta: string;
-  // Last time the flow was updated
+  flow_delta: NumberQueryType;
   last_update: string;
-  // Maximum amount that can flow in a window
   max_rate: string;
-  // Time window in milliseconds
   window_duration: string;
 }
 
 interface MarketConfigQueryType {
-  /// Minimum collateral ratio required for safe borrowing (in percentage)
-  safe_collateral_ratio: string;
-  /// Threshold at which positions become liquidatable (in percentage)
-  liquidation_threshold: string;
-  /// Maximum amount of deposits allowed in the market
-  deposit_limit: string;
-  /// Fee charged on borrows (in basis points)
-  borrow_fee_bps: string;
-  /// Fee charged on deposits (in basis points)
-  deposit_fee_bps: string;
-  /// Fee charged on withdrawals (in basis points)
-  withdraw_fee_bps: string;
-  /// Not used in the current implementation
-  collateral_types: string[];
-  /// Utilization rate at which interest rates change (in percentage)
-  interest_rate_kinks: string[];
-  /// Interest rates for different utilization rates (in basis points)
-  interest_rates: string[];
-  /// Bonus for liquidating positions (in basis points)
-  liquidation_bonus_bps: string;
-  /// Fee charged for liquidating positions (in basis points)
-  liquidation_fee_bps: string;
-  /// Fee charged for interest earned in the market (in basis points)
-  spread_fee_bps: string;
-  /// Flag indicating if the market is isolated
-  isolated: boolean;
-  /// ID of the cascade market (0 if not a cascade market) Not used in the current implementation
-  cascade_market_id: string;
-  /// Percentage of fee to be shared with protocol (in basis points)
-  protocol_fee_share_bps: string;
-  /// Percentage of spread fee to be shared with protocol (in basis points)
-  protocol_spread_fee_share_bps: string;
-  /// Timestamp when the market config can be updated
-  time_lock: string;
-  /// Timestamp when the Market config was last updated
-  last_updated: string;
-  /// Flag indicating if the market is a native market
-  is_native: boolean;
-  /// Borrow weight for the market
-  borrow_weight: string;
-  /// Extension fields for future use
-  extension_fields: string;
-  /// Flag indicating if the market is currently active
   active: boolean;
-  /// Percentage of debt that can be closed in a single liquidation
-  close_factor_percentage: string;
+  borrow_fee_bps: string;
+  borrow_weight: NumberQueryType;
+  cascade_market_id: string;
+  close_factor_percentage: number;
+  collateral_types: TypeNameQueryType[];
+  deposit_fee_bps: string;
+  deposit_limit: string;
+  extension_fields: {
+    fields: {
+      id: {
+        id: string;
+      };
+      size: string;
+    };
+    type: string;
+  };
+  interest_rate_kinks: number[];
+  interest_rates: number[];
+  is_native: boolean;
+  isolated: boolean;
+  last_updated: string;
+  liquidation_bonus_bps: string;
+  liquidation_fee_bps: string;
+  liquidation_threshold: number;
+  protocol_fee_share_bps: string;
+  protocol_spread_fee_share_bps: string;
+  safe_collateral_ratio: number;
+  spread_fee_bps: string;
+  time_lock: string;
+  withdraw_fee_bps: string;
 }
 
-// You should adjust these types according to your actual contract structure
+// Position Query Types
+
 export interface PositionCapQueryType {
   objectId: string;
+  version: string;
+  digest: string;
   content: {
+    dataType: string;
     type: string;
+    fields: {
+      id: {
+        id: string;
+      };
+      position_id: string;
+      client_address: string;
+    };
+  };
+}
+
+export interface PositionQueryType {
+  objectId: string;
+  version: string;
+  digest: string;
+  content: {
+    dataType: string;
+    type: string;
+    fields: {
+      id: {
+        id: string;
+      };
+      name: string;
+      value: {
+        fields: {
+          additional_permissible_borrow_usd: NumberQueryType;
+          collaterals: {
+            fields: {
+              contents: {
+                fields: {
+                  key: string;
+                  value: string;
+                };
+                type: string;
+              }[];
+            };
+            type: string;
+          };
+          id: {
+            id: string;
+          };
+          is_isolated_borrowed: boolean;
+          is_position_healthy: boolean;
+          is_position_liquidatable: boolean;
+          last_refreshed: string;
+          liquidation_value: NumberQueryType;
+          loans: {
+            fields: BorrowQueryType;
+            type: string;
+          }[];
+          lp_collaterals: {
+            fields: LpPositionCollateralQueryType;
+            type: string;
+          } | null;
+          partner_id: string | null;
+          reward_distributors: {
+            fields: UserRewardDistributorQueryType;
+            type: string;
+          }[];
+          safe_collateral_usd: NumberQueryType;
+          spot_total_loan_usd: NumberQueryType;
+          total_collateral_usd: NumberQueryType;
+          total_loan_usd: NumberQueryType;
+          weighted_spot_total_loan_usd: NumberQueryType;
+          weighted_total_loan_usd: NumberQueryType;
+        };
+        type: string;
+      };
+    };
+  };
+}
+
+export interface LpPositionCollateralQueryType {
+  config: {
+    fields: LpPositionCollateralConfigQueryType;
+    type: string;
+  };
+  last_updated: string;
+  liquidity: string;
+  liquidation_value: NumberQueryType;
+  lp_position_id: string;
+  lp_type: number;
+  pool_id: string;
+  safe_usd_value: NumberQueryType;
+  usd_value: NumberQueryType;
+}
+
+export interface LpPositionCollateralConfigQueryType {
+  close_factor_percentage: number;
+  liquidation_bonus: string;
+  liquidation_fee: string;
+  liquidation_threshold: number;
+  safe_collateral_ratio: number;
+}
+
+export interface BorrowQueryType {
+  amount: string;
+  borrow_compounded_interest: NumberQueryType;
+  borrow_time: string;
+  coin_type: TypeNameQueryType;
+  market_id: string;
+  reward_distributor_index: string;
+}
+
+export interface UserRewardDistributorQueryType {
+  reward_distributor_id: string;
+  market_id: string;
+  share: string;
+  rewards: (UserRewardQueryType | null)[];
+  last_updated: string;
+  is_deposit: boolean;
+}
+
+export interface UserRewardQueryType {
+  reward_id: string;
+  coin_type: TypeNameQueryType;
+  earned_rewards: NumberQueryType;
+  cummulative_rewards_per_share: NumberQueryType;
+  is_auto_compounded: boolean;
+  auto_compound_market_id: string;
+}
+
+export interface PriceData {
+  coinType: string;
+  price: {
+    price: string;
+    conf: string;
+    expo: number;
+    publish_time: number;
+  };
+  ema_price: {
+    price: string;
+    conf: string;
+    expo: number;
+    publish_time: number;
   };
 }

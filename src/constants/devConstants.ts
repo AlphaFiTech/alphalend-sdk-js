@@ -2,10 +2,10 @@ export const devConstants = {
   SUI_CLOCK_OBJECT_ID: "0x6",
 
   // AlphaFi constants
-  ORACLE_PACKAGE_ID:
+  ALPHAFI_ORACLE_PACKAGE_ID:
     "0x8f4d641c8d03e72b1b137ea81e4fe2f949f0bf5c04720528e5a9029440216774",
 
-  ORACLE_OBJECT_ID:
+  ALPHAFI_ORACLE_OBJECT_ID:
     "0xcd920128a47c35fc9272de635e7e23754070f46f42fea2f845f18757628dbcaf",
 
   ADMIN_CAP_ID:
@@ -13,6 +13,8 @@ export const devConstants = {
 
   // AlphaLend constants
   ALPHALEND_PACKAGE_ID: "", // Replace with actual package ID
+
+  ALPHALEND_ORACLE_OBJECT_ID: "", // Replace with actual oracle object ID
 
   LENDING_PROTOCOL_ID: "", // Replace with actual protocol object ID
 
@@ -37,6 +39,10 @@ export const devConstants = {
 
   PYTH_PRICE_INDENTIFIER_TYPE:
     "0xabf837e98c26087cba0883c0a7a28326b1fa3c5e1e2c5abdb486f9e8f594c837::price_identifier::PriceIdentifier",
+
+  PYTH_MAINNET_API_ENDPOINT: "https://hermes-beta.pyth.network",
+
+  PYTH_PRICE_PATH: "/api/latest_price_feeds",
 
   // Coin Types
   SUI_COIN_TYPE: "0x2::sui::SUI",

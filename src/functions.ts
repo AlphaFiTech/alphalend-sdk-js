@@ -2,7 +2,16 @@ import { SuiClient } from "@mysten/sui/client";
 import { isPositionCapObject } from "./utils/helper.js";
 import { getConstants } from "./constants/index.js";
 import { Market, Portfolio, ProtocolStats } from "./core/types.js";
-import { MarketQueryType, PositionCapQueryType } from "./utils/queryTypes.js";
+import {
+  BorrowQueryType,
+  MarketQueryType,
+  PositionCapQueryType,
+  PositionQueryType,
+  PriceData,
+} from "./utils/queryTypes.js";
+import { pythPriceFeedIds } from "./utils/priceFeedIds.js";
+
+const constants = getConstants();
 
 // Function to fetch all owned objects and find the PositionCap
 export const getUserPositionCapId = async (
@@ -30,122 +39,62 @@ export const getUserPositionCapId = async (
       return (positionCapObject.data as unknown as PositionCapQueryType)
         .objectId;
     }
-
-    return undefined;
   } catch (error) {
     console.error("Error fetching user positionCap ID:", error);
   }
 };
 
-/**
- * Fetch all markets with their market IDs
- * This function uses the ACTIVE_MARKETS array from constants
- * and retrieves market details for each market ID
- *
- * @param suiClient - The SUI client instance
- * @returns Promise resolving to an array of Market objects
- */
-export const getMarkets = async (suiClient: SuiClient): Promise<Market[]> => {
+// Function to fetch all owned objects and find the PositionCap and return the positionId
+export const getUserPositionId = async (
+  suiClient: SuiClient,
+  userAddress: string,
+): Promise<string | undefined> => {
   try {
-    const constants = getConstants();
-    const activeMarketIds = constants.ACTIVE_MARKETS;
+    // Fetch owned objects for the user
+    const response = await suiClient.getOwnedObjects({
+      owner: userAddress,
+      options: {
+        showContent: true, // Include object content to access fields
+      },
+    });
 
-    // Fetch and process each market from the active market IDs
-    const markets: Market[] = [];
-
-    for (const marketId of activeMarketIds) {
-      try {
-        // Get the specific market object from the dynamic field
-        const response = await suiClient.getObject({
-          id: marketId,
-          options: {
-            showContent: true,
-          },
-        });
-        const marketObject = response.data as unknown as MarketQueryType;
-
-        if (
-          !marketObject.content ||
-          marketObject.content.dataType !== "moveObject"
-        ) {
-          console.warn(`Market ${marketId} data not found or invalid`);
-          continue;
-        }
-
-        const marketFields = marketObject.content.fields;
-
-        // Extract the market details and add to results
-        const marketConfig = marketFields.config.fields;
-
-        // Calculate utilization rate
-        const totalSupply = BigInt(marketFields.xtoken_supply);
-        const totalBorrow = BigInt(marketFields.borrowed_amount);
-        const utilizationRate =
-          totalSupply > 0
-            ? Number((totalBorrow * BigInt(100)) / totalSupply) / 100
-            : 0;
-
-        // Get the interest rate model from market config
-        const interestRateModel = {
-          baseRate: Number(marketConfig.interest_rates[0]) / 10000, // Base rate, convert from basis points
-          slope1:
-            (Number(marketConfig.interest_rates[1]) -
-              Number(marketConfig.interest_rates[0])) /
-            10000,
-          slope2:
-            (Number(marketConfig.interest_rates[2]) -
-              Number(marketConfig.interest_rates[1])) /
-            10000,
-          optimalUtilization: Number(marketConfig.interest_rate_kinks[0]) / 100,
-        };
-
-        // Calculate borrow APR
-        const borrowApr = calculateBorrowApr(
-          utilizationRate,
-          interestRateModel,
-        );
-
-        // Calculate supply APR using borrow APR
-        const reserveFactor =
-          Number(marketConfig.protocol_fee_share_bps) / 10000;
-        const supplyApr = calculateSupplyApr(
-          borrowApr.interestApr,
-          utilizationRate,
-          reserveFactor,
-        );
-
-        markets.push({
-          marketId: marketFields.market_id,
-          coinType: marketFields.coin_type,
-          totalSupply,
-          totalBorrow,
-          utilizationRate,
-          supplyApr,
-          borrowApr,
-          ltv: Number(marketConfig.safe_collateral_ratio) / 100,
-          liquidationThreshold:
-            Number(marketConfig.liquidation_threshold) / 100,
-          depositLimit: BigInt(marketConfig.deposit_limit),
-        });
-      } catch (error) {
-        console.error(`Error fetching market ${marketId}:`, error);
-      }
+    if (!response || !response.data || response.data.length === 0) {
+      return undefined;
     }
 
-    return markets;
+    // Find the first PositionCap object and extract the positionCap ID
+    const positionCapObject = response.data.find((data) =>
+      isPositionCapObject(data.data as unknown as PositionCapQueryType),
+    );
+    if (positionCapObject) {
+      return (positionCapObject.data as unknown as PositionCapQueryType).content
+        .fields.position_id;
+    }
   } catch (error) {
-    console.error("Error fetching markets:", error);
-    return [];
+    console.error("Error fetching user position ID:", error);
   }
 };
 
-/**
- * Get protocol statistics including total supplied and borrowed values
- * This function aggregates data across all markets
- *
- * @param suiClient - The SUI client instance
- * @returns Promise resolving to a ProtocolStats object
- */
+export const getUserPosition = async (
+  suiClient: SuiClient,
+  userAddress: string,
+): Promise<PositionQueryType | undefined> => {
+  const positionId = await getUserPositionId(suiClient, userAddress);
+  if (!positionId) {
+    console.error("No position ID found");
+    return undefined;
+  }
+
+  const response = await suiClient.getObject({
+    id: positionId,
+    options: {
+      showContent: true,
+    },
+  });
+
+  return response.data as unknown as PositionQueryType;
+};
+
 export const getProtocolStats = async (
   suiClient: SuiClient,
 ): Promise<ProtocolStats> => {
@@ -155,17 +104,23 @@ export const getProtocolStats = async (
     let totalSuppliedUsd = 0;
     let totalBorrowedUsd = 0;
 
-    // Sum up the total supplied and borrowed across all markets
-    // Note: In a real implementation, we would convert the token amounts to USD
-    // using price feeds. For simplicity, assuming 1:1 conversion for now.
+    const prices = await getPricesFromPyth(
+      markets.map((market) => market.coinType),
+    );
+
     for (const market of markets) {
-      // To convert to USD, we would multiply by token price
-      // For example: const tokenPrice = await getPriceForToken(market.coinType);
-      const tokenPrice = 1; // Placeholder for actual price implementation
+      const tokenPrice = prices.find(
+        (price) => price.coinType === market.coinType,
+      )?.price.price;
+
+      if (!tokenPrice) {
+        console.error(`No price found for ${market.coinType}`);
+        continue;
+      }
 
       // Add to total supplied and borrowed
-      totalSuppliedUsd += Number(market.totalSupply) * tokenPrice;
-      totalBorrowedUsd += Number(market.totalBorrow) * tokenPrice;
+      totalSuppliedUsd += Number(market.totalSupply) * Number(tokenPrice);
+      totalBorrowedUsd += Number(market.totalBorrow) * Number(tokenPrice);
     }
 
     return {
@@ -178,6 +133,92 @@ export const getProtocolStats = async (
       totalSuppliedUsd: "0",
       totalBorrowedUsd: "0",
     };
+  }
+};
+
+export const getMarkets = async (suiClient: SuiClient): Promise<Market[]> => {
+  try {
+    const constants = getConstants();
+    const activeMarketIds = constants.ACTIVE_MARKETS;
+
+    // Fetch and process each market from the active market IDs
+    const markets: Market[] = [];
+    const responses = await suiClient.multiGetObjects({
+      ids: activeMarketIds,
+      options: {
+        showContent: true,
+      },
+    });
+
+    for (const response of responses) {
+      const marketObject = response.data as unknown as MarketQueryType;
+
+      if (
+        !marketObject.content ||
+        marketObject.content.dataType !== "moveObject"
+      ) {
+        console.warn(
+          `Market ${marketObject.objectId} data not found or invalid`,
+        );
+        continue;
+      }
+
+      const marketFields = marketObject.content.fields.value.fields;
+
+      // Extract the market details and add to results
+      const marketConfig = marketFields.config.fields;
+
+      // Calculate utilization rate
+      const totalSupply = BigInt(marketFields.xtoken_supply);
+      const totalBorrow = BigInt(marketFields.borrowed_amount);
+      const utilizationRate =
+        totalSupply > 0
+          ? Number((totalBorrow * BigInt(100)) / totalSupply) / 100
+          : 0;
+
+      // Get the interest rate model from market config
+      const interestRateModel = {
+        baseRate: Number(marketConfig.interest_rates[0]) / 10000, // Base rate, convert from basis points
+        slope1:
+          (Number(marketConfig.interest_rates[1]) -
+            Number(marketConfig.interest_rates[0])) /
+          10000,
+        slope2:
+          (Number(marketConfig.interest_rates[2]) -
+            Number(marketConfig.interest_rates[1])) /
+          10000,
+        optimalUtilization: Number(marketConfig.interest_rate_kinks[0]) / 100,
+      };
+
+      // Calculate borrow APR
+      const borrowApr = calculateBorrowApr(utilizationRate, interestRateModel);
+
+      // Calculate supply APR using borrow APR
+      const reserveFactor = Number(marketConfig.protocol_fee_share_bps) / 10000;
+      const supplyApr = calculateSupplyApr(
+        borrowApr.interestApr,
+        utilizationRate,
+        reserveFactor,
+      );
+
+      markets.push({
+        marketId: marketFields.market_id,
+        coinType: marketFields.coin_type.fields.name,
+        totalSupply,
+        totalBorrow,
+        utilizationRate,
+        supplyApr,
+        borrowApr,
+        ltv: Number(marketConfig.safe_collateral_ratio) / 100,
+        liquidationThreshold: Number(marketConfig.liquidation_threshold) / 100,
+        depositLimit: BigInt(marketConfig.deposit_limit),
+      });
+    }
+
+    return markets;
+  } catch (error) {
+    console.error("Error fetching markets:", error);
+    return [];
   }
 };
 
@@ -233,6 +274,283 @@ export const getUserPortfolio = async (
   suiClient: SuiClient,
   userAddress: string,
 ): Promise<Portfolio> => {
-  console.log(suiClient, userAddress);
-  return {} as Portfolio;
+  try {
+    // Get user position ID
+    const position = await getUserPosition(suiClient, userAddress);
+    if (!position) {
+      // Return empty portfolio if no position found
+      return {
+        userAddress,
+        netWorth: "0",
+        totalSuppliedUsd: "0",
+        totalBorrowedUsd: "0",
+        safeBorrowLimit: "0",
+        borrowLimitUsed: "0",
+        liquidationLimit: "0",
+        rewardsToClaimUsd: "0",
+        rewardsByToken: [],
+        dailyEarnings: "0",
+        netApr: "0",
+        aggregatedSupplyApr: "0",
+        aggregatedBorrowApr: "0",
+        userBalances: [],
+      };
+    }
+    const positionFields = position.content.fields.value.fields;
+
+    // Get all markets to calculate APRs and limits
+    const markets = await getMarkets(suiClient);
+    const prices = await getPricesFromPyth(
+      markets.map((market) => market.coinType),
+    );
+    const marketMap = createMarketMap(markets);
+    const priceMap = createPriceMap(prices);
+
+    const collaterals = positionFields.collaterals.fields.contents;
+    const loans = positionFields.loans;
+
+    const collateralMap = createCollateralMap(collaterals, marketMap, priceMap);
+
+    const loanMap = createLoanMap(loans, marketMap, priceMap);
+
+    // Initialize portfolio metrics
+    let totalSuppliedUsd = 0;
+    let totalBorrowedUsd = 0;
+    let weightedSupplyApr = 0;
+    let weightedBorrowApr = 0;
+    let totalWeight = 0;
+    let liquidationLimit = 0;
+    let safeBorrowLimit = 0;
+    const userBalances: {
+      marketId: string;
+      suppliedAmount: bigint;
+      borrowedAmount: bigint;
+    }[] = [];
+
+    // Calculate portfolio metrics
+    for (const market of markets) {
+      const tokenPrice = prices.find(
+        (price) => price.coinType === market.coinType,
+      )?.price.price;
+      if (!tokenPrice) continue;
+
+      // Calculate supplied and borrowed values
+      const suppliedValue = Number(market.totalSupply) * Number(tokenPrice);
+      const borrowedValue = Number(market.totalBorrow) * Number(tokenPrice);
+
+      totalSuppliedUsd += suppliedValue;
+      totalBorrowedUsd += borrowedValue;
+
+      // Calculate weighted APRs
+      const weight = suppliedValue + borrowedValue;
+      totalWeight += weight;
+      weightedSupplyApr +=
+        (market.supplyApr.interestApr +
+          market.supplyApr.rewards.reduce(
+            (acc, reward) => acc + reward.rewardApr,
+            0,
+          )) *
+        suppliedValue;
+      weightedBorrowApr +=
+        (market.borrowApr.interestApr +
+          market.borrowApr.rewards.reduce(
+            (acc, reward) => acc + reward.rewardApr,
+            0,
+          )) *
+        borrowedValue;
+
+      // Calculate limits
+      liquidationLimit += suppliedValue * market.liquidationThreshold;
+      safeBorrowLimit += suppliedValue * market.ltv;
+
+      // Add to user balances
+      userBalances.push({
+        marketId: market.marketId,
+        suppliedAmount: market.totalSupply,
+        borrowedAmount: market.totalBorrow,
+      });
+    }
+
+    // Calculate final metrics
+    const netWorth = totalSuppliedUsd - totalBorrowedUsd;
+    const borrowLimitUsed =
+      safeBorrowLimit > 0 ? (totalBorrowedUsd / safeBorrowLimit) * 100 : 0;
+    const aggregatedSupplyApr =
+      totalSuppliedUsd > 0 ? weightedSupplyApr / totalSuppliedUsd : 0;
+    const aggregatedBorrowApr =
+      totalBorrowedUsd > 0 ? weightedBorrowApr / totalBorrowedUsd : 0;
+    const netApr =
+      totalWeight > 0
+        ? (weightedSupplyApr - weightedBorrowApr) / totalWeight
+        : 0;
+    const dailyEarnings = (netApr / 365) * netWorth;
+
+    return {
+      userAddress,
+      netWorth: netWorth.toString(),
+      totalSuppliedUsd: totalSuppliedUsd.toString(),
+      totalBorrowedUsd: totalBorrowedUsd.toString(),
+      safeBorrowLimit: safeBorrowLimit.toString(),
+      borrowLimitUsed: borrowLimitUsed.toString(),
+      liquidationLimit: liquidationLimit.toString(),
+      rewardsToClaimUsd: "0", // TODO: Implement rewards calculation
+      rewardsByToken: [], // TODO: Implement rewards by token
+      dailyEarnings: dailyEarnings.toString(),
+      netApr: netApr.toString(),
+      aggregatedSupplyApr: aggregatedSupplyApr.toString(),
+      aggregatedBorrowApr: aggregatedBorrowApr.toString(),
+      userBalances,
+    };
+  } catch (error) {
+    console.error("Error getting user portfolio:", error);
+    // Return empty portfolio on error
+    return {
+      userAddress,
+      netWorth: "0",
+      totalSuppliedUsd: "0",
+      totalBorrowedUsd: "0",
+      safeBorrowLimit: "0",
+      borrowLimitUsed: "0",
+      liquidationLimit: "0",
+      rewardsToClaimUsd: "0",
+      rewardsByToken: [],
+      dailyEarnings: "0",
+      netApr: "0",
+      aggregatedSupplyApr: "0",
+      aggregatedBorrowApr: "0",
+      userBalances: [],
+    };
+  }
+};
+
+const createMarketMap = (markets: Market[]) => {
+  return new Map(markets.map((market) => [market.marketId, market]));
+};
+
+const createPriceMap = (prices: PriceData[]) => {
+  return new Map(prices.map((price) => [price.coinType, price]));
+};
+
+const createCollateralMap = (
+  collaterals: {
+    fields: {
+      key: string;
+      value: string;
+    };
+    type: string;
+  }[],
+  marketMap: Map<string, Market>,
+  priceMap: Map<string, PriceData>,
+): Map<string, { amount: string; amountUsd: string }> => {
+  const collateralMap = new Map<
+    string,
+    {
+      amount: string;
+      amountUsd: string;
+    }
+  >();
+  for (const collateral of collaterals) {
+    const marketId = collateral.fields.key;
+    const collateralAmount = collateral.fields.value;
+
+    const market = marketMap.get(marketId);
+    if (!market) continue;
+
+    const tokenPrice = priceMap.get(market.coinType)?.price.price;
+    if (!tokenPrice) continue;
+
+    const suppliedValueUsd = Number(collateralAmount) * Number(tokenPrice);
+    collateralMap.set(marketId, {
+      amount: collateralAmount,
+      amountUsd: suppliedValueUsd.toString(),
+    });
+  }
+  return collateralMap;
+};
+
+const createLoanMap = (
+  loans: {
+    fields: BorrowQueryType;
+    type: string;
+  }[],
+  marketMap: Map<string, Market>,
+  priceMap: Map<string, PriceData>,
+): Map<string, { amount: string; amountUsd: string }> => {
+  const loanMap = new Map<string, { amount: string; amountUsd: string }>();
+  for (const loan of loans) {
+    const marketId = loan.fields.market_id;
+    const loanAmount = loan.fields.amount;
+
+    const market = marketMap.get(marketId);
+    if (!market) continue;
+
+    const tokenPrice = priceMap.get(market.coinType)?.price.price;
+    if (!tokenPrice) continue;
+
+    const loanValueUsd = Number(loanAmount) * Number(tokenPrice);
+    loanMap.set(marketId, {
+      amount: loanAmount,
+      amountUsd: loanValueUsd.toString(),
+    });
+  }
+  return loanMap;
+};
+
+export const getPricesFromPyth = async (
+  coinTypes: string[],
+): Promise<PriceData[]> => {
+  try {
+    if (coinTypes.length === 0) {
+      return [];
+    }
+
+    const feedIds: string[] = [];
+    const feedIdToCoinType: Record<string, string> = {};
+    // Collect feed IDs for given coin IDs
+    coinTypes.forEach((coinType) => {
+      const id = pythPriceFeedIds[coinType];
+      if (!id) {
+        console.error(`Coin ID not supported: ${coinType}`);
+      }
+      feedIdToCoinType[id] = coinType;
+      feedIds.push(id);
+    });
+
+    if (feedIds.length === 0) {
+      console.error("No feed IDs found for the requested coin IDs");
+      return [];
+    }
+
+    // Construct URL with query parameters
+    const queryParams = feedIds.map((id) => `ids[]=${id}`).join("&");
+    const url = `${constants.PYTH_MAINNET_API_ENDPOINT}${constants.PYTH_PRICE_PATH}?${queryParams}`;
+
+    // Fetch data from Pyth Network
+    const response = await fetch(url);
+    if (!response.ok) {
+      console.error(
+        `Failed to fetch from Pyth Network: HTTP ${response.status}`,
+      );
+      return [];
+    }
+    const prices = await response.json();
+    if (!Array.isArray(prices)) {
+      console.error("Invalid response format from Pyth Network");
+      return [];
+    }
+
+    const result: PriceData[] = [];
+    for (const price of prices) {
+      result.push({
+        coinType: feedIdToCoinType[price.id],
+        price: price.price,
+        ema_price: price.ema_price,
+      });
+    }
+
+    return result;
+  } catch (error) {
+    console.error("Error fetching prices from Pyth Network:", error);
+    throw error;
+  }
 };
