@@ -3,13 +3,13 @@ export const devConstants = {
 
   // AlphaFi constants
   ALPHAFI_ORACLE_PACKAGE_ID:
-    "0x8f4d641c8d03e72b1b137ea81e4fe2f949f0bf5c04720528e5a9029440216774",
+    "0x2fc8339ed4c6c4b597a353380f781b7a8144a5bb59fb968aad959c0edd193893",
 
   ALPHAFI_ORACLE_OBJECT_ID:
-    "0xcd920128a47c35fc9272de635e7e23754070f46f42fea2f845f18757628dbcaf",
+    "0x1db5b88a2e19739a06803476c9b5f4afebaed9194db59bfcb6e68542d0d8caa1",
 
   ADMIN_CAP_ID:
-    "0xd52c22044e8d6853f92d7d80e78a2136f73ed358c51be11dcfcb8e437c6792d8",
+    "0x5e676b201dec046f14ba9660b41fc8ba8fa1c3a448769551518384d330a7310c",
 
   // AlphaLend constants
   ALPHALEND_PACKAGE_ID: "", // Replace with actual package ID

@@ -39,23 +39,13 @@ export function getExecStuff() {
 
 async function addCoinToOracleCaller() {
   let tx = new Transaction();
-  const { suiClient } = getExecStuff();
-  const pythClient = new SuiPythClient(
-    suiClient,
-    constants.PYTH_STATE_ID,
-    constants.WORMHOLE_STATE_ID,
-  );
-  const pythConnection = new SuiPriceServiceConnection(
-    "https://hermes.pyth.network",
-    // "https://hermes-beta.pyth.network"
-  );
   const adminCapId = constants.ADMIN_CAP_ID;
-  tx = await addCoinToOracle(
+  await addCoinToOracle(
     tx,
     adminCapId,
-    "0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC",
-    pythClient,
-    pythConnection,
+    "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin1::TESTCOIN1",
+    1,
+    1000,
   );
 
   return tx;
@@ -74,7 +64,7 @@ async function updatePricesCaller() {
 
 async function run() {
   const { suiClient, keypair } = getExecStuff();
-  const tx = await updatePricesCaller();
+  const tx = await addCoinToOracleCaller();
   if (tx) {
     tx.setGasBudget(100_000_000);
 
@@ -96,5 +86,5 @@ async function run() {
       });
   }
 }
-addCoinToOracleCaller();
+updatePricesCaller();
 run();

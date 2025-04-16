@@ -10,6 +10,8 @@
  * - Blockchain-specific type mappings
  */
 
+import { Decimal } from "decimal.js";
+
 /**
  * Special constant for maximum u64 value (2^64 - 1)
  * Used to indicate withdrawing all collateral when passed as the amount parameter
@@ -167,34 +169,42 @@ export interface Market {
   marketId: string;
   /** Fully qualified coin type handled by this market */
   coinType: string;
+  /** Decimal digit of the coin */
+  decimalDigit: number;
   /** Total token supply in the market */
-  totalSupply: bigint;
+  totalSupply: Decimal;
   /** Total tokens borrowed from the market */
-  totalBorrow: bigint;
+  totalBorrow: Decimal;
   /** Current utilization rate (0.0 to 1.0) */
-  utilizationRate: number;
+  utilizationRate: Decimal;
   /** Annual percentage rate for suppliers */
   supplyApr: {
-    interestApr: number;
+    interestApr: Decimal;
     rewards: {
       coinType: string;
-      rewardApr: number;
+      rewardApr: Decimal;
     }[];
   };
   /** Annual percentage rate for borrowers */
   borrowApr: {
-    interestApr: number;
+    interestApr: Decimal;
     rewards: {
       coinType: string;
-      rewardApr: number;
+      rewardApr: Decimal;
     }[];
   };
   /** Loan-to-value ratio (0.0 to 1.0) */
-  ltv: number;
+  ltv: Decimal;
   /** Liquidation threshold (0.0 to 1.0) */
-  liquidationThreshold: number;
+  liquidationThreshold: Decimal;
   /** Maximum amount that can be deposited into the market */
-  depositLimit: bigint;
+  depositLimit: Decimal;
+  /** Borrow fee */
+  borrowFee: Decimal;
+  /** Borrow weight */
+  borrowWeight: Decimal;
+  /** XToken ratio */
+  xtokenRatio: Decimal;
 }
 
 /**
@@ -236,6 +246,26 @@ export interface Portfolio {
     suppliedAmount: bigint;
     borrowedAmount: bigint;
   }[];
+  /** Health factor of the user's position (safe when > 1.0) */
+  healthFactor: string;
+  /** Whether the user's position is eligible for liquidation */
+  isLiquidatable: boolean;
+  /** Detailed information about user's positions in each market */
+  marketPositions: Record<
+    string,
+    {
+      marketId: string;
+      coinType: string;
+      suppliedAmount: string;
+      suppliedAmountUsd: string;
+      borrowedAmount: string;
+      borrowedAmountUsd: string;
+      supplyApr: number;
+      borrowApr: number;
+      ltv: number;
+      liquidationThreshold: number;
+    }
+  >;
 }
 
 /**
