@@ -65,35 +65,36 @@ async function updatePricesCaller() {
   const { suiClient } = getExecStuff();
   const alphalendClient = new AlphalendClient(suiClient);
   let tx = new Transaction();
-  tx = await alphalendClient.updatePrices(tx, [
+  return await alphalendClient.updatePrices(tx, [
     "0x2::sui::SUI",
     "0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC",
     // "0x356a26eb9e012a68958082340d4c4116e7f55615cf27affcff209cf0ae544f59::wal::WAL",
   ]);
-  return tx;
 }
 
 async function run() {
   const { suiClient, keypair } = getExecStuff();
   const tx = await updatePricesCaller();
-  tx.setGasBudget(100_000_000);
+  if (tx) {
+    tx.setGasBudget(100_000_000);
 
-  suiClient
-    .signAndExecuteTransaction({
-      signer: keypair,
-      transaction: tx,
-      requestType: "WaitForLocalExecution",
-      options: {
-        showEffects: true,
-        showObjectChanges: true,
-      },
-    })
-    .then((res) => {
-      console.log(JSON.stringify(res, null, 2));
-    })
-    .catch((error) => {
-      console.error(error);
-    });
+    suiClient
+      .signAndExecuteTransaction({
+        signer: keypair,
+        transaction: tx,
+        requestType: "WaitForLocalExecution",
+        options: {
+          showEffects: true,
+          showObjectChanges: true,
+        },
+      })
+      .then((res) => {
+        console.log(JSON.stringify(res, null, 2));
+      })
+      .catch((error) => {
+        console.error(error);
+      });
+  }
 }
 addCoinToOracleCaller();
 run();

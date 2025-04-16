@@ -14,7 +14,7 @@ export function createAdditionalAdminCap(
   adminCapId: string,
 ): Transaction {
   tx.moveCall({
-    target: `${constants.ORACLE_PACKAGE_ID}::oracle::create_additional_admin_cap`,
+    target: `${constants.ALPHAFI_ORACLE_PACKAGE_ID}::oracle::create_additional_admin_cap`,
     arguments: [tx.object(adminCapId)],
   });
   return tx;
@@ -26,9 +26,9 @@ export function updateOracleMaxAge(
   newAge: number,
 ): Transaction {
   tx.moveCall({
-    target: `${constants.ORACLE_PACKAGE_ID}::oracle::update_max_age`,
+    target: `${constants.ALPHAFI_ORACLE_PACKAGE_ID}::oracle::update_max_age`,
     arguments: [
-      tx.object(constants.ORACLE_OBJECT_ID),
+      tx.object(constants.ALPHAFI_ORACLE_OBJECT_ID),
       tx.object(adminCapId),
       tx.pure.u64(newAge),
     ],
@@ -91,9 +91,9 @@ export async function addCoinToOracle(
 
   // making final moveCall
   transaction.moveCall({
-    target: `${constants.ORACLE_PACKAGE_ID}::oracle::add_coin_to_oracle`,
+    target: `${constants.ALPHAFI_ORACLE_PACKAGE_ID}::oracle::add_coin_to_oracle`,
     arguments: [
-      transaction.object(constants.ORACLE_OBJECT_ID),
+      transaction.object(constants.ALPHAFI_ORACLE_OBJECT_ID),
       transaction.object(adminCapId),
       coinTypeName,
       priceIdentifier,
@@ -142,9 +142,9 @@ export function removeCoinFromOracle(
   });
 
   tx.moveCall({
-    target: `${constants.ORACLE_PACKAGE_ID}::oracle::remove_coin_type`,
+    target: `${constants.ALPHAFI_ORACLE_PACKAGE_ID}::oracle::remove_coin_type`,
     arguments: [
-      tx.object(constants.ORACLE_OBJECT_ID),
+      tx.object(constants.ALPHAFI_ORACLE_OBJECT_ID),
       tx.object(adminCapId),
       coinTypeName,
     ],
