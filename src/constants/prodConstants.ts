@@ -2,10 +2,10 @@ export const prodConstants = {
   SUI_CLOCK_OBJECT_ID: "0x6",
 
   // AlphaFi constants
-  ORACLE_PACKAGE_ID:
+  ALPHAFI_ORACLE_PACKAGE_ID:
     "0xfa586dca0c394eb1b1a963c9dcd6a834a7b7cad05eae9ccf0f4f0de6fa13590a",
 
-  ORACLE_OBJECT_ID:
+  ALPHAFI_ORACLE_OBJECT_ID:
     "0x880656d2ea985abc7c9db203595d203cdfb1c511bba44302ea1465ff744b5ebb",
 
   ADMIN_CAP_ID:
@@ -13,6 +13,8 @@ export const prodConstants = {
 
   // AlphaLend constants
   ALPHALEND_PACKAGE_ID: "", // Replace with actual package ID
+
+  ALPHALEND_ORACLE_OBJECT_ID: "", // Replace with actual oracle object ID
 
   LENDING_PROTOCOL_ID: "", // Replace with actual protocol object ID
 

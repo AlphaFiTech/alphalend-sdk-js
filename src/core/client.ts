@@ -73,14 +73,20 @@ export class AlphalendClient {
   async updatePrices(
     tx: Transaction,
     coinTypes: string[],
-  ): Promise<Transaction> {
+  ): Promise<Transaction | undefined> {
     // Get price feed IDs for the coin types, filtering out undefined ones
-    const priceFeedIds = coinTypes
-      .map((coinType) => pythPriceFeedIds[coinType])
-      .filter((id): id is string => id !== undefined);
+    const priceFeedToCoinTypeMap = new Map<string, string>();
+    const priceFeedIds: string[] = [];
+    coinTypes.forEach((coinType) => {
+      const priceFeedId = pythPriceFeedIds[coinType];
+      if (priceFeedId) {
+        priceFeedToCoinTypeMap.set(priceFeedId, coinType);
+        priceFeedIds.push(priceFeedId);
+      }
+    });
 
     if (priceFeedIds.length === 0) {
-      return tx; // Return empty transaction if no valid price feeds found
+      return undefined; // Return undefined if no valid price feeds found
     }
 
     const priceFeedToInfoIdMap = new Map<string, string>();
@@ -110,12 +116,17 @@ export class AlphalendClient {
       });
     }
 
-    for (const [, priceInfoObjectId] of priceFeedToInfoIdMap.entries()) {
-      updatePriceTransaction(tx, {
-        oracle: constants.ORACLE_OBJECT_ID,
-        priceInfoObject: priceInfoObjectId,
-        clock: constants.SUI_CLOCK_OBJECT_ID,
-      });
+    for (const [
+      priceFeedId,
+      priceInfoObjectId,
+    ] of priceFeedToInfoIdMap.entries()) {
+      const coinType = priceFeedToCoinTypeMap.get(priceFeedId);
+      if (coinType) {
+        updatePriceTransaction(tx, {
+          priceInfoObject: priceInfoObjectId,
+          coinType: coinType,
+        });
+      }
     }
 
     return tx;
