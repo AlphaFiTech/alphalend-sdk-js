@@ -59,8 +59,8 @@ export class AlphalendClient {
       constants.WORMHOLE_STATE_ID,
     );
     this.pythConnection = new SuiPriceServiceConnection(
-      "https://hermes.pyth.network",
-      // "https://hermes-beta.pyth.network",
+      // "https://hermes.pyth.network",
+      "https://hermes-beta.pyth.network",
     );
   }
 
@@ -142,7 +142,7 @@ export class AlphalendClient {
     const tx = new Transaction();
 
     // First update prices to ensure latest oracle values
-    await this.updatePrices(tx, params.priceUpdateCoinTypes);
+    // await this.updatePrices(tx, params.priceUpdateCoinTypes);
 
     // Get coin object
     const coin = await this.getCoinObject(
@@ -200,7 +200,7 @@ export class AlphalendClient {
     const tx = new Transaction();
 
     // First update prices to ensure latest oracle values
-    await this.updatePrices(tx, params.priceUpdateCoinTypes);
+    // await this.updatePrices(tx, params.priceUpdateCoinTypes);
 
     // Build remove_collateral transaction
     tx.moveCall({
@@ -228,7 +228,7 @@ export class AlphalendClient {
     const tx = new Transaction();
 
     // First update prices to ensure latest oracle values
-    await this.updatePrices(tx, params.priceUpdateCoinTypes);
+    // await this.updatePrices(tx, params.priceUpdateCoinTypes);
 
     // Build borrow transaction
     tx.moveCall({
@@ -256,7 +256,7 @@ export class AlphalendClient {
     const tx = new Transaction();
 
     // First update prices to ensure latest oracle values
-    await this.updatePrices(tx, params.priceUpdateCoinTypes);
+    // await this.updatePrices(tx, params.priceUpdateCoinTypes);
 
     // Get coin object
     const coin = await this.getCoinObject(

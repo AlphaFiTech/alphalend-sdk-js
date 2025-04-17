@@ -3,7 +3,7 @@ export const devConstants = {
 
   // AlphaFi constants
   ALPHAFI_ORACLE_PACKAGE_ID:
-    "0x2fc8339ed4c6c4b597a353380f781b7a8144a5bb59fb968aad959c0edd193893",
+    "0xcffb5846b6bfd07eecfcf84834fcf3c263baa4d773b2e3d5d78318e5740dff06",
 
   ALPHAFI_ORACLE_OBJECT_ID:
     "0x1db5b88a2e19739a06803476c9b5f4afebaed9194db59bfcb6e68542d0d8caa1",
@@ -12,15 +12,15 @@ export const devConstants = {
     "0x5e676b201dec046f14ba9660b41fc8ba8fa1c3a448769551518384d330a7310c",
 
   // AlphaLend constants
-  ALPHALEND_PACKAGE_ID: "", // Replace with actual package ID
+  ALPHALEND_PACKAGE_ID: "0x94b1fa9cd87e6f947e43037a69e13d4f8c12751e817ad84ae1999a70c3f2a3e7", // Replace with actual package ID
 
-  ALPHALEND_ORACLE_OBJECT_ID: "", // Replace with actual oracle object ID
+  ALPHALEND_ORACLE_OBJECT_ID: "0x8cdf28019e57cbd1fc61200ab9461eda1568f219282e7d72a7372531d5f58f0b", // Replace with actual oracle object ID
 
-  LENDING_PROTOCOL_ID: "", // Replace with actual protocol object ID
+  LENDING_PROTOCOL_ID: "0x0f3fe7c53658c877746353c3e375e7403798f635e204cfdd686289d85e51d3af", // Replace with actual protocol object ID
 
-  LENDING_PROTOCOL_CAP_ID: "", // Replace with actual protocol cap ID
+  LENDING_PROTOCOL_CAP_ID: "0x2e322ae4a8e0b771f4902f19fab6d9befede04169780cae192d69635b4bec0df", // Replace with actual protocol cap ID
 
-  POSITION_CAP_TYPE: "", // Replace with actual position cap type
+  POSITION_CAP_TYPE: "0x94b1fa9cd87e6f947e43037a69e13d4f8c12751e817ad84ae1999a70c3f2a3e7::position::PositionCap", // Replace with actual position cap type
 
   ACTIVE_MARKETS: [""], // to-do: think of a way to store this outside sdk(db or seperate contract)
 

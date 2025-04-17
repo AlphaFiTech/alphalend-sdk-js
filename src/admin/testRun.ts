@@ -2,10 +2,6 @@ import { getFullnodeUrl, SuiClient } from "@mysten/sui/client";
 import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
 import { Transaction } from "@mysten/sui/transactions";
 import { fromB64 } from "@mysten/sui/utils";
-import {
-  SuiPriceServiceConnection,
-  SuiPythClient,
-} from "@pythnetwork/pyth-sui-js";
 import { getConstants } from "../constants/index.js";
 import { addCoinToOracle } from "./oracle.js";
 import { AlphalendClient } from "../core/client.js";
@@ -43,7 +39,7 @@ async function addCoinToOracleCaller() {
   await addCoinToOracle(
     tx,
     adminCapId,
-    "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin1::TESTCOIN1",
+    "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin4::TESTCOIN4",
     1,
     1000,
   );

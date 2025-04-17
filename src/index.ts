@@ -1,4 +1,4 @@
-import { SuiClient } from "@mysten/sui/client";
+import { getFullnodeUrl, SuiClient } from "@mysten/sui/client";
 
 // Main exports
 export * from "./constants/index.js";
@@ -28,5 +28,10 @@ export {
 } from "./core/types.js";
 
 export function getSuiClient() {
-  return new SuiClient({ url: "https://fullnode.mainnet.sui.io:443" });
+  const network = process.env.NETWORK || "testnet";
+  return new SuiClient({
+    url: getFullnodeUrl(
+      network as "mainnet" | "testnet" | "devnet" | "localnet",
+    ),
+  });
 }
