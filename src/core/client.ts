@@ -32,6 +32,7 @@ import {
   getProtocolStats,
   getUserPortfolio,
 } from "../functions.js";
+import { getEstimatedGasBudget } from "../utils/helper.js";
 
 /**
  * AlphaLend Client
@@ -59,8 +60,8 @@ export class AlphalendClient {
       constants.WORMHOLE_STATE_ID,
     );
     this.pythConnection = new SuiPriceServiceConnection(
-      "https://hermes.pyth.network",
-      // "https://hermes-beta.pyth.network",
+      // "https://hermes.pyth.network",
+      "https://hermes-beta.pyth.network",
     );
   }
 
@@ -140,16 +141,13 @@ export class AlphalendClient {
    */
   async supply(params: SupplyParams): Promise<Transaction | undefined> {
     const tx = new Transaction();
+    console.log("supply", params);
 
     // First update prices to ensure latest oracle values
-    await this.updatePrices(tx, params.priceUpdateCoinTypes);
+    // await this.updatePrices(tx, params.priceUpdateCoinTypes);
 
     // Get coin object
-    const coin = await this.getCoinObject(
-      tx,
-      params.supplyCoinType,
-      params.address,
-    );
+    const coin = await this.getCoinObject(tx, params.coinType, params.address);
     if (!coin) {
       console.error("Coin object not found");
       return undefined;
@@ -161,7 +159,7 @@ export class AlphalendClient {
       // Build add_collateral transaction
       tx.moveCall({
         target: `${constants.ALPHALEND_PACKAGE_ID}::alpha_lending::add_collateral`,
-        typeArguments: [params.supplyCoinType],
+        typeArguments: [params.coinType],
         arguments: [
           tx.object(constants.LENDING_PROTOCOL_ID), // Protocol object
           tx.object(params.positionCapId), // Position capability
@@ -175,7 +173,7 @@ export class AlphalendClient {
       // Build add_collateral transaction
       tx.moveCall({
         target: `${constants.ALPHALEND_PACKAGE_ID}::alpha_lending::add_collateral`,
-        typeArguments: [params.supplyCoinType],
+        typeArguments: [params.coinType],
         arguments: [
           tx.object(constants.LENDING_PROTOCOL_ID), // Protocol object
           positionCap, // Position capability
@@ -187,6 +185,13 @@ export class AlphalendClient {
       tx.transferObjects([positionCap], params.address);
     }
     tx.transferObjects([coin], params.address);
+
+    const estimatedGasBudget = await getEstimatedGasBudget(
+      this.client,
+      tx,
+      params.address,
+    );
+    if (estimatedGasBudget) tx.setGasBudget(estimatedGasBudget);
     return tx;
   }
 
@@ -200,12 +205,12 @@ export class AlphalendClient {
     const tx = new Transaction();
 
     // First update prices to ensure latest oracle values
-    await this.updatePrices(tx, params.priceUpdateCoinTypes);
+    // await this.updatePrices(tx, params.priceUpdateCoinTypes);
 
     // Build remove_collateral transaction
-    tx.moveCall({
+    const coin = tx.moveCall({
       target: `${constants.ALPHALEND_PACKAGE_ID}::alpha_lending::remove_collateral`,
-      typeArguments: [params.withdrawCoinType],
+      typeArguments: [params.coinType],
       arguments: [
         tx.object(constants.LENDING_PROTOCOL_ID), // Protocol object
         tx.object(params.positionCapId), // Position capability
@@ -214,7 +219,14 @@ export class AlphalendClient {
         tx.object(constants.SUI_CLOCK_OBJECT_ID), // Clock object
       ],
     });
+    tx.transferObjects([coin], params.address);
 
+    const estimatedGasBudget = await getEstimatedGasBudget(
+      this.client,
+      tx,
+      params.address,
+    );
+    if (estimatedGasBudget) tx.setGasBudget(estimatedGasBudget);
     return tx;
   }
 
@@ -228,12 +240,12 @@ export class AlphalendClient {
     const tx = new Transaction();
 
     // First update prices to ensure latest oracle values
-    await this.updatePrices(tx, params.priceUpdateCoinTypes);
+    // await this.updatePrices(tx, params.priceUpdateCoinTypes);
 
     // Build borrow transaction
-    tx.moveCall({
+    const coin = tx.moveCall({
       target: `${constants.ALPHALEND_PACKAGE_ID}::alpha_lending::borrow`,
-      typeArguments: [params.borrowCoinType],
+      typeArguments: [params.coinType],
       arguments: [
         tx.object(constants.LENDING_PROTOCOL_ID), // Protocol object
         tx.object(params.positionCapId), // Position capability
@@ -242,7 +254,14 @@ export class AlphalendClient {
         tx.object(constants.SUI_CLOCK_OBJECT_ID), // Clock object
       ],
     });
+    tx.transferObjects([coin], params.address);
 
+    const estimatedGasBudget = await getEstimatedGasBudget(
+      this.client,
+      tx,
+      params.address,
+    );
+    if (estimatedGasBudget) tx.setGasBudget(estimatedGasBudget);
     return tx;
   }
 
@@ -256,14 +275,10 @@ export class AlphalendClient {
     const tx = new Transaction();
 
     // First update prices to ensure latest oracle values
-    await this.updatePrices(tx, params.priceUpdateCoinTypes);
+    // await this.updatePrices(tx, params.priceUpdateCoinTypes);
 
     // Get coin object
-    const coin = await this.getCoinObject(
-      tx,
-      params.repayCoinType,
-      params.address,
-    );
+    const coin = await this.getCoinObject(tx, params.coinType, params.address);
     if (!coin) {
       console.error("Coin object not found");
       return undefined;
@@ -272,9 +287,9 @@ export class AlphalendClient {
     const [repayCoinA] = tx.splitCoins(coin, [params.amount]);
 
     // Build repay transaction
-    tx.moveCall({
+    const repayCoin = tx.moveCall({
       target: `${constants.ALPHALEND_PACKAGE_ID}::alpha_lending::repay`,
-      typeArguments: [params.repayCoinType],
+      typeArguments: [params.coinType],
       arguments: [
         tx.object(constants.LENDING_PROTOCOL_ID), // Protocol object
         tx.object(params.positionCapId), // Position capability
@@ -283,8 +298,14 @@ export class AlphalendClient {
         tx.object(constants.SUI_CLOCK_OBJECT_ID), // Clock object
       ],
     });
+    tx.transferObjects([repayCoin, coin], params.address);
 
-    tx.transferObjects([coin], params.address);
+    const estimatedGasBudget = await getEstimatedGasBudget(
+      this.client,
+      tx,
+      params.address,
+    );
+    if (estimatedGasBudget) tx.setGasBudget(estimatedGasBudget);
     return tx;
   }
 
@@ -312,6 +333,12 @@ export class AlphalendClient {
       ],
     });
 
+    const estimatedGasBudget = await getEstimatedGasBudget(
+      this.client,
+      tx,
+      params.address,
+    );
+    if (estimatedGasBudget) tx.setGasBudget(estimatedGasBudget);
     return tx;
   }
 
@@ -342,6 +369,12 @@ export class AlphalendClient {
       ],
     });
 
+    const estimatedGasBudget = await getEstimatedGasBudget(
+      this.client,
+      tx,
+      params.address,
+    );
+    if (estimatedGasBudget) tx.setGasBudget(estimatedGasBudget);
     return tx;
   }
 

@@ -10,6 +10,8 @@
  * - Blockchain-specific type mappings
  */
 
+import { Decimal } from "decimal.js";
+
 /**
  * Special constant for maximum u64 value (2^64 - 1)
  * Used to indicate withdrawing all collateral when passed as the amount parameter
@@ -31,7 +33,7 @@ export interface SupplyParams {
   /** Amount to supply as collateral in base units */
   amount: bigint;
   /** Supply coin type (e.g., "0x2::sui::SUI") */
-  supplyCoinType: string;
+  coinType: string;
   /** Object ID of the position capability object */
   positionCapId?: string;
   /** Address of the user supplying collateral */
@@ -50,9 +52,11 @@ export interface WithdrawParams {
   /** Amount to withdraw (use MAX_U64 constant to withdraw all) */
   amount: bigint;
   /** Withdraw coin type (e.g., "0x2::sui::SUI") */
-  withdrawCoinType: string;
+  coinType: string;
   /** Object ID of the position capability object */
   positionCapId: string;
+  /** Address of the user supplying collateral */
+  address: string;
   /** Coin types of the coins whose price needs to be updated */
   priceUpdateCoinTypes: string[];
 }
@@ -67,9 +71,11 @@ export interface BorrowParams {
   /** Amount to borrow in base units */
   amount: bigint;
   /** Borrow coin type (e.g., "0x2::sui::SUI") */
-  borrowCoinType: string;
+  coinType: string;
   /** Object ID of the position capability object */
   positionCapId: string;
+  /** Address of the user supplying collateral */
+  address: string;
   /** Coin types of the coins whose price needs to be updated */
   priceUpdateCoinTypes: string[];
 }
@@ -84,7 +90,7 @@ export interface RepayParams {
   /** Amount to repay in base units */
   amount: bigint;
   /** Repay coin type (e.g., "0x2::sui::SUI") */
-  repayCoinType: string;
+  coinType: string;
   /** Object ID of the position capability object */
   positionCapId: string;
   /** Address of the user repaying the debt */
@@ -104,6 +110,8 @@ export interface ClaimRewardsParams {
   coinType: string;
   /** Object ID of the position capability object */
   positionCapId: string;
+  /** Address of the user supplying collateral */
+  address: string;
   /** Coin types of the coins whose price needs to be updated */
   priceUpdateCoinTypes: string[];
 }
@@ -127,6 +135,8 @@ export interface LiquidateParams {
   withdrawCoinType: string;
   /** Object ID of the coin to use for repayment */
   coinObjectId: string;
+  /** Address of the user supplying collateral */
+  address: string;
   /** Coin types of the coins whose price needs to be updated */
   priceUpdateCoinTypes: string[];
 }
@@ -167,34 +177,42 @@ export interface Market {
   marketId: string;
   /** Fully qualified coin type handled by this market */
   coinType: string;
+  /** Decimal digit of the coin */
+  decimalDigit: number;
   /** Total token supply in the market */
-  totalSupply: bigint;
+  totalSupply: Decimal;
   /** Total tokens borrowed from the market */
-  totalBorrow: bigint;
+  totalBorrow: Decimal;
   /** Current utilization rate (0.0 to 1.0) */
-  utilizationRate: number;
+  utilizationRate: Decimal;
   /** Annual percentage rate for suppliers */
   supplyApr: {
-    interestApr: number;
+    interestApr: Decimal;
     rewards: {
       coinType: string;
-      rewardApr: number;
+      rewardApr: Decimal;
     }[];
   };
   /** Annual percentage rate for borrowers */
   borrowApr: {
-    interestApr: number;
+    interestApr: Decimal;
     rewards: {
       coinType: string;
-      rewardApr: number;
+      rewardApr: Decimal;
     }[];
   };
   /** Loan-to-value ratio (0.0 to 1.0) */
-  ltv: number;
+  ltv: Decimal;
   /** Liquidation threshold (0.0 to 1.0) */
-  liquidationThreshold: number;
+  liquidationThreshold: Decimal;
   /** Maximum amount that can be deposited into the market */
-  depositLimit: bigint;
+  depositLimit: Decimal;
+  /** Borrow fee */
+  borrowFee: Decimal;
+  /** Borrow weight */
+  borrowWeight: Decimal;
+  /** XToken ratio */
+  xtokenRatio: Decimal;
 }
 
 /**
@@ -236,6 +254,26 @@ export interface Portfolio {
     suppliedAmount: bigint;
     borrowedAmount: bigint;
   }[];
+  /** Health factor of the user's position (safe when > 1.0) */
+  healthFactor: string;
+  /** Whether the user's position is eligible for liquidation */
+  isLiquidatable: boolean;
+  /** Detailed information about user's positions in each market */
+  marketPositions: Record<
+    string,
+    {
+      marketId: string;
+      coinType: string;
+      suppliedAmount: string;
+      suppliedAmountUsd: string;
+      borrowedAmount: string;
+      borrowedAmountUsd: string;
+      supplyApr: number;
+      borrowApr: number;
+      ltv: number;
+      liquidationThreshold: number;
+    }
+  >;
 }
 
 /**

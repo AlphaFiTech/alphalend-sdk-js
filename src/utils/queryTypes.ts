@@ -110,7 +110,7 @@ interface FlowLimiterQueryType {
   window_duration: string;
 }
 
-interface MarketConfigQueryType {
+export interface MarketConfigQueryType {
   active: boolean;
   borrow_fee_bps: string;
   borrow_weight: NumberQueryType;

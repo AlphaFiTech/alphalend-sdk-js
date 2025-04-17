@@ -64,7 +64,7 @@ export function updatePriceTransaction(
   });
 
   const coinTypeName = tx.moveCall({
-    target: `0x2::type_name::get`,
+    target: `0x1::type_name::get`,
     typeArguments: [args.coinType],
   });
 

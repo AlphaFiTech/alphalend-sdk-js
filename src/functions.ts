@@ -4,12 +4,14 @@ import { getConstants } from "./constants/index.js";
 import { Market, Portfolio, ProtocolStats } from "./core/types.js";
 import {
   BorrowQueryType,
+  MarketConfigQueryType,
   MarketQueryType,
   PositionCapQueryType,
   PositionQueryType,
   PriceData,
 } from "./utils/queryTypes.js";
 import { pythPriceFeedIds } from "./utils/priceFeedIds.js";
+import { Decimal } from "decimal.js";
 
 const constants = getConstants();
 
@@ -85,10 +87,11 @@ export const getUserPosition = async (
     return undefined;
   }
 
-  const response = await suiClient.getObject({
-    id: positionId,
-    options: {
-      showContent: true,
+  const response = await suiClient.getDynamicFieldObject({
+    parentId: constants.POSITION_TABLE_ID,
+    name: {
+      type: "0x2::object::ID",
+      value: positionId,
     },
   });
 
@@ -168,50 +171,51 @@ export const getMarkets = async (suiClient: SuiClient): Promise<Market[]> => {
       // Extract the market details and add to results
       const marketConfig = marketFields.config.fields;
 
-      // Calculate utilization rate
-      const totalSupply = BigInt(marketFields.xtoken_supply);
-      const totalBorrow = BigInt(marketFields.borrowed_amount);
-      const utilizationRate =
-        totalSupply > 0
-          ? Number((totalBorrow * BigInt(100)) / totalSupply) / 100
-          : 0;
+      const decimalDigit = new Decimal(marketFields.decimal_digit.fields.value);
 
-      // Get the interest rate model from market config
-      const interestRateModel = {
-        baseRate: Number(marketConfig.interest_rates[0]) / 10000, // Base rate, convert from basis points
-        slope1:
-          (Number(marketConfig.interest_rates[1]) -
-            Number(marketConfig.interest_rates[0])) /
-          10000,
-        slope2:
-          (Number(marketConfig.interest_rates[2]) -
-            Number(marketConfig.interest_rates[1])) /
-          10000,
-        optimalUtilization: Number(marketConfig.interest_rate_kinks[0]) / 100,
-      };
+      // Calculate utilization rate
+      const totalSupply = new Decimal(marketFields.xtoken_supply).div(
+        decimalDigit,
+      );
+      const totalBorrow = new Decimal(marketFields.borrowed_amount).div(
+        decimalDigit,
+      );
+      const utilizationRate = totalSupply.gt(0)
+        ? totalBorrow.div(totalSupply)
+        : new Decimal(0);
 
       // Calculate borrow APR
-      const borrowApr = calculateBorrowApr(utilizationRate, interestRateModel);
-
-      // Calculate supply APR using borrow APR
-      const reserveFactor = Number(marketConfig.protocol_fee_share_bps) / 10000;
+      const borrowApr = calculateBorrowApr(utilizationRate, marketConfig);
+      const reserveFactor = new Decimal(
+        marketConfig.protocol_fee_share_bps,
+      ).div(10000);
       const supplyApr = calculateSupplyApr(
         borrowApr.interestApr,
         utilizationRate,
         reserveFactor,
       );
 
+      const coinType = marketFields.coin_type.fields.name.includes("sui::SUI")
+        ? "0x2::sui::SUI"
+        : marketFields.coin_type.fields.name;
+
       markets.push({
         marketId: marketFields.market_id,
-        coinType: marketFields.coin_type.fields.name,
+        coinType,
+        decimalDigit: decimalDigit.log(10).toNumber(),
         totalSupply,
         totalBorrow,
         utilizationRate,
         supplyApr,
         borrowApr,
-        ltv: Number(marketConfig.safe_collateral_ratio) / 100,
-        liquidationThreshold: Number(marketConfig.liquidation_threshold) / 100,
-        depositLimit: BigInt(marketConfig.deposit_limit),
+        ltv: new Decimal(marketConfig.safe_collateral_ratio).div(100),
+        liquidationThreshold: new Decimal(
+          marketConfig.liquidation_threshold,
+        ).div(100),
+        depositLimit: new Decimal(marketConfig.deposit_limit),
+        borrowFee: new Decimal(marketConfig.borrow_fee_bps).div(100),
+        borrowWeight: new Decimal(marketConfig.borrow_weight.fields.value),
+        xtokenRatio: new Decimal(marketFields.xtoken_ratio.fields.value),
       });
     }
 
@@ -223,13 +227,20 @@ export const getMarkets = async (suiClient: SuiClient): Promise<Market[]> => {
 };
 
 const calculateSupplyApr = (
-  borrowApr = 0,
-  utilizationRate = 0,
-  reserveFactor = 0.2,
-) => {
+  borrowApr: Decimal,
+  utilizationRate: Decimal,
+  reserveFactor: Decimal,
+): {
+  interestApr: Decimal;
+  rewards: {
+    coinType: string;
+    rewardApr: Decimal;
+  }[];
+} => {
   // Supply APR = Borrow APR * Utilization * (1 - Reserve Factor)
-  const interestApr = borrowApr * utilizationRate * (1 - reserveFactor);
-
+  const interestApr = borrowApr
+    .mul(utilizationRate)
+    .mul(new Decimal(1).sub(reserveFactor));
   return {
     interestApr,
     rewards: [], // Rewards would be added here if available
@@ -237,35 +248,53 @@ const calculateSupplyApr = (
 };
 
 const calculateBorrowApr = (
-  utilizationRate = 0,
-  model = {
-    baseRate: 0.01, // 1%
-    slope1: 0.1, // 10%
-    slope2: 0.4, // 40%
-    optimalUtilization: 0.8, // 80%
-  },
-) => {
-  const { baseRate, slope1, slope2, optimalUtilization } = model;
+  utilizationRate: Decimal,
+  marketConfig: MarketConfigQueryType,
+): {
+  interestApr: Decimal;
+  rewards: {
+    coinType: string;
+    rewardApr: Decimal;
+  }[];
+} => {
+  const utilizationRatePercentage = utilizationRate.mul(100);
+  const kinks = marketConfig.interest_rate_kinks;
+  const rates = marketConfig.interest_rates;
+  if (kinks.length === 0) {
+    return {
+      interestApr: new Decimal(rates[0]).div(10000),
+      rewards: [], // Rewards would be added here if available
+    };
+  }
 
-  let interestApr = 0;
+  for (let i = 0; i < kinks.length; i++) {
+    if (utilizationRatePercentage.gte(kinks[i])) {
+      continue;
+    }
 
-  // If utilization is below optimal, use the first slope
-  if (utilizationRate <= optimalUtilization) {
-    const utilizationFactor =
-      optimalUtilization === 0 ? 0 : utilizationRate / optimalUtilization;
-    interestApr = baseRate + slope1 * utilizationFactor;
-  } else {
-    // If utilization is above optimal, use the second slope
-    const excessUtilization = utilizationRate - optimalUtilization;
-    const maxExcess = 1.0 - optimalUtilization; // 1.00 - optimal
+    // Calculate linear interpolation
+    let leftApr = i == 0 ? new Decimal(0) : new Decimal(rates[i - 1]);
+    let rightApr = new Decimal(rates[i]);
+    let leftKink = i == 0 ? new Decimal(0) : new Decimal(kinks[i - 1]);
+    let rightKink = new Decimal(kinks[i]);
 
-    const utilizationFactor =
-      maxExcess === 0 ? 0 : excessUtilization / maxExcess;
-    interestApr = baseRate + slope1 + slope2 * utilizationFactor;
+    // Calculate interpolated rate
+    let interestApr = leftApr.add(
+      rightApr
+        .sub(leftApr)
+        .mul(utilizationRatePercentage.sub(leftKink))
+        .div(rightKink.sub(leftKink)),
+    );
+
+    // Convert from bps to decimal
+    return {
+      interestApr: interestApr.div(10000),
+      rewards: [], // Rewards would be added here if available
+    };
   }
 
   return {
-    interestApr,
+    interestApr: new Decimal(rates[0]).div(10000),
     rewards: [], // Rewards would be added here if available
   };
 };
@@ -274,161 +303,231 @@ export const getUserPortfolio = async (
   suiClient: SuiClient,
   userAddress: string,
 ): Promise<Portfolio> => {
-  try {
-    // Get user position ID
-    const position = await getUserPosition(suiClient, userAddress);
-    if (!position) {
-      // Return empty portfolio if no position found
-      return {
-        userAddress,
-        netWorth: "0",
-        totalSuppliedUsd: "0",
-        totalBorrowedUsd: "0",
-        safeBorrowLimit: "0",
-        borrowLimitUsed: "0",
-        liquidationLimit: "0",
-        rewardsToClaimUsd: "0",
-        rewardsByToken: [],
-        dailyEarnings: "0",
-        netApr: "0",
-        aggregatedSupplyApr: "0",
-        aggregatedBorrowApr: "0",
-        userBalances: [],
-      };
-    }
-    const positionFields = position.content.fields.value.fields;
+  // try {
+  //   // Get user position
+  //   const position = await getUserPosition(suiClient, userAddress);
+  //   if (!position) {
+  //     // Return empty portfolio if no position found
+  //     return {
+  //       userAddress,
+  //       netWorth: "0",
+  //       totalSuppliedUsd: "0",
+  //       totalBorrowedUsd: "0",
+  //       safeBorrowLimit: "0",
+  //       borrowLimitUsed: "0",
+  //       liquidationLimit: "0",
+  //       rewardsToClaimUsd: "0",
+  //       rewardsByToken: [],
+  //       dailyEarnings: "0",
+  //       netApr: "0",
+  //       aggregatedSupplyApr: "0",
+  //       aggregatedBorrowApr: "0",
+  //       userBalances: [],
+  //       healthFactor: "100", // Perfect health when no borrows
+  //       isLiquidatable: false,
+  //       marketPositions: {},
+  //     };
+  //   }
+  //   const positionFields = position.content.fields.value.fields;
 
-    // Get all markets to calculate APRs and limits
-    const markets = await getMarkets(suiClient);
-    const prices = await getPricesFromPyth(
-      markets.map((market) => market.coinType),
-    );
-    const marketMap = createMarketMap(markets);
-    const priceMap = createPriceMap(prices);
+  //   // Get all markets and prices
+  //   const markets = await getMarkets(suiClient);
+  //   const marketMap = new Map<string, Market>();
+  //   const coinTypes: string[] = [];
+  //   for (const market of markets) {
+  //     coinTypes.push(market.coinType);
+  //     // to-do --> refresh map and postion
+  //     marketMap.set(market.marketId, market);
+  //   }
 
-    const collaterals = positionFields.collaterals.fields.contents;
-    const loans = positionFields.loans;
+  //   const prices = await getPricesFromPyth(coinTypes);
+  //   const priceMap = new Map(prices.map((price) => [price.coinType, price]));
 
-    const collateralMap = createCollateralMap(collaterals, marketMap, priceMap);
+  //   // Process collaterals and loans
+  //   const collaterals = positionFields.collaterals.fields.contents;
+  //   const loans = positionFields.loans;
+  //   const collateralMap = createCollateralMap(collaterals, marketMap, priceMap);
+  //   const loanMap = createLoanMap(loans, marketMap, priceMap);
 
-    const loanMap = createLoanMap(loans, marketMap, priceMap);
+  //   // Initialize portfolio metrics
+  //   let totalSuppliedUsd = new Decimal(0);
+  //   let totalBorrowedUsd = new Decimal(0);
+  //   let weightedSupplyApr = new Decimal(0);
+  //   let weightedBorrowApr = new Decimal(0);
+  //   let totalWeightedAmount = new Decimal(0);
+  //   let safeBorrowLimit = new Decimal(0);
+  //   let liquidationLimit = new Decimal(0);
+  //   const marketPositions: Record<
+  //     string,
+  //     {
+  //       marketId: string;
+  //       coinType: string;
+  //       suppliedAmount: Decimal;
+  //       suppliedAmountUsd: Decimal;
+  //       borrowedAmount: Decimal;
+  //       borrowedAmountUsd: Decimal;
+  //     }
+  //   > = {};
 
-    // Initialize portfolio metrics
-    let totalSuppliedUsd = 0;
-    let totalBorrowedUsd = 0;
-    let weightedSupplyApr = 0;
-    let weightedBorrowApr = 0;
-    let totalWeight = 0;
-    let liquidationLimit = 0;
-    let safeBorrowLimit = 0;
-    const userBalances: {
-      marketId: string;
-      suppliedAmount: bigint;
-      borrowedAmount: bigint;
-    }[] = [];
+  //   // Calculate supplied values from collaterals
+  //   for (const [marketId, collateralInfo] of collateralMap.entries()) {
+  //     const market = marketMap.get(marketId);
+  //     if (!market) {
+  //       console.error(`Market not found: ${marketId}`);
+  //       continue;
+  //     }
 
-    // Calculate portfolio metrics
-    for (const market of markets) {
-      const tokenPrice = prices.find(
-        (price) => price.coinType === market.coinType,
-      )?.price.price;
-      if (!tokenPrice) continue;
+  //     const tokenPrice = priceMap.get(market.coinType)?.price.price;
+  //     if (!tokenPrice) {
+  //       console.error(`Price not found for ${market.coinType}`);
+  //       continue;
+  //     }
 
-      // Calculate supplied and borrowed values
-      const suppliedValue = Number(market.totalSupply) * Number(tokenPrice);
-      const borrowedValue = Number(market.totalBorrow) * Number(tokenPrice);
+  //     const amountUsd = collateralInfo.amountUsd;
+  //     totalSuppliedUsd = totalSuppliedUsd.add(amountUsd);
 
-      totalSuppliedUsd += suppliedValue;
-      totalBorrowedUsd += borrowedValue;
+  //     // Calculate contribution to borrow limit
+  //     safeBorrowLimit = safeBorrowLimit.add(amountUsd.mul(market.ltv));
 
-      // Calculate weighted APRs
-      const weight = suppliedValue + borrowedValue;
-      totalWeight += weight;
-      weightedSupplyApr +=
-        (market.supplyApr.interestApr +
-          market.supplyApr.rewards.reduce(
-            (acc, reward) => acc + reward.rewardApr,
-            0,
-          )) *
-        suppliedValue;
-      weightedBorrowApr +=
-        (market.borrowApr.interestApr +
-          market.borrowApr.rewards.reduce(
-            (acc, reward) => acc + reward.rewardApr,
-            0,
-          )) *
-        borrowedValue;
+  //     // Calculate weighted liquidation threshold
+  //     liquidationLimit = liquidationLimit.add(
+  //       amountUsd.mul(market.liquidationThreshold),
+  //     );
 
-      // Calculate limits
-      liquidationLimit += suppliedValue * market.liquidationThreshold;
-      safeBorrowLimit += suppliedValue * market.ltv;
+  //     // Calculate weighted APR
+  //     weightedSupplyApr = weightedSupplyApr.add(
+  //       market.supplyApr.interestApr.mul(amountUsd),
+  //     );
+  //     totalWeightedAmount = totalWeightedAmount.add(amountUsd);
 
-      // Add to user balances
-      userBalances.push({
-        marketId: market.marketId,
-        suppliedAmount: market.totalSupply,
-        borrowedAmount: market.totalBorrow,
-      });
-    }
+  //     // Add to market positions
+  //     marketPositions[marketId] = {
+  //       marketId,
+  //       coinType: market.coinType,
+  //       suppliedAmount: collateralInfo.amount,
+  //       suppliedAmountUsd: collateralInfo.amountUsd,
+  //       borrowedAmount: new Decimal(0),
+  //       borrowedAmountUsd: new Decimal(0),
+  //     };
+  //   }
 
-    // Calculate final metrics
-    const netWorth = totalSuppliedUsd - totalBorrowedUsd;
-    const borrowLimitUsed =
-      safeBorrowLimit > 0 ? (totalBorrowedUsd / safeBorrowLimit) * 100 : 0;
-    const aggregatedSupplyApr =
-      totalSuppliedUsd > 0 ? weightedSupplyApr / totalSuppliedUsd : 0;
-    const aggregatedBorrowApr =
-      totalBorrowedUsd > 0 ? weightedBorrowApr / totalBorrowedUsd : 0;
-    const netApr =
-      totalWeight > 0
-        ? (weightedSupplyApr - weightedBorrowApr) / totalWeight
-        : 0;
-    const dailyEarnings = (netApr / 365) * netWorth;
+  //   // Calculate borrowed values from loans
+  //   for (const [marketId, loanInfo] of loanMap.entries()) {
+  //     const market = marketMap.get(marketId);
+  //     if (!market) {
+  //       console.error(`Market not found: ${marketId}`);
+  //       continue;
+  //     }
 
-    return {
-      userAddress,
-      netWorth: netWorth.toString(),
-      totalSuppliedUsd: totalSuppliedUsd.toString(),
-      totalBorrowedUsd: totalBorrowedUsd.toString(),
-      safeBorrowLimit: safeBorrowLimit.toString(),
-      borrowLimitUsed: borrowLimitUsed.toString(),
-      liquidationLimit: liquidationLimit.toString(),
-      rewardsToClaimUsd: "0", // TODO: Implement rewards calculation
-      rewardsByToken: [], // TODO: Implement rewards by token
-      dailyEarnings: dailyEarnings.toString(),
-      netApr: netApr.toString(),
-      aggregatedSupplyApr: aggregatedSupplyApr.toString(),
-      aggregatedBorrowApr: aggregatedBorrowApr.toString(),
-      userBalances,
-    };
-  } catch (error) {
-    console.error("Error getting user portfolio:", error);
-    // Return empty portfolio on error
-    return {
-      userAddress,
-      netWorth: "0",
-      totalSuppliedUsd: "0",
-      totalBorrowedUsd: "0",
-      safeBorrowLimit: "0",
-      borrowLimitUsed: "0",
-      liquidationLimit: "0",
-      rewardsToClaimUsd: "0",
-      rewardsByToken: [],
-      dailyEarnings: "0",
-      netApr: "0",
-      aggregatedSupplyApr: "0",
-      aggregatedBorrowApr: "0",
-      userBalances: [],
-    };
-  }
-};
+  //     const tokenPrice = priceMap.get(market.coinType)?.price.price;
+  //     if (!tokenPrice) {
+  //       console.error(`Price not found for ${market.coinType}`);
+  //       continue;
+  //     }
 
-const createMarketMap = (markets: Market[]) => {
-  return new Map(markets.map((market) => [market.marketId, market]));
-};
+  //     const amountUsd = Number(loanInfo.amountUsd);
+  //     totalBorrowedUsd += amountUsd;
 
-const createPriceMap = (prices: PriceData[]) => {
-  return new Map(prices.map((price) => [price.coinType, price]));
+  //     // Calculate weighted borrow APR
+  //     weightedBorrowApr += market.borrowApr.interestApr * amountUsd;
+  //     totalWeightedAmount -= amountUsd; // Subtract borrowed amount
+
+  //     // Update or create market position
+  //     if (marketPositions[marketId]) {
+  //       marketPositions[marketId].borrowedAmount = loanInfo.amount;
+  //       marketPositions[marketId].borrowedAmountUsd = loanInfo.amountUsd;
+  //     } else {
+  //       marketPositions[marketId] = {
+  //         marketId,
+  //         coinType: market.coinType,
+  //         suppliedAmount: "0",
+  //         suppliedAmountUsd: "0",
+  //         borrowedAmount: loanInfo.amount,
+  //         borrowedAmountUsd: loanInfo.amountUsd,
+  //       };
+  //     }
+  //   }
+
+  //   // Calculate final metrics
+  //   const netWorth = totalSuppliedUsd - totalBorrowedUsd;
+  //   const borrowLimitUsed =
+  //     safeBorrowLimit > 0 ? (totalBorrowedUsd / safeBorrowLimit) * 100 : 0;
+
+  //   // Calculate health factor with zero division protection
+  //   const healthFactor =
+  //     totalBorrowedUsd > 0 ? liquidationLimit / totalBorrowedUsd : 100; // Perfect health when no borrows
+
+  //   const isLiquidatable = healthFactor < 1;
+
+  //   // Calculate APRs with zero division protection
+  //   const aggregatedSupplyApr =
+  //     totalSuppliedUsd > 0 ? weightedSupplyApr / totalSuppliedUsd : 0;
+
+  //   const aggregatedBorrowApr =
+  //     totalBorrowedUsd > 0 ? weightedBorrowApr / totalBorrowedUsd : 0;
+
+  //   // Calculate net APR
+  //   const netApr =
+  //     totalWeightedAmount > 0
+  //       ? (weightedSupplyApr - weightedBorrowApr) / totalWeightedAmount
+  //       : 0;
+
+  //   // Calculate daily earnings based on net APR
+  //   const dailyEarnings = (netApr / 365) * netWorth;
+
+  //   // Create user balances for backwards compatibility
+  //   const userBalances = Object.values(marketPositions).map((position) => ({
+  //     marketId: position.marketId,
+  //     suppliedAmount: BigInt(position.suppliedAmount),
+  //     borrowedAmount: BigInt(position.borrowedAmount),
+  //   }));
+
+  //   // Create rewards by token (empty for now as in Rust SDK it's a placeholder)
+  //   const rewardsByToken = [];
+  //   const rewardsToClaimUsd = "0";
+
+  //   return {
+  //     userAddress,
+  //     netWorth: netWorth.toString(),
+  //     totalSuppliedUsd: totalSuppliedUsd.toString(),
+  //     totalBorrowedUsd: totalBorrowedUsd.toString(),
+  //     safeBorrowLimit: safeBorrowLimit.toString(),
+  //     borrowLimitUsed: borrowLimitUsed.toString(),
+  //     liquidationLimit: liquidationLimit.toString(),
+  //     rewardsToClaimUsd,
+  //     rewardsByToken,
+  //     dailyEarnings: dailyEarnings.toString(),
+  //     netApr: netApr.toString(),
+  //     aggregatedSupplyApr: aggregatedSupplyApr.toString(),
+  //     aggregatedBorrowApr: aggregatedBorrowApr.toString(),
+  //     userBalances,
+  //     healthFactor: healthFactor.toString(),
+  //     isLiquidatable,
+  //     marketPositions,
+  //   };
+  // } catch (error) {
+  //   console.error("Error getting user portfolio:", error);
+  //   // Return empty portfolio on error
+  return {
+    userAddress,
+    netWorth: "0",
+    totalSuppliedUsd: "0",
+    totalBorrowedUsd: "0",
+    safeBorrowLimit: "0",
+    borrowLimitUsed: "0",
+    liquidationLimit: "0",
+    rewardsToClaimUsd: "0",
+    rewardsByToken: [],
+    dailyEarnings: "0",
+    netApr: "0",
+    aggregatedSupplyApr: "0",
+    aggregatedBorrowApr: "0",
+    userBalances: [],
+    healthFactor: "100", // Perfect health when no positions
+    isLiquidatable: false,
+    marketPositions: {},
+  };
+  // }
 };
 
 const createCollateralMap = (
@@ -441,28 +540,37 @@ const createCollateralMap = (
   }[],
   marketMap: Map<string, Market>,
   priceMap: Map<string, PriceData>,
-): Map<string, { amount: string; amountUsd: string }> => {
+): Map<string, { amount: Decimal; amountUsd: Decimal }> => {
   const collateralMap = new Map<
     string,
     {
-      amount: string;
-      amountUsd: string;
+      amount: Decimal;
+      amountUsd: Decimal;
     }
   >();
   for (const collateral of collaterals) {
     const marketId = collateral.fields.key;
-    const collateralAmount = collateral.fields.value;
+    const collateralXTokenAmount = collateral.fields.value;
 
     const market = marketMap.get(marketId);
-    if (!market) continue;
+    if (!market) {
+      console.error(`Market not found: ${marketId}`);
+      continue;
+    }
 
     const tokenPrice = priceMap.get(market.coinType)?.price.price;
-    if (!tokenPrice) continue;
+    if (!tokenPrice) {
+      console.error(`Price not found for ${market.coinType}`);
+      continue;
+    }
 
-    const suppliedValueUsd = Number(collateralAmount) * Number(tokenPrice);
+    const collateralAmount = new Decimal(collateralXTokenAmount).mul(
+      market.xtokenRatio,
+    );
+    const suppliedValueUsd = new Decimal(collateralAmount).mul(tokenPrice);
     collateralMap.set(marketId, {
-      amount: collateralAmount,
-      amountUsd: suppliedValueUsd.toString(),
+      amount: new Decimal(collateralAmount),
+      amountUsd: suppliedValueUsd,
     });
   }
   return collateralMap;
@@ -475,22 +583,28 @@ const createLoanMap = (
   }[],
   marketMap: Map<string, Market>,
   priceMap: Map<string, PriceData>,
-): Map<string, { amount: string; amountUsd: string }> => {
-  const loanMap = new Map<string, { amount: string; amountUsd: string }>();
+): Map<string, { amount: Decimal; amountUsd: Decimal }> => {
+  const loanMap = new Map<string, { amount: Decimal; amountUsd: Decimal }>();
   for (const loan of loans) {
     const marketId = loan.fields.market_id;
     const loanAmount = loan.fields.amount;
 
     const market = marketMap.get(marketId);
-    if (!market) continue;
+    if (!market) {
+      console.error(`Market not found: ${marketId}`);
+      continue;
+    }
 
     const tokenPrice = priceMap.get(market.coinType)?.price.price;
-    if (!tokenPrice) continue;
+    if (!tokenPrice) {
+      console.error(`Price not found for ${market.coinType}`);
+      continue;
+    }
 
-    const loanValueUsd = Number(loanAmount) * Number(tokenPrice);
+    const loanValueUsd = new Decimal(loanAmount).mul(tokenPrice);
     loanMap.set(marketId, {
-      amount: loanAmount,
-      amountUsd: loanValueUsd.toString(),
+      amount: new Decimal(loanAmount),
+      amountUsd: loanValueUsd,
     });
   }
   return loanMap;
