@@ -33,7 +33,7 @@ export interface SupplyParams {
   /** Amount to supply as collateral in base units */
   amount: bigint;
   /** Supply coin type (e.g., "0x2::sui::SUI") */
-  supplyCoinType: string;
+  coinType: string;
   /** Object ID of the position capability object */
   positionCapId?: string;
   /** Address of the user supplying collateral */
@@ -52,9 +52,11 @@ export interface WithdrawParams {
   /** Amount to withdraw (use MAX_U64 constant to withdraw all) */
   amount: bigint;
   /** Withdraw coin type (e.g., "0x2::sui::SUI") */
-  withdrawCoinType: string;
+  coinType: string;
   /** Object ID of the position capability object */
   positionCapId: string;
+  /** Address of the user supplying collateral */
+  address: string;
   /** Coin types of the coins whose price needs to be updated */
   priceUpdateCoinTypes: string[];
 }
@@ -69,9 +71,11 @@ export interface BorrowParams {
   /** Amount to borrow in base units */
   amount: bigint;
   /** Borrow coin type (e.g., "0x2::sui::SUI") */
-  borrowCoinType: string;
+  coinType: string;
   /** Object ID of the position capability object */
   positionCapId: string;
+  /** Address of the user supplying collateral */
+  address: string;
   /** Coin types of the coins whose price needs to be updated */
   priceUpdateCoinTypes: string[];
 }
@@ -86,7 +90,7 @@ export interface RepayParams {
   /** Amount to repay in base units */
   amount: bigint;
   /** Repay coin type (e.g., "0x2::sui::SUI") */
-  repayCoinType: string;
+  coinType: string;
   /** Object ID of the position capability object */
   positionCapId: string;
   /** Address of the user repaying the debt */
@@ -106,6 +110,8 @@ export interface ClaimRewardsParams {
   coinType: string;
   /** Object ID of the position capability object */
   positionCapId: string;
+  /** Address of the user supplying collateral */
+  address: string;
   /** Coin types of the coins whose price needs to be updated */
   priceUpdateCoinTypes: string[];
 }
@@ -129,6 +135,8 @@ export interface LiquidateParams {
   withdrawCoinType: string;
   /** Object ID of the coin to use for repayment */
   coinObjectId: string;
+  /** Address of the user supplying collateral */
+  address: string;
   /** Coin types of the coins whose price needs to be updated */
   priceUpdateCoinTypes: string[];
 }

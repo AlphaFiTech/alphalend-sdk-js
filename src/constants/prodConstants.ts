@@ -22,6 +22,8 @@ export const prodConstants = {
 
   POSITION_CAP_TYPE: "", // Replace with actual position cap type
 
+  POSITION_TABLE_ID: "", // Replace with actual position table ID
+
   ACTIVE_MARKETS: [""], // to-do: think of a way to store this outside sdk(db or seperate contract)
 
   // Pyth Constants

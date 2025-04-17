@@ -87,10 +87,11 @@ export const getUserPosition = async (
     return undefined;
   }
 
-  const response = await suiClient.getObject({
-    id: positionId,
-    options: {
-      showContent: true,
+  const response = await suiClient.getDynamicFieldObject({
+    parentId: constants.POSITION_TABLE_ID,
+    name: {
+      type: "0x2::object::ID",
+      value: positionId,
     },
   });
 
@@ -170,9 +171,7 @@ export const getMarkets = async (suiClient: SuiClient): Promise<Market[]> => {
       // Extract the market details and add to results
       const marketConfig = marketFields.config.fields;
 
-      const decimalDigit = new Decimal(
-        marketFields.decimal_digit.fields.value,
-      );
+      const decimalDigit = new Decimal(marketFields.decimal_digit.fields.value);
 
       // Calculate utilization rate
       const totalSupply = new Decimal(marketFields.xtoken_supply).div(
@@ -509,25 +508,25 @@ export const getUserPortfolio = async (
   // } catch (error) {
   //   console.error("Error getting user portfolio:", error);
   //   // Return empty portfolio on error
-    return {
-      userAddress,
-      netWorth: "0",
-      totalSuppliedUsd: "0",
-      totalBorrowedUsd: "0",
-      safeBorrowLimit: "0",
-      borrowLimitUsed: "0",
-      liquidationLimit: "0",
-      rewardsToClaimUsd: "0",
-      rewardsByToken: [],
-      dailyEarnings: "0",
-      netApr: "0",
-      aggregatedSupplyApr: "0",
-      aggregatedBorrowApr: "0",
-      userBalances: [],
-      healthFactor: "100", // Perfect health when no positions
-      isLiquidatable: false,
-      marketPositions: {},
-    };
+  return {
+    userAddress,
+    netWorth: "0",
+    totalSuppliedUsd: "0",
+    totalBorrowedUsd: "0",
+    safeBorrowLimit: "0",
+    borrowLimitUsed: "0",
+    liquidationLimit: "0",
+    rewardsToClaimUsd: "0",
+    rewardsByToken: [],
+    dailyEarnings: "0",
+    netApr: "0",
+    aggregatedSupplyApr: "0",
+    aggregatedBorrowApr: "0",
+    userBalances: [],
+    healthFactor: "100", // Perfect health when no positions
+    isLiquidatable: false,
+    marketPositions: {},
+  };
   // }
 };
 
