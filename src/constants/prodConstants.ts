@@ -11,10 +11,10 @@ export const prodConstants = {
   ADMIN_CAP_ID:
     "0x16567b0eb680c5b3d3e1b707702880c230d313dc97e6a768d957c65c754602c8",
 
+  ALPHAFI_STDLIB_PACKAGE_ID: "",
+
   // AlphaLend constants
   ALPHALEND_PACKAGE_ID: "", // Replace with actual package ID
-
-  ALPHALEND_ORACLE_OBJECT_ID: "", // Replace with actual oracle object ID
 
   LENDING_PROTOCOL_ID: "", // Replace with actual protocol object ID
 
