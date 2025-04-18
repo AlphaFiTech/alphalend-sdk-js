@@ -154,7 +154,7 @@ export class AlphalendClient {
     }
 
     const [supplyCoinA] = tx.splitCoins(coin, [
-      params.amount.floor().toNumber(),
+      params.amount.floor().toString(),
     ]);
 
     if (params.positionCapId) {
@@ -217,7 +217,7 @@ export class AlphalendClient {
         tx.object(constants.LENDING_PROTOCOL_ID), // Protocol object
         tx.object(params.positionCapId), // Position capability
         tx.pure.u64(params.marketId), // Market ID
-        tx.pure.u64(params.amount.floor().toNumber()), // Amount to withdraw
+        tx.pure.u64(params.amount.floor().toString()), // Amount to withdraw
         tx.object(constants.SUI_CLOCK_OBJECT_ID), // Clock object
       ],
     });
@@ -252,7 +252,7 @@ export class AlphalendClient {
         tx.object(constants.LENDING_PROTOCOL_ID), // Protocol object
         tx.object(params.positionCapId), // Position capability
         tx.pure.u64(params.marketId), // Market ID
-        tx.pure.u64(params.amount.floor().toNumber()), // Amount to borrow
+        tx.pure.u64(params.amount.floor().toString()), // Amount to borrow
         tx.object(constants.SUI_CLOCK_OBJECT_ID), // Clock object
       ],
     });
@@ -287,7 +287,7 @@ export class AlphalendClient {
     }
 
     const [repayCoinA] = tx.splitCoins(coin, [
-      params.amount.floor().toNumber(),
+      params.amount.floor().toString(),
     ]);
 
     // Build repay transaction
