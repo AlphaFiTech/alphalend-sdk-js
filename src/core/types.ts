@@ -17,7 +17,7 @@ import { Decimal } from "decimal.js";
  * Used to indicate withdrawing all collateral when passed as the amount parameter
  * in withdraw operations.
  */
-export const MAX_U64 = BigInt("18446744073709551615");
+export const MAX_U64 = Decimal("18446744073709551615");
 
 /**
  * Parameter interfaces for protocol operations
@@ -31,7 +31,7 @@ export interface SupplyParams {
   /** Market ID where collateral is being added */
   marketId: string;
   /** Amount to supply as collateral in base units */
-  amount: bigint;
+  amount: Decimal;
   /** Supply coin type (e.g., "0x2::sui::SUI") */
   coinType: string;
   /** Object ID of the position capability object */
@@ -50,7 +50,7 @@ export interface WithdrawParams {
   /** Market ID from which to withdraw */
   marketId: string;
   /** Amount to withdraw (use MAX_U64 constant to withdraw all) */
-  amount: bigint;
+  amount: Decimal;
   /** Withdraw coin type (e.g., "0x2::sui::SUI") */
   coinType: string;
   /** Object ID of the position capability object */
@@ -69,7 +69,7 @@ export interface BorrowParams {
   /** Market ID to borrow from */
   marketId: string;
   /** Amount to borrow in base units */
-  amount: bigint;
+  amount: Decimal;
   /** Borrow coin type (e.g., "0x2::sui::SUI") */
   coinType: string;
   /** Object ID of the position capability object */
@@ -88,7 +88,7 @@ export interface RepayParams {
   /** Market ID where the debt exists */
   marketId: string;
   /** Amount to repay in base units */
-  amount: bigint;
+  amount: Decimal;
   /** Repay coin type (e.g., "0x2::sui::SUI") */
   coinType: string;
   /** Object ID of the position capability object */
@@ -128,7 +128,7 @@ export interface LiquidateParams {
   /** Market ID where collateral is seized */
   withdrawMarketId: string;
   /** Amount of debt to repay in base units */
-  repayAmount: bigint;
+  repayAmount: Decimal;
   /** Fully qualified coin type for debt repayment */
   borrowCoinType: string;
   /** Fully qualified coin type for collateral to seize */
@@ -150,7 +150,7 @@ export interface TransactionResponse {
   /** Status of the transaction */
   status: "success" | "failure";
   /** Gas fee paid for the transaction */
-  gasFee?: bigint;
+  gasFee?: Decimal;
   /** Timestamp when the transaction completed */
   timestamp?: number;
 }
@@ -251,8 +251,8 @@ export interface Portfolio {
   /** User balances */
   userBalances: {
     marketId: string;
-    suppliedAmount: bigint;
-    borrowedAmount: bigint;
+    suppliedAmount: Decimal;
+    borrowedAmount: Decimal;
   }[];
   /** Health factor of the user's position (safe when > 1.0) */
   healthFactor: string;
@@ -285,7 +285,7 @@ export interface Loan {
   /** Market ID where the loan exists */
   marketId: string;
   /** Amount borrowed in base units */
-  amount: bigint;
+  amount: Decimal;
   /** USD value of the borrowed amount */
   amountUsd: number;
 }
@@ -297,7 +297,7 @@ export interface Position {
   /** Position identifier */
   id: string;
   /** Map of market IDs to collateral amounts */
-  collaterals: { [marketId: string]: bigint };
+  collaterals: { [marketId: string]: Decimal };
   /** List of outstanding loans */
   loans: Loan[];
   /** Total USD value of all collateral */

@@ -73,11 +73,13 @@ export function updatePriceTransaction(
     arguments: [tx.object(constants.ALPHAFI_ORACLE_OBJECT_ID), coinTypeName],
   });
 
+  const oracleMutObject = tx.moveCall({
+    target: `${constants.ALPHALEND_PACKAGE_ID}::alpha_lending::get_oracle_mut`,
+    arguments: [tx.object(constants.LENDING_PROTOCOL_ID)],
+  });
+
   tx.moveCall({
     target: `${constants.ALPHALEND_PACKAGE_ID}::oracle::update_price`,
-    arguments: [
-      tx.object(constants.ALPHALEND_ORACLE_OBJECT_ID),
-      oraclePriceInfo,
-    ],
+    arguments: [oracleMutObject, oraclePriceInfo],
   });
 }

@@ -39,7 +39,7 @@ async function addCoinToOracleCaller() {
   await addCoinToOracle(
     tx,
     adminCapId,
-    "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin4::TESTCOIN4",
+    "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin1::TESTCOIN1",
     1,
     1000,
   );
@@ -58,9 +58,73 @@ async function updatePricesCaller() {
   ]);
 }
 
+async function setPrice(
+  coinType: string,
+  price: number,
+  ema: number,
+  conf: number,
+) {
+  let tx = new Transaction();
+  const priceNumnber = tx.moveCall({
+    target: `${constants.ALPHAFI_STDLIB_PACKAGE_ID}::math::from`,
+    arguments: [tx.pure.u64(price)],
+  });
+  const emaPriceNumnber = tx.moveCall({
+    target: `${constants.ALPHAFI_STDLIB_PACKAGE_ID}::math::from`,
+    arguments: [tx.pure.u64(ema)],
+  });
+  const confNumnber = tx.moveCall({
+    target: `${constants.ALPHAFI_STDLIB_PACKAGE_ID}::math::from`,
+    arguments: [tx.pure.u64(conf)],
+  });
+  const coinTypeName = tx.moveCall({
+    target: `0x1::type_name::get`,
+    typeArguments: [coinType],
+  });
+  tx.moveCall({
+    target: `${constants.ALPHAFI_ORACLE_PACKAGE_ID}::oracle::set_price_remove_for_mainnet`,
+    arguments: [
+      tx.object(constants.ALPHAFI_ORACLE_OBJECT_ID),
+      coinTypeName,
+      emaPriceNumnber,
+      priceNumnber,
+      confNumnber,
+      tx.object(constants.SUI_CLOCK_OBJECT_ID),
+    ],
+  });
+
+  const coinTypeName1 = tx.moveCall({
+    target: `0x1::type_name::get`,
+    typeArguments: [coinType],
+  });
+
+  const oraclePriceInfo = tx.moveCall({
+    target: `${constants.ALPHAFI_ORACLE_PACKAGE_ID}::oracle::get_price_info`,
+    arguments: [tx.object(constants.ALPHAFI_ORACLE_OBJECT_ID), coinTypeName1],
+  });
+
+  const oracleMutObject = tx.moveCall({
+    target: `${constants.ALPHALEND_PACKAGE_ID}::alpha_lending::get_oracle_mut`,
+    arguments: [tx.object(constants.LENDING_PROTOCOL_ID)],
+  });
+
+  tx.moveCall({
+    target: `${constants.ALPHALEND_PACKAGE_ID}::oracle::update_price`,
+    arguments: [oracleMutObject, oraclePriceInfo],
+  });
+
+  return tx;
+}
+
 async function run() {
   const { suiClient, keypair } = getExecStuff();
-  const tx = await addCoinToOracleCaller();
+  const tx = await setPrice(
+    "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin1::TESTCOIN1",
+    1,
+    1,
+    0,
+  );
+  // const tx = await addCoinToOracleCaller();
   if (tx) {
     tx.setGasBudget(100_000_000);
 
@@ -82,5 +146,5 @@ async function run() {
       });
   }
 }
-updatePricesCaller();
+// updatePricesCaller();
 run();

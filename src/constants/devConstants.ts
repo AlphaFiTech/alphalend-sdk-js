@@ -11,12 +11,11 @@ export const devConstants = {
   ADMIN_CAP_ID:
     "0x5e676b201dec046f14ba9660b41fc8ba8fa1c3a448769551518384d330a7310c",
 
+  ALPHAFI_STDLIB_PACKAGE_ID: "0x8e9a679b29ff2210afbdefeb0517da098149e3a30259ee35591b39f4bc74687b",
+
   // AlphaLend constants
   ALPHALEND_PACKAGE_ID:
     "0x672fcd756e79eb12a1b69c43ab39e5c65f114c1cc4bd7aadda10f2c9b941281d", // Replace with actual package ID
-
-  ALPHALEND_ORACLE_OBJECT_ID:
-    "0x8cdf28019e57cbd1fc61200ab9461eda1568f219282e7d72a7372531d5f58f0b", // Replace with actual oracle object ID
 
   LENDING_PROTOCOL_ID:
     "0x0f3fe7c53658c877746353c3e375e7403798f635e204cfdd686289d85e51d3af", // Replace with actual protocol object ID
