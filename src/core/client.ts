@@ -353,33 +353,27 @@ export class AlphalendClient {
    *               borrowCoinType, withdrawCoinType, coinObjectId, priceUpdateCoinTypes
    * @returns Transaction object ready for signing and execution
    */
-  async liquidate(params: LiquidateParams): Promise<Transaction> {
-    const tx = new Transaction();
+  async liquidate(params: LiquidateParams): Promise<TransactionResult> {
+    const tx = params.tx || new Transaction();
 
     // First update prices to ensure latest oracle values
     await this.updatePrices(tx, params.priceUpdateCoinTypes);
 
     // Build liquidate transaction
-    tx.moveCall({
+    const res = tx.moveCall({
       target: `${constants.ALPHALEND_PACKAGE_ID}::alpha_lending::liquidate`,
       typeArguments: [params.borrowCoinType, params.withdrawCoinType],
       arguments: [
         tx.object(constants.LENDING_PROTOCOL_ID), // Protocol object
-        tx.pure.address(params.liquidatePositionId), // Position ID to liquidate
+        tx.pure.id(params.liquidatePositionId), // Position ID to liquidate
         tx.pure.u64(params.borrowMarketId), // Borrow market ID
         tx.pure.u64(params.withdrawMarketId), // Withdraw market ID
-        tx.object(params.coinObjectId), // Coin to repay with
+        params.repayCoin, // Coin to repay with
         tx.object(constants.SUI_CLOCK_OBJECT_ID), // Clock object
       ],
     });
 
-    const estimatedGasBudget = await getEstimatedGasBudget(
-      this.client,
-      tx,
-      params.address,
-    );
-    if (estimatedGasBudget) tx.setGasBudget(estimatedGasBudget);
-    return tx;
+    return res;
   }
 
   /**
