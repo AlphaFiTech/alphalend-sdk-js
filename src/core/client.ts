@@ -33,6 +33,7 @@ import {
   getUserPortfolio,
 } from "../functions.js";
 import { getEstimatedGasBudget } from "../utils/helper.js";
+import { setPrice } from "../utils/helper.js";
 
 /**
  * AlphaLend Client
@@ -208,6 +209,34 @@ export class AlphalendClient {
 
     // First update prices to ensure latest oracle values
     // await this.updatePrices(tx, params.priceUpdateCoinTypes);
+    await setPrice(
+      tx,
+      "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin1::TESTCOIN1",
+      1,
+      1,
+      1,
+    );
+    await setPrice(
+      tx,
+      "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin2::TESTCOIN2",
+      1,
+      1,
+      1,
+    );
+    await setPrice(
+      tx,
+      "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin3::TESTCOIN3",
+      1,
+      1,
+      1,
+    );
+    await setPrice(
+      tx,
+      "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin4::TESTCOIN4",
+      1,
+      1,
+      1,
+    );
 
     // Build remove_collateral transaction
     const coin = tx.moveCall({
@@ -243,6 +272,34 @@ export class AlphalendClient {
 
     // First update prices to ensure latest oracle values
     // await this.updatePrices(tx, params.priceUpdateCoinTypes);
+    await setPrice(
+      tx,
+      "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin1::TESTCOIN1",
+      1,
+      1,
+      1,
+    );
+    await setPrice(
+      tx,
+      "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin2::TESTCOIN2",
+      1,
+      1,
+      1,
+    );
+    await setPrice(
+      tx,
+      "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin3::TESTCOIN3",
+      1,
+      1,
+      1,
+    );
+    await setPrice(
+      tx,
+      "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin4::TESTCOIN4",
+      1,
+      1,
+      1,
+    );
 
     // Build borrow transaction
     const coin = tx.moveCall({
