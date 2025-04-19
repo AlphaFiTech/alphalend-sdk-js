@@ -10,6 +10,7 @@
  * - Blockchain-specific type mappings
  */
 
+import { Transaction, TransactionArgument } from "@mysten/sui/transactions";
 import { Decimal } from "decimal.js";
 
 /**
@@ -121,6 +122,7 @@ export interface ClaimRewardsParams {
  * Used with the `liquidate` method
  */
 export interface LiquidateParams {
+  tx?: Transaction;
   /** Object ID of the position to liquidate */
   liquidatePositionId: string;
   /** Market ID where debt is repaid */
@@ -128,15 +130,11 @@ export interface LiquidateParams {
   /** Market ID where collateral is seized */
   withdrawMarketId: string;
   /** Amount of debt to repay in base units */
-  repayAmount: Decimal;
+  repayCoin: TransactionArgument;
   /** Fully qualified coin type for debt repayment */
   borrowCoinType: string;
   /** Fully qualified coin type for collateral to seize */
   withdrawCoinType: string;
-  /** Object ID of the coin to use for repayment */
-  coinObjectId: string;
-  /** Address of the user supplying collateral */
-  address: string;
   /** Coin types of the coins whose price needs to be updated */
   priceUpdateCoinTypes: string[];
 }
