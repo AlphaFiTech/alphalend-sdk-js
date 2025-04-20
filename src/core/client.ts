@@ -600,10 +600,10 @@ export class AlphalendClient {
     }
     
     if(positionCap){
-      return await this.collectRewardInternal(positionCap, rewardInput);
+      return await this.collectRewardInternal(userAddress, positionCap, rewardInput);
     }
   }
-  async collectRewardInternal(positionCap: string, reward: Reward):Promise<Transaction>{
+  async collectRewardInternal(userAddress:string, positionCap: string, reward: Reward):Promise<Transaction>{
     const txb =  new Transaction();
 
     await setPrice(
@@ -647,7 +647,7 @@ export class AlphalendClient {
             txb.object('0x6')
           ]
         });
-        txb.transferObjects([c], "0xa511088cc13a632a5e8f9937028a77ae271832465e067360dd13f548fe934d1a")
+        txb.transferObjects([c], userAddress)
       }
     }
     return txb;
