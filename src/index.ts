@@ -7,7 +7,7 @@ export * from "./core/types.js";
 export * from "./utils/oracle.js";
 export * from "./utils/priceFeedIds.js";
 export * from "./coin/index.js";
-export { getUserPositionCapId } from "./functions.js";
+export { getUserPositionCapId } from "./models/position.js";
 
 // Re-export key types for easier access
 export { AlphalendClient } from "./core/client.js";
@@ -28,7 +28,7 @@ export {
 } from "./core/types.js";
 
 export function getSuiClient() {
-  const network = process.env.NETWORK || "testnet";
+  const network = "testnet";
   return new SuiClient({
     url: getFullnodeUrl(
       network as "mainnet" | "testnet" | "devnet" | "localnet",

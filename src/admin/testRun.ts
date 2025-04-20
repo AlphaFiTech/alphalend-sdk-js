@@ -34,29 +34,23 @@ export function getExecStuff() {
   return { address, keypair, suiClient };
 }
 export async function dryRunTransactionBlock(txb: Transaction) {
-  const { keypair, suiClient, address } = getExecStuff();
-  //0x5c455d275a6cd3d9bb5bf91f8a47bffc07574b5df0960093e016a33c6987de9c
+  const { suiClient, address } = getExecStuff();
   txb.setSender(address);
   // txb.setGasBudget(4e9);
-  try{
-    let serializedTxb = await txb.build({client: suiClient});
-  suiClient
-    .dryRunTransactionBlock({
-
-      transactionBlock: serializedTxb,
-    })
-    .then((res) => {
-      // console.log(JSON.stringify(res, null, 2));
-      console.log(res.effects.status, res.balanceChanges);
-      
-    })
-    .catch((error) => {
-      console.error(error);
-    });
-  }
-  catch(e){
+  try {
+    let serializedTxb = await txb.build({ client: suiClient });
+    suiClient
+      .dryRunTransactionBlock({
+        transactionBlock: serializedTxb,
+      })
+      .then((res) => {
+        console.log(res.effects.status, res.balanceChanges);
+      })
+      .catch((error) => {
+        console.error(error);
+      });
+  } catch (e) {
     console.log(e);
-    
   }
 }
 async function addCoinToOracleCaller(tx: Transaction) {
@@ -85,27 +79,19 @@ async function updatePricesCaller() {
 
 async function run() {
   const { suiClient, keypair } = getExecStuff();
-  let tx:Transaction|undefined;
-  // await setPrice(
-  //   tx,
-  //   "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin1::TESTCOIN1",
-  //   1,
-  //   1,
-  //   0,
-  // );
+  let tx: Transaction | undefined;
   // await addCoinToOracleCaller(tx);
   let alc = new AlphalendClient(suiClient);
-  tx = await alc.collectReward("0xa511088cc13a632a5e8f9937028a77ae271832465e067360dd13f548fe934d1a");
+  tx = await alc.claimRewards({
+    address:
+      "0xa511088cc13a632a5e8f9937028a77ae271832465e067360dd13f548fe934d1a",
+    positionCapId:
+      "0x5c455d275a6cd3d9bb5bf91f8a47bffc07574b5df0960093e016a33c6987de9c",
+    priceUpdateCoinTypes: [],
+  });
   if (tx) {
-    dryRunTransactionBlock(tx)
+    dryRunTransactionBlock(tx);
   }
 }
 // updatePricesCaller();
 run();
-
-// (async ()=>{
-//   const { suiClient, keypair } = getExecStuff();
-//   let alc = new AlphalendClient(suiClient);
-//   const txb = await alc.collectReward("0xa511088cc13a632a5e8f9937028a77ae271832465e067360dd13f548fe934d1a");
-
-// })()
