@@ -19,6 +19,9 @@ export interface MarketQueryType {
   version: string;
   digest: string;
   content: {
+    disassembled: {
+      [key: string]: unknown;
+    };
     dataType: string;
     type: string;
     fields: {
@@ -89,18 +92,21 @@ interface RewardDistributorQueryType {
 }
 
 interface RewardQueryType {
-  id: {
-    id: string;
+  type:string;
+  fields: {
+    id: {
+      id: string;
+    };
+    coin_type: TypeNameQueryType;
+    distributor_id: string;
+    is_auto_compounded: boolean;
+    auto_compound_market_id: string;
+    total_rewards: string;
+    start_time: string;
+    end_time: string;
+    distributed_rewards: string;
+    cummulative_rewards_per_share: string;
   };
-  coin_type: TypeNameQueryType;
-  distributor_id: string;
-  is_auto_compounded: boolean;
-  auto_compound_market_id: string;
-  total_rewards: string;
-  start_time: string;
-  end_time: string;
-  distributed_rewards: string;
-  cummulative_rewards_per_share: string;
 }
 
 interface FlowLimiterQueryType {
@@ -168,6 +174,9 @@ export interface PositionQueryType {
   version: string;
   digest: string;
   content: {
+    disassembled: {
+      [key: string]: unknown;
+    };
     dataType: string;
     type: string;
     fields: {

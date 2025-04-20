@@ -29,6 +29,8 @@ export const devConstants = {
   POSITION_TABLE_ID:
     "0x1a069b7aee2ea458114a8ca94f5aba1c1f5c6dab901d0e5d0b37250bb0e45eb4", // Replace with actual position table ID
 
+    MARKETS_TABLE_ID: "0x3625afe989ce9f272a9b85bb599f1b73ac4a85dcd2beaf86061c91c69e10167f",
+
   ACTIVE_MARKETS: [""], // to-do: think of a way to store this outside sdk(db or seperate contract)
 
   // Pyth Constants

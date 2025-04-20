@@ -27,6 +27,9 @@ export const getUserPositionCapId = async (
       options: {
         showContent: true, // Include object content to access fields
       },
+      filter: {
+        StructType: `${constants.ALPHALEND_PACKAGE_ID}::position::PositionCap`
+      }
     });
 
     if (!response || !response.data || response.data.length === 0) {
@@ -58,8 +61,11 @@ export const getUserPositionId = async (
       options: {
         showContent: true, // Include object content to access fields
       },
+      filter: {
+        StructType: `${constants.ALPHALEND_PACKAGE_ID}::position::PositionCap`
+      }
     });
-
+    
     if (!response || !response.data || response.data.length === 0) {
       return undefined;
     }
@@ -96,6 +102,22 @@ export const getUserPosition = async (
   });
 
   return response.data as unknown as PositionQueryType;
+};
+
+export const getMarket = async (
+  suiClient: SuiClient,
+  marketId: number,
+): Promise<MarketQueryType | undefined> => {
+
+  const response = await suiClient.getDynamicFieldObject({
+    parentId: constants.MARKETS_TABLE_ID,
+    name: {
+      type: "u64",
+      value: marketId.toString(),
+    },
+  });
+
+  return response.data as MarketQueryType;
 };
 
 export const getProtocolStats = async (
