@@ -105,10 +105,6 @@ export interface RepayParams {
  * Used with the `claimRewards` method
  */
 export interface ClaimRewardsParams {
-  /** Market ID to claim rewards from */
-  marketId: string;
-  /** Fully qualified coin type of the reward */
-  coinType: string;
   /** Object ID of the position capability object */
   positionCapId: string;
   /** Address of the user supplying collateral */
@@ -307,13 +303,3 @@ export interface Position {
   /** Whether this position is eligible for liquidation */
   isLiquidatable: boolean;
 }
-
-
-export interface Reward {
-  data: {
-    marketId: number;
-    coinTypes: string[];
-  }[];
-}
-
-

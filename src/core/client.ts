@@ -25,21 +25,13 @@ import {
   Market,
   Portfolio,
   ProtocolStats,
-  Reward,
 } from "./types.js";
 import { PythPriceInfo } from "../coin/types.js";
-import {
-  getMarket,
-  getMarkets,
-  getProtocolStats,
-  getUserPortfolio,
-  getUserPosition,
-  getUserPositionCapId,
-} from "../functions.js";
-import { getEstimatedGasBudget } from "../utils/helper.js";
+import { getProtocolStats } from "../models/protocol.js";
+import { getMarkets } from "../models/market.js";
+import { getUserPortfolio } from "../models/position.js";
+import { getClaimRewardInput, getEstimatedGasBudget } from "../utils/helper.js";
 import { setPrice } from "../utils/helper.js";
-import { PositionCapQueryType, PositionQueryType } from "../utils/queryTypes.js";
-import { useReportTransactionEffects } from "@mysten/dapp-kit";
 
 /**
  * AlphaLend Client
@@ -148,7 +140,6 @@ export class AlphalendClient {
    */
   async supply(params: SupplyParams): Promise<Transaction | undefined> {
     const tx = new Transaction();
-    console.log("supply", params);
 
     // First update prices to ensure latest oracle values
     // await this.updatePrices(tx, params.priceUpdateCoinTypes);
@@ -386,19 +377,53 @@ export class AlphalendClient {
     const tx = new Transaction();
 
     // First update prices to ensure latest oracle values
-    await this.updatePrices(tx, params.priceUpdateCoinTypes);
+    // await this.updatePrices(tx, params.priceUpdateCoinTypes);
 
-    // Build collect_reward transaction
-    tx.moveCall({
-      target: `${constants.ALPHALEND_PACKAGE_ID}::alpha_lending::collect_reward`,
-      typeArguments: [params.coinType],
-      arguments: [
-        tx.object(constants.LENDING_PROTOCOL_ID), // Protocol object
-        tx.pure.u64(params.marketId), // Market ID
-        tx.object(params.positionCapId), // Position capability
-        tx.object(constants.SUI_CLOCK_OBJECT_ID), // Clock object
-      ],
-    });
+    await setPrice(
+      tx,
+      "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin1::TESTCOIN1",
+      1,
+      1,
+      1,
+    );
+    await setPrice(
+      tx,
+      "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin2::TESTCOIN2",
+      1,
+      1,
+      1,
+    );
+    await setPrice(
+      tx,
+      "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin3::TESTCOIN3",
+      1,
+      1,
+      1,
+    );
+    await setPrice(
+      tx,
+      "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin4::TESTCOIN4",
+      1,
+      1,
+      1,
+    );
+
+    const rewardInput = await getClaimRewardInput(this.client, params.address);
+    for (const data of rewardInput) {
+      for (const coinType of data.coinTypes) {
+        let coin = tx.moveCall({
+          target: `${constants.ALPHALEND_PACKAGE_ID}::alpha_lending::collect_reward`,
+          typeArguments: [coinType],
+          arguments: [
+            tx.object(constants.LENDING_PROTOCOL_ID),
+            tx.pure.u64(data.marketId),
+            tx.object(params.positionCapId),
+            tx.object(constants.SUI_CLOCK_OBJECT_ID),
+          ],
+        });
+        tx.transferObjects([coin], params.address);
+      }
+    }
 
     const estimatedGasBudget = await getEstimatedGasBudget(
       this.client,
@@ -462,9 +487,14 @@ export class AlphalendClient {
    *
    * @returns Promise resolving to a ProtocolStats object
    */
-  async getProtocolStats(): Promise<ProtocolStats> {
-    const stats = await getProtocolStats(this.client);
-    return stats;
+  async getProtocolStats(): Promise<ProtocolStats | undefined> {
+    try {
+      const stats = await getProtocolStats(this.client);
+      return stats;
+    } catch (error) {
+      console.error("Error getting protocol stats:", error);
+      return undefined;
+    }
   }
 
   /**
@@ -472,9 +502,14 @@ export class AlphalendClient {
    *
    * @returns Promise resolving to an array of Market objects
    */
-  async getAllMarkets(): Promise<Market[]> {
-    const markets = await getMarkets(this.client);
-    return markets;
+  async getAllMarkets(): Promise<Market[] | undefined> {
+    try {
+      const markets = await getMarkets(this.client);
+      return markets;
+    } catch (error) {
+      console.error("Error getting markets:", error);
+      return undefined;
+    }
   }
 
   /**
@@ -555,101 +590,5 @@ export class AlphalendClient {
     }
 
     return priceIdsToUpdate;
-  }
-
-  async collectReward(userAddress: string):Promise<Transaction|undefined>{
-    const positionCap = await getUserPositionCapId(this.client, userAddress);
-    
-    const position = await getUserPosition(this.client, userAddress);
-    
-    let rewardInput: Reward = {
-      data: []
-    };
-    let marketActionMap = new Map<number, {supply: boolean, borrow: boolean}>();
-    for(const collaterals of position!.content.fields.value.fields.collaterals.fields.contents){
-      
-      marketActionMap.set(Number(collaterals.fields.key), {supply: true, borrow: false});
-    }
-    
-    for(const loan of position!.content.fields.value.fields.loans){
-      if(marketActionMap.has(Number(loan.fields.market_id))){
-        marketActionMap.set(Number(loan.fields.market_id), {supply: true, borrow: true});
-      }
-      else{
-        marketActionMap.set(Number(loan.fields.market_id), {supply: false, borrow: true});
-      }
-    }
-    for(const [marketId, {supply, borrow}] of marketActionMap){
-      
-      const market = await getMarket(this.client, marketId);
-      
-      let coinTypes = new Set<string>();
-      if(supply){
-        for(const reward of market!.content.fields.value.fields.deposit_reward_distributor.fields.rewards){
-          
-          coinTypes.add(String(reward?.fields.coin_type.fields.name));
-        }
-      }
-      if(borrow){
-        for(const reward of market!.content.fields.value.fields.borrow_reward_distributor.fields.rewards){
-          coinTypes.add(String(reward?.fields.coin_type.fields.name));
-        }
-      }
-      
-      rewardInput.data.push({marketId: marketId, coinTypes: [...coinTypes]});
-    }
-    
-    if(positionCap){
-      return await this.collectRewardInternal(userAddress, positionCap, rewardInput);
-    }
-  }
-  async collectRewardInternal(userAddress:string, positionCap: string, reward: Reward):Promise<Transaction>{
-    const txb =  new Transaction();
-
-    await setPrice(
-      txb,
-      "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin1::TESTCOIN1",
-      1,
-      1,
-      1,
-    );
-    await setPrice(
-      txb,
-      "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin2::TESTCOIN2",
-      1,
-      1,
-      1,
-    );
-    await setPrice(
-      txb,
-      "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin3::TESTCOIN3",
-      1,
-      1,
-      1,
-    );
-    await setPrice(
-      txb,
-      "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin4::TESTCOIN4",
-      1,
-      1,
-      1,
-    );
-
-    for(const data of reward.data){
-      for(const coinType of data.coinTypes){
-        let c = txb.moveCall({
-          target: `${constants.ALPHALEND_PACKAGE_ID}::alpha_lending::collect_reward`,
-          typeArguments: [coinType],
-          arguments: [
-            txb.object(constants.LENDING_PROTOCOL_ID),
-            txb.pure.u64(data.marketId),
-            txb.object(positionCap),
-            txb.object('0x6')
-          ]
-        });
-        txb.transferObjects([c], userAddress)
-      }
-    }
-    return txb;
   }
 }
