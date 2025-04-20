@@ -1,6 +1,6 @@
 import { SuiClient } from "@mysten/sui/client";
 import { Decimal } from "decimal.js";
-import { MarketConfigQueryType, MarketQueryType } from "../utils/queryTypes";
+import { MarketConfigQueryType, MarketQueryType } from "../utils/queryTypes.js";
 import { getConstants } from "../constants/index.js";
 import { Market } from "../core/types.js";
 

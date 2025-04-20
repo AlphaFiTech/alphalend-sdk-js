@@ -6,7 +6,7 @@ import {
   PositionCapQueryType,
   PositionQueryType,
   PriceData,
-} from "../utils/queryTypes";
+} from "../utils/queryTypes.js";
 import { Market, Portfolio } from "../core/types.js";
 
 const constants = getConstants();
