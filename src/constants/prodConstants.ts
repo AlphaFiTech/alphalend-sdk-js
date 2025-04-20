@@ -26,6 +26,8 @@ export const prodConstants = {
 
   ACTIVE_MARKETS: [""], // to-do: think of a way to store this outside sdk(db or seperate contract)
 
+  MARKETS_TABLE_ID: "",
+
   // Pyth Constants
   PYTH_PACKAGE_ID:
     "0x04e20ddf36af412a4096f9014f4a565af9e812db9a05cc40254846cf6ed0ad91",

@@ -25,15 +25,21 @@ import {
   Market,
   Portfolio,
   ProtocolStats,
+  Reward,
 } from "./types.js";
 import { PythPriceInfo } from "../coin/types.js";
 import {
+  getMarket,
   getMarkets,
   getProtocolStats,
   getUserPortfolio,
+  getUserPosition,
+  getUserPositionCapId,
 } from "../functions.js";
 import { getEstimatedGasBudget } from "../utils/helper.js";
 import { setPrice } from "../utils/helper.js";
+import { PositionCapQueryType, PositionQueryType } from "../utils/queryTypes.js";
+import { useReportTransactionEffects } from "@mysten/dapp-kit";
 
 /**
  * AlphaLend Client
@@ -549,5 +555,101 @@ export class AlphalendClient {
     }
 
     return priceIdsToUpdate;
+  }
+
+  async collectReward(userAddress: string):Promise<Transaction|undefined>{
+    const positionCap = await getUserPositionCapId(this.client, userAddress);
+    
+    const position = await getUserPosition(this.client, userAddress);
+    
+    let rewardInput: Reward = {
+      data: []
+    };
+    let marketActionMap = new Map<number, {supply: boolean, borrow: boolean}>();
+    for(const collaterals of position!.content.fields.value.fields.collaterals.fields.contents){
+      
+      marketActionMap.set(Number(collaterals.fields.key), {supply: true, borrow: false});
+    }
+    
+    for(const loan of position!.content.fields.value.fields.loans){
+      if(marketActionMap.has(Number(loan.fields.market_id))){
+        marketActionMap.set(Number(loan.fields.market_id), {supply: true, borrow: true});
+      }
+      else{
+        marketActionMap.set(Number(loan.fields.market_id), {supply: false, borrow: true});
+      }
+    }
+    for(const [marketId, {supply, borrow}] of marketActionMap){
+      
+      const market = await getMarket(this.client, marketId);
+      
+      let coinTypes = new Set<string>();
+      if(supply){
+        for(const reward of market!.content.fields.value.fields.deposit_reward_distributor.fields.rewards){
+          
+          coinTypes.add(String(reward?.fields.coin_type.fields.name));
+        }
+      }
+      if(borrow){
+        for(const reward of market!.content.fields.value.fields.borrow_reward_distributor.fields.rewards){
+          coinTypes.add(String(reward?.fields.coin_type.fields.name));
+        }
+      }
+      
+      rewardInput.data.push({marketId: marketId, coinTypes: [...coinTypes]});
+    }
+    
+    if(positionCap){
+      return await this.collectRewardInternal(userAddress, positionCap, rewardInput);
+    }
+  }
+  async collectRewardInternal(userAddress:string, positionCap: string, reward: Reward):Promise<Transaction>{
+    const txb =  new Transaction();
+
+    await setPrice(
+      txb,
+      "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin1::TESTCOIN1",
+      1,
+      1,
+      1,
+    );
+    await setPrice(
+      txb,
+      "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin2::TESTCOIN2",
+      1,
+      1,
+      1,
+    );
+    await setPrice(
+      txb,
+      "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin3::TESTCOIN3",
+      1,
+      1,
+      1,
+    );
+    await setPrice(
+      txb,
+      "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin4::TESTCOIN4",
+      1,
+      1,
+      1,
+    );
+
+    for(const data of reward.data){
+      for(const coinType of data.coinTypes){
+        let c = txb.moveCall({
+          target: `${constants.ALPHALEND_PACKAGE_ID}::alpha_lending::collect_reward`,
+          typeArguments: [coinType],
+          arguments: [
+            txb.object(constants.LENDING_PROTOCOL_ID),
+            txb.pure.u64(data.marketId),
+            txb.object(positionCap),
+            txb.object('0x6')
+          ]
+        });
+        txb.transferObjects([c], userAddress)
+      }
+    }
+    return txb;
   }
 }

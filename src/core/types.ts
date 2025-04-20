@@ -307,3 +307,13 @@ export interface Position {
   /** Whether this position is eligible for liquidation */
   isLiquidatable: boolean;
 }
+
+
+export interface Reward {
+  data: {
+    marketId: number;
+    coinTypes: string[];
+  }[];
+}
+
+
