@@ -27,11 +27,12 @@ export {
   TransactionResponse,
 } from "./core/types.js";
 
-export function getSuiClient() {
-  const network = "testnet";
+export function getSuiClient(
+  network?: string,
+) {
   return new SuiClient({
     url: getFullnodeUrl(
-      network as "mainnet" | "testnet" | "devnet" | "localnet",
+      (network || "mainnet") as "mainnet" | "testnet" | "devnet" | "localnet",
     ),
   });
 }
