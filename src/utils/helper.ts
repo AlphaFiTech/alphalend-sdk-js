@@ -20,7 +20,6 @@ export async function getClaimRewardInput(
   }[] = [];
 
   let marketActionMap = new Map<number, { supply: boolean; borrow: boolean }>();
-  console.log("position", position);
   for (const collaterals of position!.content.fields.value.fields.collaterals
     .fields.contents) {
     marketActionMap.set(Number(collaterals.fields.key), {
