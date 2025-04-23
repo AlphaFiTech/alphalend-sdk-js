@@ -219,7 +219,7 @@ export class AlphalendClient {
       ],
     });
     const isSui = params.coinType === constants.SUI_COIN_TYPE;
-    let coin;
+    let coin: string | TransactionObjectArgument | undefined;
     if (isSui) {
       coin = tx.moveCall({
         target: `${constants.ALPHALEND_PACKAGE_ID}::alpha_lending::fullfill_promise_SUI`,
@@ -233,7 +233,9 @@ export class AlphalendClient {
     } else {
       coin = await this.handlePromise(tx, promise, params.coinType);
     }
-    tx.transferObjects([coin], params.address);
+    if (coin) {
+      tx.transferObjects([coin], params.address);
+    }
 
     const estimatedGasBudget = await getEstimatedGasBudget(
       this.client,
