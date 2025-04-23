@@ -7,6 +7,7 @@ import { addCoinToOracle } from "./oracle.js";
 import { AlphalendClient } from "../core/client.js";
 import * as dotenv from "dotenv";
 import { setPrice } from "../utils/helper.js";
+import { Decimal } from "decimal.js";
 
 dotenv.config();
 
@@ -37,6 +38,7 @@ export async function dryRunTransactionBlock(txb: Transaction) {
   const { suiClient, address } = getExecStuff();
   txb.setSender(address);
   // txb.setGasBudget(4e9);
+  console.log("address", address);
   try {
     let serializedTxb = await txb.build({ client: suiClient });
     suiClient
@@ -137,4 +139,25 @@ async function run() {
   }
 }
 // updatePricesCaller();
-run();
+
+async function withdraw() {
+  const { suiClient, keypair } = getExecStuff();
+  let tx: Transaction | undefined;
+  let alc = new AlphalendClient(suiClient);
+  tx = await alc.withdraw({
+    address:
+      "0x8948f801fa2325eedb4b0ad4eb0a55bfb318acc531f3a2f0cddd8daa9b4a8c94",
+    positionCapId:
+      "0x04aef463126fea9cc518a37abc8ae8367f68c8eceeef31790b2da6be852d9d4b",
+    coinType:
+      "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin1::TESTCOIN1",
+    marketId: "1",
+    amount: new Decimal(1000000000000),
+    priceUpdateCoinTypes: [],
+  });
+  if (tx) {
+    dryRunTransactionBlock(tx);
+  }
+}
+
+withdraw();

@@ -1,5 +1,6 @@
 export const prodConstants = {
   SUI_CLOCK_OBJECT_ID: "0x6",
+  SUI_SYSTEM_STATE_ID: "0x5",
 
   // AlphaFi constants
   ALPHAFI_ORACLE_PACKAGE_ID:

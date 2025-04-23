@@ -1,5 +1,6 @@
 export const devConstants = {
   SUI_CLOCK_OBJECT_ID: "0x6",
+  SUI_SYSTEM_STATE_ID: "0x5",
 
   // AlphaFi constants
   ALPHAFI_ORACLE_PACKAGE_ID:
@@ -11,25 +12,27 @@ export const devConstants = {
   ALPHAFI_ORACLE_ADMIN_CAP_ID:
     "0x42c0b79773907f2348c8474de5fe334f691cec037f6162914e021d9949a92c0a",
 
-  ALPHAFI_STDLIB_PACKAGE_ID: "0xce9c2ecf1ff6768c2096516dd21bad3880bb71b88d330fb77e7cbd746a46a9ae",
+  ALPHAFI_STDLIB_PACKAGE_ID:
+    "0xce9c2ecf1ff6768c2096516dd21bad3880bb71b88d330fb77e7cbd746a46a9ae",
 
   // AlphaLend constants
   ALPHALEND_PACKAGE_ID:
-    "0x03e07137bd3fcafc823899e8e1eb7cc6de70c33dcc92bd25ea4286be3c09f9bc", // Replace with actual package ID
+    "0x7c9f844e48a9449addd7bc0dc6de00e898d683991d5dc12105c6b4caab392ff6", // Replace with actual package ID
 
   LENDING_PROTOCOL_ID:
-    "0xcfa197e1edae3476437db4521cfa64579cc8cb642869c0699870216ac81d3e87", // Replace with actual protocol object ID
+    "0x995c0c8ca0b0dd676a855e6dd435e1fd9813305366baad3e8052bfa7f306f9a5", // Replace with actual protocol object ID
 
   LENDING_PROTOCOL_CAP_ID:
     "0x1e8357fb9edd15dc6e83c4785318ba4cd8a1de3e4ef9ff543bd9f4e6a7be2879", // Replace with actual protocol cap ID
 
   POSITION_CAP_TYPE:
-    "0x03e07137bd3fcafc823899e8e1eb7cc6de70c33dcc92bd25ea4286be3c09f9bc::position::PositionCap", // Replace with actual position cap type
+    "0x7c9f844e48a9449addd7bc0dc6de00e898d683991d5dc12105c6b4caab392ff6::position::PositionCap", // Replace with actual position cap type
 
   POSITION_TABLE_ID:
-    "0x1a069b7aee2ea458114a8ca94f5aba1c1f5c6dab901d0e5d0b37250bb0e45eb4", // Replace with actual position table ID
+    "0xf0c5071d164de9d7e3c7cbeb692d2bcd3c59cbf67f870c9b35f88a049bba8f84", // Replace with actual position table ID
 
-    MARKETS_TABLE_ID: "0x3625afe989ce9f272a9b85bb599f1b73ac4a85dcd2beaf86061c91c69e10167f",
+  MARKETS_TABLE_ID:
+    "0xfb993d4f2e8ba871247f221b83db01aab72ae0c9778287c2577d76017dbe37bb",
 
   ACTIVE_MARKETS: [1, 3], // to-do: think of a way to store this outside sdk(db or seperate contract)
 
