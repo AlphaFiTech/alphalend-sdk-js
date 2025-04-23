@@ -205,52 +205,8 @@ export class AlphalendClient {
     const tx = new Transaction();
 
     // First update prices to ensure latest oracle values
-    // await this.updatePrices(tx, params.priceUpdateCoinTypes);
-    await setPrice(
-      tx,
-      "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin1::TESTCOIN1",
-      1,
-      1,
-      1,
-    );
-    await setPrice(
-      tx,
-      "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin2::TESTCOIN2",
-      1,
-      1,
-      1,
-    );
-    await setPrice(
-      tx,
-      "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin3::TESTCOIN3",
-      1,
-      1,
-      1,
-    );
-    await setPrice(
-      tx,
-      "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin4::TESTCOIN4",
-      1,
-      1,
-      1,
-    );
-    await setPrice(
-      tx,
-      "0xf357286b629e3fd7ab921faf9ab1344fdff30244a4ff0897181845546babb2e1::testcoin5::TESTCOIN5",
-      1,
-      1,
-      1,
-    );
-    await setPrice(
-      tx,
-      "0xf357286b629e3fd7ab921faf9ab1344fdff30244a4ff0897181845546babb2e1::testcoin6::TESTCOIN6",
-      1,
-      1,
-      1,
-    );
-    await setPrice(tx, "0x2::sui::SUI", 1, 1, 1);
-
-    // Build remove_collateral transaction
+    await this.updatePrices(tx, params.priceUpdateCoinTypes);
+    await this.setPrices(tx);
     const promise = tx.moveCall({
       target: `${constants.ALPHALEND_PACKAGE_ID}::alpha_lending::remove_collateral`,
       typeArguments: [params.coinType],
@@ -263,11 +219,8 @@ export class AlphalendClient {
       ],
     });
     const isSui = params.coinType === constants.SUI_COIN_TYPE;
-
-    console.log("isSui", isSui);
     let coin;
     if (isSui) {
-      // for SUI you need the system_state object as well
       coin = tx.moveCall({
         target: `${constants.ALPHALEND_PACKAGE_ID}::alpha_lending::fullfill_promise_SUI`,
         arguments: [
@@ -278,15 +231,7 @@ export class AlphalendClient {
         ],
       });
     } else {
-      coin = tx.moveCall({
-        target: `${constants.ALPHALEND_PACKAGE_ID}::alpha_lending::fullfill_promise`,
-        typeArguments: [params.coinType],
-        arguments: [
-          tx.object(constants.LENDING_PROTOCOL_ID),
-          promise,
-          tx.object(constants.SUI_CLOCK_OBJECT_ID),
-        ],
-      });
+      coin = await this.handlePromise(tx, promise, params.coinType);
     }
     tx.transferObjects([coin], params.address);
 
@@ -309,52 +254,8 @@ export class AlphalendClient {
     const tx = new Transaction();
 
     // First update prices to ensure latest oracle values
-    // await this.updatePrices(tx, params.priceUpdateCoinTypes);
-    await setPrice(
-      tx,
-      "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin1::TESTCOIN1",
-      1,
-      1,
-      1,
-    );
-    await setPrice(
-      tx,
-      "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin2::TESTCOIN2",
-      1,
-      1,
-      1,
-    );
-    await setPrice(
-      tx,
-      "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin3::TESTCOIN3",
-      1,
-      1,
-      1,
-    );
-    await setPrice(
-      tx,
-      "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin4::TESTCOIN4",
-      1,
-      1,
-      1,
-    );
-    await setPrice(
-      tx,
-      "0xf357286b629e3fd7ab921faf9ab1344fdff30244a4ff0897181845546babb2e1::testcoin5::TESTCOIN5",
-      1,
-      1,
-      1,
-    );
-    await setPrice(
-      tx,
-      "0xf357286b629e3fd7ab921faf9ab1344fdff30244a4ff0897181845546babb2e1::testcoin6::TESTCOIN6",
-      1,
-      1,
-      1,
-    );
-    await setPrice(tx, "0x2::sui::SUI", 1, 1, 1);
-
-    // Build borrow transaction
+    await this.updatePrices(tx, params.priceUpdateCoinTypes);
+    await this.setPrices(tx);
     const promise = tx.moveCall({
       target: `${constants.ALPHALEND_PACKAGE_ID}::alpha_lending::borrow`,
       typeArguments: [params.coinType],
@@ -397,6 +298,7 @@ export class AlphalendClient {
       params.address,
     );
     if (estimatedGasBudget) tx.setGasBudget(estimatedGasBudget);
+
     return tx;
   }
 
@@ -456,56 +358,13 @@ export class AlphalendClient {
     const tx = new Transaction();
 
     // First update prices to ensure latest oracle values
-    // await this.updatePrices(tx, params.priceUpdateCoinTypes);
-
-    await setPrice(
-      tx,
-      "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin1::TESTCOIN1",
-      1,
-      1,
-      1,
-    );
-    await setPrice(
-      tx,
-      "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin2::TESTCOIN2",
-      1,
-      1,
-      1,
-    );
-    await setPrice(
-      tx,
-      "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin3::TESTCOIN3",
-      1,
-      1,
-      1,
-    );
-    await setPrice(
-      tx,
-      "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin4::TESTCOIN4",
-      1,
-      1,
-      1,
-    );
-    await setPrice(
-      tx,
-      "0xf357286b629e3fd7ab921faf9ab1344fdff30244a4ff0897181845546babb2e1::testcoin5::TESTCOIN5",
-      1,
-      1,
-      1,
-    );
-    await setPrice(
-      tx,
-      "0xf357286b629e3fd7ab921faf9ab1344fdff30244a4ff0897181845546babb2e1::testcoin6::TESTCOIN6",
-      1,
-      1,
-      1,
-    );
-    await setPrice(tx, "0x2::sui::SUI", 1, 1, 1);
+    await this.updatePrices(tx, params.priceUpdateCoinTypes);
+    await this.setPrices(tx);
 
     const rewardInput = await getClaimRewardInput(this.client, params.address);
     for (const data of rewardInput) {
       for (const coinType of data.coinTypes) {
-        let coin = tx.moveCall({
+        let [coin1, promise] = tx.moveCall({
           target: `${constants.ALPHALEND_PACKAGE_ID}::alpha_lending::collect_reward`,
           typeArguments: [coinType],
           arguments: [
@@ -515,7 +374,16 @@ export class AlphalendClient {
             tx.object(constants.SUI_CLOCK_OBJECT_ID),
           ],
         });
-        tx.transferObjects([coin], params.address);
+
+        if (promise) {
+          const coin2 = await this.handlePromise(tx, promise, coinType);
+          if (coin2) {
+            tx.transferObjects([coin1, coin2], params.address);
+          }
+        } else {
+          // If no promise returned, just transfer coin1
+          tx.transferObjects([coin1], params.address);
+        }
       }
     }
 
@@ -535,14 +403,15 @@ export class AlphalendClient {
    *               borrowCoinType, withdrawCoinType, coinObjectId, priceUpdateCoinTypes
    * @returns Transaction object ready for signing and execution
    */
-  async liquidate(params: LiquidateParams): Promise<TransactionResult> {
+  async liquidate(params: LiquidateParams) {
     const tx = params.tx || new Transaction();
 
     // First update prices to ensure latest oracle values
     await this.updatePrices(tx, params.priceUpdateCoinTypes);
 
     // Build liquidate transaction
-    const res = tx.moveCall({
+
+    const [promise, coin1] = tx.moveCall({
       target: `${constants.ALPHALEND_PACKAGE_ID}::alpha_lending::liquidate`,
       typeArguments: [params.borrowCoinType, params.withdrawCoinType],
       arguments: [
@@ -554,8 +423,12 @@ export class AlphalendClient {
         tx.object(constants.SUI_CLOCK_OBJECT_ID), // Clock object
       ],
     });
+    let coin2: TransactionObjectArgument | undefined;
+    if (promise) {
+      coin2 = await this.handlePromise(tx, promise, params.borrowCoinType);
+    }
 
-    return res;
+    return [coin1, coin2];
   }
 
   /**
@@ -684,5 +557,71 @@ export class AlphalendClient {
     }
 
     return priceIdsToUpdate;
+  }
+
+  private async setPrices(tx: Transaction) {
+    await setPrice(
+      tx,
+      "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin1::TESTCOIN1",
+      1,
+      1,
+      1,
+    );
+    await setPrice(
+      tx,
+      "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin2::TESTCOIN2",
+      1,
+      1,
+      1,
+    );
+    await setPrice(
+      tx,
+      "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin3::TESTCOIN3",
+      1,
+      1,
+      1,
+    );
+    await setPrice(
+      tx,
+      "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin4::TESTCOIN4",
+      1,
+      1,
+      1,
+    );
+    await setPrice(
+      tx,
+      "0xf357286b629e3fd7ab921faf9ab1344fdff30244a4ff0897181845546babb2e1::testcoin5::TESTCOIN5",
+      1,
+      1,
+      1,
+    );
+    await setPrice(
+      tx,
+      "0xf357286b629e3fd7ab921faf9ab1344fdff30244a4ff0897181845546babb2e1::testcoin6::TESTCOIN6",
+      1,
+      1,
+      1,
+    );
+    await setPrice(tx, "0x2::sui::SUI", 1, 1, 1);
+  }
+
+  private async handlePromise(
+    tx: Transaction,
+    promise: any,
+    coinType: string,
+  ): Promise<TransactionObjectArgument | undefined> {
+    if (promise) {
+      const coin = tx.moveCall({
+        target: `${constants.ALPHALEND_PACKAGE_ID}::alpha_lending::fullfill_promise`,
+        typeArguments: [coinType],
+        arguments: [
+          tx.object(constants.LENDING_PROTOCOL_ID),
+          promise,
+          tx.object(constants.SUI_CLOCK_OBJECT_ID),
+        ],
+      });
+      return coin;
+    }
+    return undefined;
   }
 }
