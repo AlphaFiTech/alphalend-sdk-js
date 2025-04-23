@@ -268,7 +268,7 @@ export const getUserPositionCapId = async (
         showContent: true, // Include object content to access fields
       },
       filter: {
-        StructType: `${constants.ALPHALEND_PACKAGE_ID}::position::PositionCap`,
+        StructType: constants.POSITION_CAP_TYPE,
       },
     });
 
@@ -302,7 +302,7 @@ export const getUserPositionId = async (
         showContent: true, // Include object content to access fields
       },
       filter: {
-        StructType: `${constants.ALPHALEND_PACKAGE_ID}::position::PositionCap`,
+        StructType: constants.POSITION_CAP_TYPE,
       },
     });
 
