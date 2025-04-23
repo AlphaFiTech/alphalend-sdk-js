@@ -374,12 +374,15 @@ export class AlphalendClient {
             tx.object(constants.SUI_CLOCK_OBJECT_ID),
           ],
         });
+
         if (promise) {
-          let coin2: string | TransactionObjectArgument | undefined;
-          coin2 = await this.handlePromise(tx, promise, coinType);
+          const coin2 = await this.handlePromise(tx, promise, coinType);
           if (coin2) {
             tx.transferObjects([coin1, coin2], params.address);
           }
+        } else {
+          // If no promise returned, just transfer coin1
+          tx.transferObjects([coin1], params.address);
         }
       }
     }
@@ -619,5 +622,6 @@ export class AlphalendClient {
       });
       return coin;
     }
+    return undefined;
   }
 }
