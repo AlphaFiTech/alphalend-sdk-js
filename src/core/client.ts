@@ -207,14 +207,6 @@ export class AlphalendClient {
     // First update prices to ensure latest oracle values
     await this.updatePrices(tx, params.priceUpdateCoinTypes);
     await this.setPrices(tx);
-    console.log(
-      "params 88888",
-      params,
-      constants.LENDING_PROTOCOL_ID,
-      constants.SUI_CLOCK_OBJECT_ID,
-      constants.SUI_SYSTEM_STATE_ID,
-      params.positionCapId,
-    );
     const promise = tx.moveCall({
       target: `${constants.ALPHALEND_PACKAGE_ID}::alpha_lending::remove_collateral`,
       typeArguments: [params.coinType],
