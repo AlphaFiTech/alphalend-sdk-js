@@ -145,15 +145,24 @@ export class AlphalendClient {
     // await this.updatePrices(tx, params.priceUpdateCoinTypes);
 
     // Get coin object
-    const coin = await this.getCoinObject(tx, params.coinType, params.address);
-    if (!coin) {
-      console.error("Coin object not found");
-      return undefined;
-    }
+    const isSui = params.coinType === constants.SUI_COIN_TYPE;
+    let supplyCoinA: TransactionObjectArgument | undefined;
+    if (!isSui) {
+      const coin = await this.getCoinObject(
+        tx,
+        params.coinType,
+        params.address,
+      );
+      if (!coin) {
+        console.error("Coin object not found");
+        return undefined;
+      }
 
-    const [supplyCoinA] = tx.splitCoins(coin, [
-      params.amount.floor().toString(),
-    ]);
+      supplyCoinA = tx.splitCoins(coin, [params.amount.floor().toString()]);
+      tx.transferObjects([coin], params.address);
+    } else {
+      supplyCoinA = tx.splitCoins(tx.gas, [params.amount.floor().toString()]);
+    }
 
     if (params.positionCapId) {
       // Build add_collateral transaction
@@ -184,7 +193,6 @@ export class AlphalendClient {
       });
       tx.transferObjects([positionCap], params.address);
     }
-    tx.transferObjects([coin], params.address);
 
     const estimatedGasBudget = await getEstimatedGasBudget(
       this.client,
@@ -205,8 +213,10 @@ export class AlphalendClient {
     const tx = new Transaction();
 
     // First update prices to ensure latest oracle values
-    await this.updatePrices(tx, params.priceUpdateCoinTypes);
+    // await this.updatePrices(tx, params.priceUpdateCoinTypes);
+
     await this.setPrices(tx);
+
     const promise = tx.moveCall({
       target: `${constants.ALPHALEND_PACKAGE_ID}::alpha_lending::remove_collateral`,
       typeArguments: [params.coinType],
@@ -256,7 +266,8 @@ export class AlphalendClient {
     const tx = new Transaction();
 
     // First update prices to ensure latest oracle values
-    await this.updatePrices(tx, params.priceUpdateCoinTypes);
+    // await this.updatePrices(tx, params.priceUpdateCoinTypes);
+
     await this.setPrices(tx);
     const promise = tx.moveCall({
       target: `${constants.ALPHALEND_PACKAGE_ID}::alpha_lending::borrow`,
@@ -317,15 +328,29 @@ export class AlphalendClient {
     // await this.updatePrices(tx, params.priceUpdateCoinTypes);
 
     // Get coin object
-    const coin = await this.getCoinObject(tx, params.coinType, params.address);
-    if (!coin) {
-      console.error("Coin object not found");
-      return undefined;
-    }
+    // Add 1 to the amount to repay to avoid rounding errors since contract returns the remaining amount.
+    const isSui = params.coinType === constants.SUI_COIN_TYPE;
+    let repayCoinA: TransactionObjectArgument | undefined;
+    if (!isSui) {
+      const coin = await this.getCoinObject(
+        tx,
+        params.coinType,
+        params.address,
+      );
+      if (!coin) {
+        console.error("Coin object not found");
+        return undefined;
+      }
 
-    const [repayCoinA] = tx.splitCoins(coin, [
-      params.amount.floor().toString(),
-    ]);
+      repayCoinA = tx.splitCoins(coin, [
+        params.amount.add(1).floor().toString(),
+      ]);
+      tx.transferObjects([coin], params.address);
+    } else {
+      repayCoinA = tx.splitCoins(tx.gas, [
+        params.amount.add(1).floor().toString(),
+      ]);
+    }
 
     // Build repay transaction
     const repayCoin = tx.moveCall({
@@ -339,7 +364,7 @@ export class AlphalendClient {
         tx.object(constants.SUI_CLOCK_OBJECT_ID), // Clock object
       ],
     });
-    tx.transferObjects([repayCoin, coin], params.address);
+    tx.transferObjects([repayCoin], params.address);
 
     const estimatedGasBudget = await getEstimatedGasBudget(
       this.client,
