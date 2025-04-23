@@ -231,7 +231,6 @@ export class AlphalendClient {
         ],
       });
     } else {
-      console.log("promise 3");
       coin = await this.handlePromise(tx, promise, params.coinType);
     }
     tx.transferObjects([coin], params.address);
