@@ -236,7 +236,7 @@ export class AlphalendClient {
     );
 
     // Build remove_collateral transaction
-    const coin = tx.moveCall({
+    const promise = tx.moveCall({
       target: `${constants.ALPHALEND_PACKAGE_ID}::alpha_lending::remove_collateral`,
       typeArguments: [params.coinType],
       arguments: [
@@ -247,6 +247,31 @@ export class AlphalendClient {
         tx.object(constants.SUI_CLOCK_OBJECT_ID), // Clock object
       ],
     });
+    const isSui = params.coinType === constants.SUI_COIN_TYPE;
+    let coin;
+    if (isSui) {
+      // for SUI you need the system_state object as well
+      coin = tx.moveCall({
+        target: `${constants.ALPHALEND_PACKAGE_ID}::alpha_lending::fullfill_promise_SUI`,
+        typeArguments: [params.coinType],
+        arguments: [
+          tx.object(constants.LENDING_PROTOCOL_ID),
+          promise,
+          tx.object(constants.SUI_SYSTEM_STATE_ID),
+          tx.object(constants.SUI_CLOCK_OBJECT_ID),
+        ],
+      });
+    } else {
+      coin = tx.moveCall({
+        target: `${constants.ALPHALEND_PACKAGE_ID}::alpha_lending::fullfill_promise`,
+        typeArguments: [params.coinType],
+        arguments: [
+          tx.object(constants.LENDING_PROTOCOL_ID),
+          promise,
+          tx.object(constants.SUI_CLOCK_OBJECT_ID),
+        ],
+      });
+    }
     tx.transferObjects([coin], params.address);
 
     const estimatedGasBudget = await getEstimatedGasBudget(
@@ -299,7 +324,7 @@ export class AlphalendClient {
     );
 
     // Build borrow transaction
-    const coin = tx.moveCall({
+    const promise = tx.moveCall({
       target: `${constants.ALPHALEND_PACKAGE_ID}::alpha_lending::borrow`,
       typeArguments: [params.coinType],
       arguments: [
@@ -310,6 +335,30 @@ export class AlphalendClient {
         tx.object(constants.SUI_CLOCK_OBJECT_ID), // Clock object
       ],
     });
+    const isSui = params.coinType === constants.SUI_COIN_TYPE;
+    let coin;
+    if (isSui) {
+      coin = tx.moveCall({
+        target: `${constants.ALPHALEND_PACKAGE_ID}::alpha_lending::fullfill_promise_SUI`,
+        typeArguments: [params.coinType],
+        arguments: [
+          tx.object(constants.LENDING_PROTOCOL_ID),
+          promise,
+          tx.object(constants.SUI_SYSTEM_STATE_ID),
+          tx.object(constants.SUI_CLOCK_OBJECT_ID),
+        ],
+      });
+    } else {
+      coin = tx.moveCall({
+        target: `${constants.ALPHALEND_PACKAGE_ID}::alpha_lending::fullfill_promise`,
+        typeArguments: [params.coinType],
+        arguments: [
+          tx.object(constants.LENDING_PROTOCOL_ID),
+          promise,
+          tx.object(constants.SUI_CLOCK_OBJECT_ID),
+        ],
+      });
+    }
     tx.transferObjects([coin], params.address);
 
     const estimatedGasBudget = await getEstimatedGasBudget(

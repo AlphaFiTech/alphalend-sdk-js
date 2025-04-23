@@ -1,5 +1,6 @@
 export const devConstants = {
   SUI_CLOCK_OBJECT_ID: "0x6",
+  SUI_SYSTEM_STATE_ID: "0x5",
 
   // AlphaFi constants
   ALPHAFI_ORACLE_PACKAGE_ID:
@@ -11,7 +12,8 @@ export const devConstants = {
   ALPHAFI_ORACLE_ADMIN_CAP_ID:
     "0x42c0b79773907f2348c8474de5fe334f691cec037f6162914e021d9949a92c0a",
 
-  ALPHAFI_STDLIB_PACKAGE_ID: "0xce9c2ecf1ff6768c2096516dd21bad3880bb71b88d330fb77e7cbd746a46a9ae",
+  ALPHAFI_STDLIB_PACKAGE_ID:
+    "0xce9c2ecf1ff6768c2096516dd21bad3880bb71b88d330fb77e7cbd746a46a9ae",
 
   // AlphaLend constants
   ALPHALEND_PACKAGE_ID:
@@ -29,7 +31,8 @@ export const devConstants = {
   POSITION_TABLE_ID:
     "0x1a069b7aee2ea458114a8ca94f5aba1c1f5c6dab901d0e5d0b37250bb0e45eb4", // Replace with actual position table ID
 
-    MARKETS_TABLE_ID: "0x3625afe989ce9f272a9b85bb599f1b73ac4a85dcd2beaf86061c91c69e10167f",
+  MARKETS_TABLE_ID:
+    "0x3625afe989ce9f272a9b85bb599f1b73ac4a85dcd2beaf86061c91c69e10167f",
 
   ACTIVE_MARKETS: [""], // to-do: think of a way to store this outside sdk(db or seperate contract)
 
