@@ -28,7 +28,7 @@ import {
 } from "./types.js";
 import { PythPriceInfo } from "../coin/types.js";
 import { getProtocolStats } from "../models/protocol.js";
-import { getMarkets } from "../models/market.js";
+import { getAllMarkets } from "../models/market.js";
 import { getUserPortfolio } from "../models/position.js";
 import { getClaimRewardInput, getEstimatedGasBudget } from "../utils/helper.js";
 import { setPrice } from "../utils/helper.js";
@@ -504,7 +504,7 @@ export class AlphalendClient {
    */
   async getAllMarkets(): Promise<Market[] | undefined> {
     try {
-      const markets = await getMarkets(this.client);
+      const markets = await getAllMarkets(this.client);
       return markets;
     } catch (error) {
       console.error("Error getting markets:", error);
