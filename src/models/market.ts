@@ -21,22 +21,24 @@ export const getMarketFromChain = async (
   return response.data as MarketQueryType;
 };
 
-export const getMarkets = async (suiClient: SuiClient): Promise<Market[]> => {
+export const getAllMarkets = async (
+  suiClient: SuiClient,
+): Promise<Market[]> => {
   try {
     const constants = getConstants();
     const activeMarketIds = constants.ACTIVE_MARKETS;
 
     // Fetch and process each market from the active market IDs
     const markets: Market[] = [];
-    const responses = await suiClient.multiGetObjects({
-      ids: activeMarketIds,
-      options: {
-        showContent: true,
-      },
-    });
+    const responses = await Promise.all(
+      activeMarketIds.map((id) => getMarketFromChain(suiClient, id)),
+    );
 
-    for (const response of responses) {
-      const marketObject = response.data as unknown as MarketQueryType;
+    for (const marketObject of responses) {
+      if (!marketObject) {
+        console.warn(`Market data not found`);
+        continue;
+      }
 
       if (
         !marketObject.content ||

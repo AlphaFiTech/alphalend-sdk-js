@@ -25,7 +25,7 @@ export const prodConstants = {
 
   POSITION_TABLE_ID: "", // Replace with actual position table ID
 
-  ACTIVE_MARKETS: [""], // to-do: think of a way to store this outside sdk(db or seperate contract)
+  ACTIVE_MARKETS: [1, 3], // to-do: think of a way to store this outside sdk(db or seperate contract)
 
   MARKETS_TABLE_ID: "",
 

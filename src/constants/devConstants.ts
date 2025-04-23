@@ -26,7 +26,7 @@ export const devConstants = {
     "0x1e8357fb9edd15dc6e83c4785318ba4cd8a1de3e4ef9ff543bd9f4e6a7be2879", // Replace with actual protocol cap ID
 
   POSITION_CAP_TYPE:
-    "0x7c9f844e48a9449addd7bc0dc6de00e898d683991d5dc12105c6b4caab392ff6::position::PositionCap", // Replace with actual position cap type
+    "0x06e65071782a787fee1a8d6833be20ee6104294be61e724e77f8faaadc4adb08::position::PositionCap", // Replace with actual position cap type
 
   POSITION_TABLE_ID:
     "0xf0c5071d164de9d7e3c7cbeb692d2bcd3c59cbf67f870c9b35f88a049bba8f84", // Replace with actual position table ID
@@ -34,7 +34,7 @@ export const devConstants = {
   MARKETS_TABLE_ID:
     "0xfb993d4f2e8ba871247f221b83db01aab72ae0c9778287c2577d76017dbe37bb",
 
-  ACTIVE_MARKETS: [""], // to-do: think of a way to store this outside sdk(db or seperate contract)
+  ACTIVE_MARKETS: [1, 3], // to-do: think of a way to store this outside sdk(db or seperate contract)
 
   // Pyth Constants
   PYTH_PACKAGE_ID:
