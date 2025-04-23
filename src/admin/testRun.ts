@@ -81,18 +81,61 @@ async function updatePricesCaller() {
 
 async function claimRewards() {
   const { suiClient, keypair } = getExecStuff();
-  let tx: Transaction | undefined;
+  let tx: Transaction | undefined = new Transaction();
   // await addCoinToOracleCaller(tx);
-  let alc = new AlphalendClient(suiClient);
-  tx = await alc.claimRewards({
-    address:
-      "0x8948f801fa2325eedb4b0ad4eb0a55bfb318acc531f3a2f0cddd8daa9b4a8c94",
-    positionCapId:
-      "0x04aef463126fea9cc518a37abc8ae8367f68c8eceeef31790b2da6be852d9d4b",
-    priceUpdateCoinTypes: [],
-  });
+  // let alc = new AlphalendClient(suiClient);
+  // tx = await alc.claimRewards({
+  //   address:
+  //     "0xa511088cc13a632a5e8f9937028a77ae271832465e067360dd13f548fe934d1a",
+  //   positionCapId:
+  //     "0x5c455d275a6cd3d9bb5bf91f8a47bffc07574b5df0960093e016a33c6987de9c",
+  //   priceUpdateCoinTypes: [],
+  // });
+  await setPrice(
+    tx,
+    "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin1::TESTCOIN1",
+    1,
+    1,
+    1,
+  );
+  await setPrice(
+    tx,
+    "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin2::TESTCOIN2",
+    1,
+    1,
+    1,
+  );
+  await setPrice(
+    tx,
+    "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin3::TESTCOIN3",
+    1,
+    1,
+    1,
+  );
+  await setPrice(
+    tx,
+    "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin4::TESTCOIN4",
+    1,
+    1,
+    1,
+  );
   if (tx) {
-    dryRunTransactionBlock(tx);
+    // dryRunTransactionBlock(tx);
+    suiClient
+      .signAndExecuteTransaction({
+        signer: keypair,
+        transaction: tx,
+        requestType: "WaitForLocalExecution",
+        options: {
+          showEffects: true,
+        },
+      })
+      .then((res) => {
+        console.log(JSON.stringify(res, null, 2));
+      })
+      .catch((error) => {
+        console.error(error);
+      });
   }
 }
 // updatePricesCaller();

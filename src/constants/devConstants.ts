@@ -34,7 +34,7 @@ export const devConstants = {
   MARKETS_TABLE_ID:
     "0xfb993d4f2e8ba871247f221b83db01aab72ae0c9778287c2577d76017dbe37bb",
 
-  ACTIVE_MARKETS: [""], // to-do: think of a way to store this outside sdk(db or seperate contract)
+  ACTIVE_MARKETS: [1, 3], // to-do: think of a way to store this outside sdk(db or seperate contract)
 
   // Pyth Constants
   PYTH_PACKAGE_ID:

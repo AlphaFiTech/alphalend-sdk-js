@@ -1,5 +1,5 @@
 import { SuiClient } from "@mysten/sui/client";
-import { getMarkets } from "./market.js";
+import { getAllMarkets } from "./market.js";
 import { getPricesFromPyth } from "../utils/helper.js";
 import { ProtocolStats } from "../core/types.js";
 
@@ -7,7 +7,7 @@ export const getProtocolStats = async (
   suiClient: SuiClient,
 ): Promise<ProtocolStats> => {
   try {
-    const markets = await getMarkets(suiClient);
+    const markets = await getAllMarkets(suiClient);
 
     let totalSuppliedUsd = 0;
     let totalBorrowedUsd = 0;
