@@ -1,13 +1,7 @@
-import { Transaction, TransactionResult } from "@mysten/sui/transactions";
+import { Transaction } from "@mysten/sui/transactions";
 import { getConstants } from "../constants/index.js";
-import {
-  SuiPriceServiceConnection,
-  SuiPythClient,
-} from "@pythnetwork/pyth-sui-js";
-import { pythPriceFeedIds } from "../utils/priceFeedIds.js";
-import { getPriceInfoObjectIdsWithUpdate } from "../utils/oracle.js";
 
-const constants = getConstants();
+const constants = getConstants("mainnet");
 
 export function createAdditionalAdminCap(
   tx: Transaction,

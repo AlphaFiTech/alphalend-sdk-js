@@ -6,8 +6,6 @@ import { pythPriceFeedIds } from "./priceFeedIds.js";
 import { getMarketFromChain } from "../models/market.js";
 import { getUserPosition } from "../models/position.js";
 
-const constants = getConstants();
-
 export async function getClaimRewardInput(
   suiClient: SuiClient,
   userAddress: string,
@@ -89,6 +87,7 @@ export const getPricesFromPyth = async (
   coinTypes: string[],
 ): Promise<PriceData[]> => {
   try {
+    const constants = getConstants("mainnet");
     if (coinTypes.length === 0) {
       return [];
     }
@@ -144,13 +143,60 @@ export const getPricesFromPyth = async (
   }
 };
 
-export async function setPrice(
+export async function setPrices(tx: Transaction) {
+  await setPrice(
+    tx,
+    "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin1::TESTCOIN1",
+    1,
+    1,
+    1,
+  );
+  await setPrice(
+    tx,
+    "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin2::TESTCOIN2",
+    1,
+    1,
+    1,
+  );
+  await setPrice(
+    tx,
+    "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin3::TESTCOIN3",
+    1,
+    1,
+    1,
+  );
+  await setPrice(
+    tx,
+    "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin4::TESTCOIN4",
+    1,
+    1,
+    1,
+  );
+  await setPrice(
+    tx,
+    "0xf357286b629e3fd7ab921faf9ab1344fdff30244a4ff0897181845546babb2e1::testcoin5::TESTCOIN5",
+    1,
+    1,
+    1,
+  );
+  await setPrice(
+    tx,
+    "0xf357286b629e3fd7ab921faf9ab1344fdff30244a4ff0897181845546babb2e1::testcoin6::TESTCOIN6",
+    1,
+    1,
+    1,
+  );
+  await setPrice(tx, "0x2::sui::SUI", 1, 1, 1);
+}
+
+async function setPrice(
   tx: Transaction,
   coinType: string,
   price: number,
   ema: number,
   conf: number,
 ) {
+  const constants = getConstants("testnet");
   const priceNumnber = tx.moveCall({
     target: `${constants.ALPHAFI_STDLIB_PACKAGE_ID}::math::from`,
     arguments: [tx.pure.u64(price)],

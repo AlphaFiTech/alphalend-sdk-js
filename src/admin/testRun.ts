@@ -6,12 +6,12 @@ import { getConstants } from "../constants/index.js";
 import { addCoinToOracle } from "./oracle.js";
 import { AlphalendClient } from "../core/client.js";
 import * as dotenv from "dotenv";
-import { setPrice } from "../utils/helper.js";
 import { Decimal } from "decimal.js";
+import { setPrices } from "../utils/helper.js";
 
 dotenv.config();
 
-const constants = getConstants();
+const constants = getConstants("testnet");
 
 export function getExecStuff() {
   if (!process.env.PK_B64) {
@@ -34,6 +34,7 @@ export function getExecStuff() {
 
   return { address, keypair, suiClient };
 }
+
 export async function dryRunTransactionBlock(txb: Transaction) {
   const { suiClient, address } = getExecStuff();
   txb.setSender(address);
@@ -55,22 +56,59 @@ export async function dryRunTransactionBlock(txb: Transaction) {
     console.log(e);
   }
 }
+
 async function addCoinToOracleCaller(tx: Transaction) {
   const adminCapId = constants.ALPHAFI_ORACLE_ADMIN_CAP_ID;
   await addCoinToOracle(
     tx,
     adminCapId,
-    "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin4::TESTCOIN4",
+    "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin1::TESTCOIN1",
     1,
     1000,
   );
+  await addCoinToOracle(
+    tx,
+    adminCapId,
+    "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin2::TESTCOIN2",
+    1,
+    1000,
+  );
+  await addCoinToOracle(
+    tx,
+    adminCapId,
+    "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin3::TESTCOIN3",
+    1,
+    1000,
+  );
+  await addCoinToOracle(
+    tx,
+    adminCapId,
+    "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin4::TESTCOIN4",
+    0,
+    1000,
+  );
+  await addCoinToOracle(
+    tx,
+    adminCapId,
+    "0xf357286b629e3fd7ab921faf9ab1344fdff30244a4ff0897181845546babb2e1::testcoin5::TESTCOIN5",
+    0,
+    1000,
+  );
+  await addCoinToOracle(
+    tx,
+    adminCapId,
+    "0xf357286b629e3fd7ab921faf9ab1344fdff30244a4ff0897181845546babb2e1::testcoin6::TESTCOIN6",
+    1,
+    1000,
+  );
+  await addCoinToOracle(tx, adminCapId, "0x2::sui::SUI", 1, 1000);
 
   return tx;
 }
 
 async function updatePricesCaller() {
   const { suiClient } = getExecStuff();
-  const alphalendClient = new AlphalendClient(suiClient);
+  const alphalendClient = new AlphalendClient("testnet", suiClient);
   let tx = new Transaction();
   return await alphalendClient.updatePrices(tx, [
     "0x2::sui::SUI",
@@ -83,35 +121,8 @@ async function claimRewards() {
   const { suiClient, keypair } = getExecStuff();
   let tx: Transaction | undefined = new Transaction();
   // await addCoinToOracleCaller(tx);
-  await setPrice(
-    tx,
-    "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin1::TESTCOIN1",
-    1,
-    1,
-    1,
-  );
-  await setPrice(
-    tx,
-    "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin2::TESTCOIN2",
-    1,
-    1,
-    1,
-  );
-  await setPrice(
-    tx,
-    "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin3::TESTCOIN3",
-    1,
-    1,
-    1,
-  );
-  await setPrice(
-    tx,
-    "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin4::TESTCOIN4",
-    1,
-    1,
-    1,
-  );
-  let alc = new AlphalendClient(suiClient);
+  await setPrices(tx);
+  let alc = new AlphalendClient("testnet", suiClient);
   tx = await alc.claimRewards({
     address:
       "0xa511088cc13a632a5e8f9937028a77ae271832465e067360dd13f548fe934d1a",
@@ -128,7 +139,7 @@ async function claimRewards() {
 async function borrow() {
   const { suiClient, keypair } = getExecStuff();
   let tx: Transaction | undefined;
-  let alc = new AlphalendClient(suiClient);
+  let alc = new AlphalendClient("testnet", suiClient);
   tx = await alc.borrow({
     address:
       "0x8948f801fa2325eedb4b0ad4eb0a55bfb318acc531f3a2f0cddd8daa9b4a8c94",
@@ -144,13 +155,15 @@ async function borrow() {
     dryRunTransactionBlock(tx);
   }
 }
-export async function executeTransactionBlock(txb: Transaction) {
-  const { keypair, suiClient } = getExecStuff();
 
+export async function executeTransactionBlock() {
+  const { keypair, suiClient } = getExecStuff();
+  const tx = new Transaction();
+  await addCoinToOracleCaller(tx);
   await suiClient
     .signAndExecuteTransaction({
       signer: keypair,
-      transaction: txb,
+      transaction: tx,
       requestType: "WaitForLocalExecution",
       options: {
         showEffects: true,
@@ -165,55 +178,15 @@ export async function executeTransactionBlock(txb: Transaction) {
       console.error(error);
     });
 }
+executeTransactionBlock();
+
 async function setPriceCaller() {
   const tx = new Transaction();
-  await setPrice(
-    tx,
-    "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin1::TESTCOIN1",
-    1,
-    1,
-    1,
-  );
-  await setPrice(
-    tx,
-    "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin2::TESTCOIN2",
-    1,
-    1,
-    1,
-  );
-  await setPrice(
-    tx,
-    "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin3::TESTCOIN3",
-    1,
-    1,
-    1,
-  );
-  await setPrice(
-    tx,
-    "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin4::TESTCOIN4",
-    1,
-    1,
-    1,
-  );
-  await setPrice(
-    tx,
-    "0xf357286b629e3fd7ab921faf9ab1344fdff30244a4ff0897181845546babb2e1::testcoin5::TESTCOIN5",
-    1,
-    1,
-    1,
-  );
-  await setPrice(
-    tx,
-    "0xf357286b629e3fd7ab921faf9ab1344fdff30244a4ff0897181845546babb2e1::testcoin6::TESTCOIN6",
-    1,
-    1,
-    1,
-  );
-  await setPrice(tx, "0x2::sui::SUI", 1, 1, 1);
+  await setPrices(tx);
 
   if (tx) {
     // dryRunTransactionBlock(tx);
-    executeTransactionBlock(tx);
+    // executeTransactionBlock(tx);
   }
 }
 // setPriceCaller();
@@ -226,14 +199,13 @@ async function setPriceCaller() {
 async function withdraw() {
   const { suiClient, keypair } = getExecStuff();
   let tx: Transaction | undefined;
-  let alc = new AlphalendClient(suiClient);
+  let alc = new AlphalendClient("testnet", suiClient);
   tx = await alc.withdraw({
     address:
       "0xa511088cc13a632a5e8f9937028a77ae271832465e067360dd13f548fe934d1a",
     positionCapId:
       "0x8465d2416b01d3e76460912cd290e5dd9c4a36cfbe52f348cfe04e8ae769de4e",
-    coinType:
-      "0x2::sui::SUI",
+    coinType: "0x2::sui::SUI",
     marketId: "6",
     amount: new Decimal(1000000000),
     priceUpdateCoinTypes: [],
@@ -242,4 +214,4 @@ async function withdraw() {
     dryRunTransactionBlock(tx);
   }
 }
-withdraw();
+// withdraw();
