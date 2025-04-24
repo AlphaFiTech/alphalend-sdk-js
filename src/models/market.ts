@@ -1,8 +1,13 @@
 import { SuiClient } from "@mysten/sui/client";
 import { Decimal } from "decimal.js";
-import { MarketConfigQueryType, MarketQueryType, RewardDistributorQueryType } from "../utils/queryTypes.js";
+import {
+  MarketConfigQueryType,
+  MarketQueryType,
+  RewardDistributorQueryType,
+} from "../utils/queryTypes.js";
 import { getConstants } from "../constants/index.js";
 import { Market } from "../core/types.js";
+import { getPricesFromPyth } from "../utils/helper.js";
 
 const constants = getConstants();
 
@@ -49,24 +54,30 @@ export const getAllMarkets = async (
         );
         continue;
       }
-
+      refreshMarket(marketObject);
       const marketFields = marketObject.content.fields.value.fields;
+
+      if (marketFields.coin_type.fields.name.includes("sui::SUI")) {
+        marketFields.coin_type.fields.name = "0x2::sui::SUI";
+      } else {
+        marketFields.coin_type.fields.name =
+          "0x" + marketFields.coin_type.fields.name;
+      }
+      const decimalDigit = new Decimal(marketFields.decimal_digit.fields.value);
 
       // Extract the market details and add to results
       const marketConfig = marketFields.config.fields;
 
-      const decimalDigit = new Decimal(marketFields.decimal_digit.fields.value);
-
       // Calculate utilization rate
-      const totalSupply = new Decimal(marketFields.xtoken_supply).div(
-        decimalDigit,
-      );
+      const totalSupply = new Decimal(
+        getTotalLiquidity(marketObject).toString(),
+      ).div(decimalDigit);
       const totalBorrow = new Decimal(marketFields.borrowed_amount).div(
         decimalDigit,
       );
-      const utilizationRate = totalSupply.gt(0)
-        ? totalBorrow.div(totalSupply)
-        : new Decimal(0);
+      const utilizationRate = new Decimal(
+        getUtilizationRate(marketObject).toString(),
+      );
 
       // Calculate borrow APR
       const borrowApr = calculateBorrowApr(utilizationRate, marketConfig);
@@ -79,13 +90,29 @@ export const getAllMarkets = async (
         reserveFactor,
       );
 
-      const coinType = marketFields.coin_type.fields.name.includes("sui::SUI")
-        ? "0x2::sui::SUI"
-        : marketFields.coin_type.fields.name;
+      // reward Aprs
+      borrowApr.rewards = await calculateBorrowRewardApr(marketObject);
+      supplyApr.rewards = await calculateSupplyRewardApr(marketObject);
+
+      const allowedBorrowAmount = Decimal.max(
+        0,
+        Decimal.min(
+          new Decimal(marketConfig.borrow_limit),
+          new Decimal(marketFields.balance_holding).mul(
+            new Decimal(marketConfig.borrow_limit_percentage).div(100),
+          ),
+        ),
+      );
+      const allowedDepositAmount = Decimal.max(
+        0,
+        new Decimal(marketConfig.deposit_limit)
+          .sub(getTotalLiquidity(marketObject).toString())
+          .div(decimalDigit),
+      );
 
       markets.push({
         marketId: marketFields.market_id,
-        coinType,
+        coinType: marketFields.coin_type.fields.name,
         decimalDigit: decimalDigit.log(10).toNumber(),
         totalSupply,
         totalBorrow,
@@ -93,12 +120,18 @@ export const getAllMarkets = async (
         supplyApr,
         borrowApr,
         ltv: new Decimal(marketConfig.safe_collateral_ratio).div(100),
+        availableLiquidity: new Decimal(marketFields.balance_holding).div(
+          decimalDigit,
+        ),
+        borrowFee: new Decimal(marketConfig.borrow_fee_bps).div(100),
+        borrowWeight: new Decimal(marketConfig.borrow_weight.fields.value).div(
+          1e18,
+        ),
         liquidationThreshold: new Decimal(
           marketConfig.liquidation_threshold,
         ).div(100),
-        depositLimit: new Decimal(marketConfig.deposit_limit),
-        borrowFee: new Decimal(marketConfig.borrow_fee_bps).div(100),
-        borrowWeight: new Decimal(marketConfig.borrow_weight.fields.value),
+        allowedDepositAmount,
+        allowedBorrowAmount,
         xtokenRatio: new Decimal(marketFields.xtoken_ratio.fields.value),
       });
     }
@@ -108,6 +141,160 @@ export const getAllMarkets = async (
     console.error("Error fetching markets:", error);
     return [];
   }
+};
+
+const calculateSupplyRewardApr = async (
+  market: MarketQueryType,
+): Promise<
+  {
+    coinType: string;
+    rewardApr: Decimal;
+  }[]
+> => {
+  const marketFields = market.content.fields.value.fields;
+  const rewardAps: {
+    coinType: string;
+    rewardApr: Decimal;
+  }[] = [];
+  const MILLISECONDS_IN_YEAR = 365 * 24 * 60 * 60 * 1000; // 31536000000
+
+  const distributor = marketFields.deposit_reward_distributor.fields;
+  const totalLiquidity = new Decimal(getTotalLiquidity(market).toString());
+  if (totalLiquidity.isZero()) {
+    return rewardAps;
+  }
+
+  const coinTypes: string[] = [];
+  const marketCoinType = marketFields.coin_type.fields.name;
+
+  for (const reward of distributor.rewards) {
+    if (!reward) continue;
+
+    if (reward.fields.coin_type.fields.name.includes("sui::SUI")) {
+      reward.fields.coin_type.fields.name = "0x2::sui::SUI";
+    } else {
+      reward.fields.coin_type.fields.name =
+        "0x" + reward.fields.coin_type.fields.name;
+    }
+
+    const coinType = reward.fields.coin_type.fields.name;
+    if (!coinTypes.includes(coinType)) {
+      coinTypes.push(coinType);
+    }
+  }
+  const marketPrice = await getPricesFromPyth([marketCoinType]);
+  const totalLiquidityValue = totalLiquidity.mul(marketPrice[0].price.price);
+  const prices = await getPricesFromPyth(coinTypes);
+
+  for (const reward of distributor.rewards) {
+    if (!reward) continue;
+
+    if (reward.fields.end_time <= reward.fields.start_time) {
+      continue;
+    }
+
+    const timeSpan =
+      parseInt(reward.fields.end_time) - parseInt(reward.fields.start_time);
+    if (timeSpan === 0) {
+      continue;
+    }
+
+    const rewardCoinType = reward.fields.coin_type.fields.name;
+    const price = prices.find((p) => p.coinType === rewardCoinType);
+    if (!price) continue;
+
+    const rewardAmount = new Decimal(reward.fields.total_rewards);
+    const rewardValue = rewardAmount.mul(price.price.price);
+
+    const rewardRate = rewardValue.div(timeSpan);
+    const rewardApr = rewardRate
+      .mul(MILLISECONDS_IN_YEAR)
+      .div(totalLiquidityValue);
+
+    rewardAps.push({
+      coinType: rewardCoinType,
+      rewardApr: rewardApr,
+    });
+  }
+
+  return rewardAps;
+};
+
+const calculateBorrowRewardApr = async (
+  market: MarketQueryType,
+): Promise<
+  {
+    coinType: string;
+    rewardApr: Decimal;
+  }[]
+> => {
+  const marketFields = market.content.fields.value.fields;
+  const rewardAprs: {
+    coinType: string;
+    rewardApr: Decimal;
+  }[] = [];
+  const MILLISECONDS_IN_YEAR = 365 * 24 * 60 * 60 * 1000; // 31536000000
+
+  const distributor = marketFields.borrow_reward_distributor.fields;
+  const borrowedAmount = new Decimal(marketFields.borrowed_amount);
+  if (borrowedAmount.isZero()) {
+    return rewardAprs;
+  }
+
+  const coinTypes: string[] = [];
+  const marketCoinType = marketFields.coin_type.fields.name;
+
+  for (const reward of distributor.rewards) {
+    if (!reward) continue;
+
+    if (reward.fields.coin_type.fields.name.includes("sui::SUI")) {
+      reward.fields.coin_type.fields.name = "0x2::sui::SUI";
+    } else {
+      reward.fields.coin_type.fields.name =
+        "0x" + reward.fields.coin_type.fields.name;
+    }
+
+    const coinType = reward.fields.coin_type.fields.name;
+    if (!coinTypes.includes(coinType)) {
+      coinTypes.push(coinType);
+    }
+  }
+  const marketPrice = await getPricesFromPyth([marketCoinType]);
+  const borrowedAmountValue = borrowedAmount.mul(marketPrice[0].price.price);
+  const prices = await getPricesFromPyth(coinTypes);
+
+  for (const reward of distributor.rewards) {
+    if (!reward) continue;
+
+    if (reward.fields.end_time <= reward.fields.start_time) {
+      continue;
+    }
+
+    const timeSpan =
+      parseInt(reward.fields.end_time) - parseInt(reward.fields.start_time);
+    if (timeSpan === 0) {
+      continue;
+    }
+
+    const rewardCoinType = reward.fields.coin_type.fields.name;
+    const price = prices.find((p) => p.coinType === rewardCoinType);
+    if (!price) continue;
+
+    const rewardAmount = new Decimal(reward.fields.total_rewards);
+    const rewardValue = rewardAmount.mul(price.price.price);
+
+    const rewardRate = rewardValue.div(timeSpan);
+    const rewardApr = rewardRate
+      .mul(MILLISECONDS_IN_YEAR)
+      .div(borrowedAmountValue);
+
+    rewardAprs.push({
+      coinType: rewardCoinType,
+      rewardApr: rewardApr,
+    });
+  }
+
+  return rewardAprs;
 };
 
 const calculateSupplyApr = (
@@ -248,8 +435,7 @@ const updateCompoundInterest = (market: MarketQueryType): void => {
       let new_borrowed = (borrowed_u256 * compoundedMultiplier) / BigInt(1e18);
 
       // Update borrowed amount
-      marketFields.borrowed_amount =
-        new_borrowed.toString();
+      marketFields.borrowed_amount = new_borrowed.toString();
       // Update compounded interest
       marketFields.compounded_interest.fields.value = (
         (BigInt(marketFields.compounded_interest.fields.value) *
@@ -296,17 +482,72 @@ const updateXTokenRatio = (market: MarketQueryType): void => {
   ).toString();
 };
 
-const refreshDepositRewardDistributors = (rewardDistributor: RewardDistributorQueryType): void => {
+const refreshRewardDistributors = (
+  rewardDistributor: RewardDistributorQueryType,
+): void => {
+  const currentTime = Date.now(); // Current time in milliseconds
 
+  // If current time matches last update, no need to refresh
+  if (currentTime === parseInt(rewardDistributor.last_updated)) {
+    return;
+  }
+  // If no xTokens, nothing to distribute
+  if (rewardDistributor.total_xtokens === "0" || !rewardDistributor.rewards) {
+    return;
+  }
+  // Iterate through rewards
+  rewardDistributor.rewards.forEach((reward) => {
+    if (!reward) return;
+
+    // Skip if reward hasn't started yet
+    if (parseInt(reward.fields.start_time) >= currentTime) {
+      return;
+    }
+    // Skip if reward has already ended
+    if (
+      parseInt(reward.fields.end_time) <
+      parseInt(rewardDistributor.last_updated)
+    ) {
+      return;
+    }
+
+    // Calculate time range for reward distribution
+    const startTime = Math.max(
+      parseInt(rewardDistributor.last_updated),
+      parseInt(reward.fields.start_time),
+    );
+    const endTime = Math.min(currentTime, parseInt(reward.fields.end_time));
+    const timeElapsed = endTime - startTime;
+
+    // Calculate rewards generated during this period
+    const totalRewards = BigInt(reward.fields.total_rewards);
+    const rewardDuration = BigInt(
+      parseInt(reward.fields.end_time) - parseInt(reward.fields.start_time),
+    );
+
+    if (rewardDuration === BigInt(0)) return;
+
+    const rewardsGenerated =
+      (totalRewards * BigInt(timeElapsed)) / rewardDuration;
+
+    reward.fields.distributed_rewards = (
+      BigInt(reward.fields.distributed_rewards) + rewardsGenerated
+    ).toString();
+
+    const rewardsPerShare =
+      (rewardsGenerated * BigInt(1e18)) /
+      BigInt(rewardDistributor.total_xtokens);
+
+    reward.fields.cummulative_rewards_per_share = (
+      BigInt(reward.fields.cummulative_rewards_per_share) + rewardsPerShare
+    ).toString();
+  });
+
+  // Update last_updated timestamp
+  rewardDistributor.last_updated = currentTime.toString();
 };
 
-const refreshBorrowRewardDistributors = (rewardDistributor: RewardDistributorQueryType): void => {
-
-};
-
-const refreshMarket = async (
-  market: MarketQueryType,
-): Promise<MarketQueryType> => {
+const refreshMarket = (market: MarketQueryType): MarketQueryType => {
   const marketFields = market.content.fields.value.fields;
 
   // 1. Compound interest
@@ -315,14 +556,12 @@ const refreshMarket = async (
   // 2. Update xToken ratio
   updateXTokenRatio(market);
 
-  // 4. Refresh reward distributors if they exist
+  // 3. Refresh reward distributors if they exist
   if (marketFields.deposit_reward_distributor) {
-    refreshDepositRewardDistributors(marketFields.deposit_reward_distributor.fields);
+    refreshRewardDistributors(marketFields.deposit_reward_distributor.fields);
   }
-
   if (marketFields.borrow_reward_distributor) {
-    refreshBorrowRewardDistributors(marketFields.borrow_reward_distributor.fields);
+    refreshRewardDistributors(marketFields.borrow_reward_distributor.fields);
   }
-
   return market;
 };

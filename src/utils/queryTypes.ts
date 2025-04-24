@@ -120,6 +120,8 @@ export interface MarketConfigQueryType {
   active: boolean;
   borrow_fee_bps: string;
   borrow_weight: NumberQueryType;
+  borrow_limit: string;
+  borrow_limit_percentage: string;
   cascade_market_id: string;
   close_factor_percentage: number;
   collateral_types: TypeNameQueryType[];

@@ -197,12 +197,16 @@ export interface Market {
   };
   /** Loan-to-value ratio (0.0 to 1.0) */
   ltv: Decimal;
-  /** Liquidation threshold (0.0 to 1.0) */
-  liquidationThreshold: Decimal;
-  /** Maximum amount that can be deposited into the market */
-  depositLimit: Decimal;
+  /** Available liquidity in the market */
+  availableLiquidity: Decimal;
   /** Borrow fee */
   borrowFee: Decimal;
+  /** Liquidation threshold (0.0 to 1.0) */
+  liquidationThreshold: Decimal;
+  /** Maximum amount that can be borrowed from the market */
+  allowedBorrowAmount: Decimal;
+  /** Maximum amount that can be deposited into the market */
+  allowedDepositAmount: Decimal;
   /** Borrow weight */
   borrowWeight: Decimal;
   /** XToken ratio */
