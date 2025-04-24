@@ -232,7 +232,7 @@ export class AlphalendClient {
     let coin: string | TransactionObjectArgument | undefined;
     if (isSui) {
       coin = tx.moveCall({
-        target: `${constants.ALPHALEND_PACKAGE_ID}::alpha_lending::fullfill_promise_SUI`,
+        target: `${constants.ALPHALEND_PACKAGE_ID}::alpha_lending::fulfill_promise_SUI`,
         arguments: [
           tx.object(constants.LENDING_PROTOCOL_ID),
           promise,
@@ -284,7 +284,7 @@ export class AlphalendClient {
     let coin;
     if (isSui) {
       coin = tx.moveCall({
-        target: `${constants.ALPHALEND_PACKAGE_ID}::alpha_lending::fullfill_promise_SUI`,
+        target: `${constants.ALPHALEND_PACKAGE_ID}::alpha_lending::fulfill_promise_SUI`,
         arguments: [
           tx.object(constants.LENDING_PROTOCOL_ID),
           promise,
@@ -294,7 +294,7 @@ export class AlphalendClient {
       });
     } else {
       coin = tx.moveCall({
-        target: `${constants.ALPHALEND_PACKAGE_ID}::alpha_lending::fullfill_promise`,
+        target: `${constants.ALPHALEND_PACKAGE_ID}::alpha_lending::fulfill_promise`,
         typeArguments: [params.coinType],
         arguments: [
           tx.object(constants.LENDING_PROTOCOL_ID),
@@ -639,7 +639,7 @@ export class AlphalendClient {
   ): Promise<TransactionObjectArgument | undefined> {
     if (promise) {
       const coin = tx.moveCall({
-        target: `${constants.ALPHALEND_PACKAGE_ID}::alpha_lending::fullfill_promise`,
+        target: `${constants.ALPHALEND_PACKAGE_ID}::alpha_lending::fulfill_promise`,
         typeArguments: [coinType],
         arguments: [
           tx.object(constants.LENDING_PROTOCOL_ID),
