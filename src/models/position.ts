@@ -117,9 +117,11 @@ export const isPositionCapObject = (object: PositionCapQueryType): boolean => {
 // Function to fetch all owned objects and find the PositionCap
 export const getUserPositionCapId = async (
   suiClient: SuiClient,
+  network: string,
   userAddress: string,
 ): Promise<string | undefined> => {
   try {
+    const constants = getConstants(network);
     // Fetch owned objects for the user
     const response = await suiClient.getOwnedObjects({
       owner: userAddress,
