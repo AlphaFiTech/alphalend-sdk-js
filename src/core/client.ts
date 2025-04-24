@@ -522,7 +522,7 @@ export class AlphalendClient {
     }
   }
 
-  private async getCoinObject(
+  async getCoinObject(
     tx: Transaction,
     type: string,
     address: string,
