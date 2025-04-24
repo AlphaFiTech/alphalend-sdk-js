@@ -136,15 +136,7 @@ export const getUserPositionCapId = async (
     if (!response || !response.data || response.data.length === 0) {
       return undefined;
     }
-
-    // Find the first PositionCap object and extract the positionCap ID
-    const positionCapObject = response.data.find((data) =>
-      isPositionCapObject(data.data as unknown as PositionCapQueryType),
-    );
-    if (positionCapObject) {
-      return (positionCapObject.data as unknown as PositionCapQueryType)
-        .objectId;
-    }
+    return response.data[0].data?.objectId;
   } catch (error) {
     console.error("Error fetching user positionCap ID:", error);
   }
