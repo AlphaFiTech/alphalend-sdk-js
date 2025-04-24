@@ -10,12 +10,12 @@ import {
 import { Market, Portfolio } from "../core/types.js";
 import { getAllMarkets } from "./market.js";
 
-const constants = getConstants();
+const constants = getConstants("mainnet");
 
 export const getUserPortfolio = async (
   suiClient: SuiClient,
   userAddress: string,
-): Promise<Portfolio> => {
+): Promise<Portfolio | undefined> => {
   try {
     const markets = await getAllMarkets(suiClient);
     const position = await getUserPosition(suiClient, userAddress);
@@ -45,25 +45,6 @@ export const getUserPortfolio = async (
       marketMap.set(market.marketId.toString(), market);
     }
     // const collateralMap = createCollateralMap(position.collaterals, marketMap, priceMap);
-    return {
-      userAddress,
-      netWorth: "0",
-      totalSuppliedUsd: "0",
-      totalBorrowedUsd: "0",
-      safeBorrowLimit: "0",
-      borrowLimitUsed: "0",
-      liquidationLimit: "0",
-      rewardsToClaimUsd: "0",
-      rewardsByToken: [],
-      dailyEarnings: "0",
-      netApr: "0",
-      aggregatedSupplyApr: "0",
-      aggregatedBorrowApr: "0",
-      userBalances: [],
-      healthFactor: "100", // Perfect health when no positions
-      isLiquidatable: false,
-      marketPositions: {},
-    };
   } catch (error) {
     console.error("Error fetching user portfolio:", error);
     return {
@@ -86,6 +67,38 @@ export const getUserPortfolio = async (
       marketPositions: {},
     };
   }
+};
+
+export const positionRefresh = async (
+  position: PositionQueryType,
+  marketMap: Map<string, Market>,
+  priceMap: Map<string, PriceData>,
+) => {
+  const currentTime = Date.now();
+
+  const collateralMarketIds = Object.keys(
+    position.content.fields.value.fields.collaterals,
+  );
+  const loanMarketIds = Object.keys(position.content.fields.value.fields.loans);
+
+  for (const marketId of collateralMarketIds) {
+    const market = marketMap.get(marketId);
+    if (!market) {
+      console.error(`Market not found: ${marketId}`);
+      continue;
+    }
+
+    // const depositRewardDistributor = market.rewardDistributor;
+    // const userDistributorIdx = position.content.fields.value.fields.reward_distributors.findIndex((distributor) => distributor.fields.distributor === depositRewardDistributor);
+    // if (userDistributorIdx === -1) {
+    //   console.error(`User distributor not found: ${depositRewardDistributor}`);
+    //   continue;
+    // }
+  }
+
+  const marketIds = new Set([...collateralMarketIds, ...loanMarketIds]);
+
+  // for (const marketId of marketIds) {
 };
 
 // Function to check if an object is a PositionCap

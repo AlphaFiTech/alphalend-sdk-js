@@ -9,7 +9,7 @@ import { getConstants } from "../constants/index.js";
 import { Market } from "../core/types.js";
 import { getPricesFromPyth } from "../utils/helper.js";
 
-const constants = getConstants();
+const constants = getConstants("mainnet");
 
 export const getMarketFromChain = async (
   suiClient: SuiClient,
@@ -26,43 +26,53 @@ export const getMarketFromChain = async (
   return response.data as MarketQueryType;
 };
 
+const fetchAndRefreshMarket = async (
+  suiClient: SuiClient,
+): Promise<MarketQueryType[]> => {
+  const activeMarketIds = constants.ACTIVE_MARKETS;
+
+  // Fetch and process each market from the active market IDs
+  const markets: MarketQueryType[] = [];
+  const responses = await Promise.all(
+    activeMarketIds.map((id) => getMarketFromChain(suiClient, id)),
+  );
+
+  for (const marketObject of responses) {
+    if (!marketObject) {
+      console.warn(`Market data not found`);
+      continue;
+    }
+
+    if (
+      !marketObject.content ||
+      marketObject.content.dataType !== "moveObject"
+    ) {
+      console.warn(`Market ${marketObject.objectId} data not found or invalid`);
+      continue;
+    }
+    const marketFields = marketObject.content.fields.value.fields;
+    if (marketFields.coin_type.fields.name.includes("sui::SUI")) {
+      marketFields.coin_type.fields.name = "0x2::sui::SUI";
+    } else {
+      marketFields.coin_type.fields.name =
+        "0x" + marketFields.coin_type.fields.name;
+    }
+    refreshMarket(marketObject);
+    markets.push(marketObject);
+  }
+  return markets;
+};
+
 export const getAllMarkets = async (
   suiClient: SuiClient,
 ): Promise<Market[]> => {
   try {
-    const constants = getConstants();
-    const activeMarketIds = constants.ACTIVE_MARKETS;
-
-    // Fetch and process each market from the active market IDs
+    // Fetch and process each market
     const markets: Market[] = [];
-    const responses = await Promise.all(
-      activeMarketIds.map((id) => getMarketFromChain(suiClient, id)),
-    );
+    const responses = await fetchAndRefreshMarket(suiClient);
 
     for (const marketObject of responses) {
-      if (!marketObject) {
-        console.warn(`Market data not found`);
-        continue;
-      }
-
-      if (
-        !marketObject.content ||
-        marketObject.content.dataType !== "moveObject"
-      ) {
-        console.warn(
-          `Market ${marketObject.objectId} data not found or invalid`,
-        );
-        continue;
-      }
-      refreshMarket(marketObject);
       const marketFields = marketObject.content.fields.value.fields;
-
-      if (marketFields.coin_type.fields.name.includes("sui::SUI")) {
-        marketFields.coin_type.fields.name = "0x2::sui::SUI";
-      } else {
-        marketFields.coin_type.fields.name =
-          "0x" + marketFields.coin_type.fields.name;
-      }
       const decimalDigit = new Decimal(marketFields.decimal_digit.fields.value);
 
       // Extract the market details and add to results

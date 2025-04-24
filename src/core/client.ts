@@ -30,8 +30,11 @@ import { PythPriceInfo } from "../coin/types.js";
 import { getProtocolStats } from "../models/protocol.js";
 import { getAllMarkets } from "../models/market.js";
 import { getUserPortfolio } from "../models/position.js";
-import { getClaimRewardInput, getEstimatedGasBudget } from "../utils/helper.js";
-import { setPrice } from "../utils/helper.js";
+import {
+  getClaimRewardInput,
+  getEstimatedGasBudget,
+  setPrices,
+} from "../utils/helper.js";
 
 /**
  * AlphaLend Client
@@ -44,23 +47,26 @@ import { setPrice } from "../utils/helper.js";
  * - Initializes and coordinates other protocol components
  */
 
-const constants = getConstants();
-
 export class AlphalendClient {
   client: SuiClient;
   pythClient: SuiPythClient;
   pythConnection: SuiPriceServiceConnection;
+  network: string;
+  constants: any;
 
-  constructor(client: SuiClient) {
+  constructor(network: string, client: SuiClient) {
+    this.network = network;
     this.client = client;
+    this.constants = getConstants(network);
     this.pythClient = new SuiPythClient(
       client,
-      constants.PYTH_STATE_ID,
-      constants.WORMHOLE_STATE_ID,
+      this.constants.PYTH_STATE_ID,
+      this.constants.WORMHOLE_STATE_ID,
     );
     this.pythConnection = new SuiPriceServiceConnection(
-      // "https://hermes.pyth.network",
-      "https://hermes-beta.pyth.network",
+      network === "mainnet"
+        ? "https://hermes.pyth.network"
+        : "https://hermes-beta.pyth.network",
     );
   }
 
@@ -122,10 +128,14 @@ export class AlphalendClient {
     ] of priceFeedToInfoIdMap.entries()) {
       const coinType = priceFeedToCoinTypeMap.get(priceFeedId);
       if (coinType) {
-        updatePriceTransaction(tx, {
-          priceInfoObject: priceInfoObjectId,
-          coinType: coinType,
-        });
+        updatePriceTransaction(
+          tx,
+          {
+            priceInfoObject: priceInfoObjectId,
+            coinType: coinType,
+          },
+          this.constants,
+        );
       }
     }
 
@@ -142,10 +152,12 @@ export class AlphalendClient {
     const tx = new Transaction();
 
     // First update prices to ensure latest oracle values
-    // await this.updatePrices(tx, params.priceUpdateCoinTypes);
+    if (this.network === "mainnet") {
+      await this.updatePrices(tx, params.priceUpdateCoinTypes);
+    }
 
     // Get coin object
-    const isSui = params.coinType === constants.SUI_COIN_TYPE;
+    const isSui = params.coinType === this.constants.SUI_COIN_TYPE;
     let supplyCoinA: TransactionObjectArgument | undefined;
     if (!isSui) {
       const coin = await this.getCoinObject(
@@ -167,28 +179,28 @@ export class AlphalendClient {
     if (params.positionCapId) {
       // Build add_collateral transaction
       tx.moveCall({
-        target: `${constants.ALPHALEND_PACKAGE_ID}::alpha_lending::add_collateral`,
+        target: `${this.constants.ALPHALEND_PACKAGE_ID}::alpha_lending::add_collateral`,
         typeArguments: [params.coinType],
         arguments: [
-          tx.object(constants.LENDING_PROTOCOL_ID), // Protocol object
+          tx.object(this.constants.LENDING_PROTOCOL_ID), // Protocol object
           tx.object(params.positionCapId), // Position capability
           tx.pure.u64(params.marketId), // Market ID
           supplyCoinA, // Coin to supply as collateral
-          tx.object(constants.SUI_CLOCK_OBJECT_ID), // Clock object
+          tx.object(this.constants.SUI_CLOCK_OBJECT_ID), // Clock object
         ],
       });
     } else {
       const positionCap = await this.createPosition(tx);
       // Build add_collateral transaction
       tx.moveCall({
-        target: `${constants.ALPHALEND_PACKAGE_ID}::alpha_lending::add_collateral`,
+        target: `${this.constants.ALPHALEND_PACKAGE_ID}::alpha_lending::add_collateral`,
         typeArguments: [params.coinType],
         arguments: [
-          tx.object(constants.LENDING_PROTOCOL_ID), // Protocol object
+          tx.object(this.constants.LENDING_PROTOCOL_ID), // Protocol object
           positionCap, // Position capability
           tx.pure.u64(params.marketId), // Market ID
           supplyCoinA, // Coin to supply as collateral
-          tx.object(constants.SUI_CLOCK_OBJECT_ID), // Clock object
+          tx.object(this.constants.SUI_CLOCK_OBJECT_ID), // Clock object
         ],
       });
       tx.transferObjects([positionCap], params.address);
@@ -213,31 +225,33 @@ export class AlphalendClient {
     const tx = new Transaction();
 
     // First update prices to ensure latest oracle values
-    // await this.updatePrices(tx, params.priceUpdateCoinTypes);
-
-    await this.setPrices(tx);
+    if (this.network === "mainnet") {
+      await this.updatePrices(tx, params.priceUpdateCoinTypes);
+    } else {
+      await setPrices(tx);
+    }
 
     const promise = tx.moveCall({
-      target: `${constants.ALPHALEND_PACKAGE_ID}::alpha_lending::remove_collateral`,
+      target: `${this.constants.ALPHALEND_PACKAGE_ID}::alpha_lending::remove_collateral`,
       typeArguments: [params.coinType],
       arguments: [
-        tx.object(constants.LENDING_PROTOCOL_ID), // Protocol object
+        tx.object(this.constants.LENDING_PROTOCOL_ID), // Protocol object
         tx.object(params.positionCapId), // Position capability
         tx.pure.u64(params.marketId), // Market ID
         tx.pure.u64(params.amount.floor().toString()), // Amount to withdraw
-        tx.object(constants.SUI_CLOCK_OBJECT_ID), // Clock object
+        tx.object(this.constants.SUI_CLOCK_OBJECT_ID), // Clock object
       ],
     });
-    const isSui = params.coinType === constants.SUI_COIN_TYPE;
+    const isSui = params.coinType === this.constants.SUI_COIN_TYPE;
     let coin: string | TransactionObjectArgument | undefined;
     if (isSui) {
       coin = tx.moveCall({
-        target: `${constants.ALPHALEND_PACKAGE_ID}::alpha_lending::fulfill_promise_SUI`,
+        target: `${this.constants.ALPHALEND_PACKAGE_ID}::alpha_lending::fulfill_promise_SUI`,
         arguments: [
-          tx.object(constants.LENDING_PROTOCOL_ID),
+          tx.object(this.constants.LENDING_PROTOCOL_ID),
           promise,
-          tx.object(constants.SUI_SYSTEM_STATE_ID),
-          tx.object(constants.SUI_CLOCK_OBJECT_ID),
+          tx.object(this.constants.SUI_SYSTEM_STATE_ID),
+          tx.object(this.constants.SUI_CLOCK_OBJECT_ID),
         ],
       });
     } else {
@@ -266,40 +280,43 @@ export class AlphalendClient {
     const tx = new Transaction();
 
     // First update prices to ensure latest oracle values
-    // await this.updatePrices(tx, params.priceUpdateCoinTypes);
+    if (this.network === "mainnet") {
+      await this.updatePrices(tx, params.priceUpdateCoinTypes);
+    } else {
+      await setPrices(tx);
+    }
 
-    await this.setPrices(tx);
     const promise = tx.moveCall({
-      target: `${constants.ALPHALEND_PACKAGE_ID}::alpha_lending::borrow`,
+      target: `${this.constants.ALPHALEND_PACKAGE_ID}::alpha_lending::borrow`,
       typeArguments: [params.coinType],
       arguments: [
-        tx.object(constants.LENDING_PROTOCOL_ID), // Protocol object
+        tx.object(this.constants.LENDING_PROTOCOL_ID), // Protocol object
         tx.object(params.positionCapId), // Position capability
         tx.pure.u64(params.marketId), // Market ID
         tx.pure.u64(params.amount.floor().toString()), // Amount to borrow
-        tx.object(constants.SUI_CLOCK_OBJECT_ID), // Clock object
+        tx.object(this.constants.SUI_CLOCK_OBJECT_ID), // Clock object
       ],
     });
-    const isSui = params.coinType === constants.SUI_COIN_TYPE;
+    const isSui = params.coinType === this.constants.SUI_COIN_TYPE;
     let coin;
     if (isSui) {
       coin = tx.moveCall({
-        target: `${constants.ALPHALEND_PACKAGE_ID}::alpha_lending::fulfill_promise_SUI`,
+        target: `${this.constants.ALPHALEND_PACKAGE_ID}::alpha_lending::fulfill_promise_SUI`,
         arguments: [
-          tx.object(constants.LENDING_PROTOCOL_ID),
+          tx.object(this.constants.LENDING_PROTOCOL_ID),
           promise,
-          tx.object(constants.SUI_SYSTEM_STATE_ID),
-          tx.object(constants.SUI_CLOCK_OBJECT_ID),
+          tx.object(this.constants.SUI_SYSTEM_STATE_ID),
+          tx.object(this.constants.SUI_CLOCK_OBJECT_ID),
         ],
       });
     } else {
       coin = tx.moveCall({
-        target: `${constants.ALPHALEND_PACKAGE_ID}::alpha_lending::fulfill_promise`,
+        target: `${this.constants.ALPHALEND_PACKAGE_ID}::alpha_lending::fulfill_promise`,
         typeArguments: [params.coinType],
         arguments: [
-          tx.object(constants.LENDING_PROTOCOL_ID),
+          tx.object(this.constants.LENDING_PROTOCOL_ID),
           promise,
-          tx.object(constants.SUI_CLOCK_OBJECT_ID),
+          tx.object(this.constants.SUI_CLOCK_OBJECT_ID),
         ],
       });
     }
@@ -325,11 +342,13 @@ export class AlphalendClient {
     const tx = new Transaction();
 
     // First update prices to ensure latest oracle values
-    // await this.updatePrices(tx, params.priceUpdateCoinTypes);
+    if (this.network === "mainnet") {
+      await this.updatePrices(tx, params.priceUpdateCoinTypes);
+    }
 
     // Get coin object
     // Add 1 to the amount to repay to avoid rounding errors since contract returns the remaining amount.
-    const isSui = params.coinType === constants.SUI_COIN_TYPE;
+    const isSui = params.coinType === this.constants.SUI_COIN_TYPE;
     let repayCoinA: TransactionObjectArgument | undefined;
     if (!isSui) {
       const coin = await this.getCoinObject(
@@ -354,14 +373,14 @@ export class AlphalendClient {
 
     // Build repay transaction
     const repayCoin = tx.moveCall({
-      target: `${constants.ALPHALEND_PACKAGE_ID}::alpha_lending::repay`,
+      target: `${this.constants.ALPHALEND_PACKAGE_ID}::alpha_lending::repay`,
       typeArguments: [params.coinType],
       arguments: [
-        tx.object(constants.LENDING_PROTOCOL_ID), // Protocol object
+        tx.object(this.constants.LENDING_PROTOCOL_ID), // Protocol object
         tx.object(params.positionCapId), // Position capability
         tx.pure.u64(params.marketId), // Market ID
         repayCoinA, // Coin to repay with
-        tx.object(constants.SUI_CLOCK_OBJECT_ID), // Clock object
+        tx.object(this.constants.SUI_CLOCK_OBJECT_ID), // Clock object
       ],
     });
     tx.transferObjects([repayCoin], params.address);
@@ -385,20 +404,23 @@ export class AlphalendClient {
     const tx = new Transaction();
 
     // First update prices to ensure latest oracle values
-    await this.updatePrices(tx, params.priceUpdateCoinTypes);
-    await this.setPrices(tx);
+    if (this.network === "mainnet") {
+      await this.updatePrices(tx, params.priceUpdateCoinTypes);
+    } else {
+      await setPrices(tx);
+    }
 
     const rewardInput = await getClaimRewardInput(this.client, params.address);
     for (const data of rewardInput) {
       for (const coinType of data.coinTypes) {
         let [coin1, promise] = tx.moveCall({
-          target: `${constants.ALPHALEND_PACKAGE_ID}::alpha_lending::collect_reward`,
+          target: `${this.constants.ALPHALEND_PACKAGE_ID}::alpha_lending::collect_reward`,
           typeArguments: [coinType],
           arguments: [
-            tx.object(constants.LENDING_PROTOCOL_ID),
+            tx.object(this.constants.LENDING_PROTOCOL_ID),
             tx.pure.u64(data.marketId),
             tx.object(params.positionCapId),
-            tx.object(constants.SUI_CLOCK_OBJECT_ID),
+            tx.object(this.constants.SUI_CLOCK_OBJECT_ID),
           ],
         });
 
@@ -434,20 +456,24 @@ export class AlphalendClient {
     const tx = params.tx || new Transaction();
 
     // First update prices to ensure latest oracle values
-    await this.updatePrices(tx, params.priceUpdateCoinTypes);
+    if (this.network === "mainnet") {
+      await this.updatePrices(tx, params.priceUpdateCoinTypes);
+    } else {
+      await setPrices(tx);
+    }
 
     // Build liquidate transaction
 
     const [promise, coin1] = tx.moveCall({
-      target: `${constants.ALPHALEND_PACKAGE_ID}::alpha_lending::liquidate`,
+      target: `${this.constants.ALPHALEND_PACKAGE_ID}::alpha_lending::liquidate`,
       typeArguments: [params.borrowCoinType, params.withdrawCoinType],
       arguments: [
-        tx.object(constants.LENDING_PROTOCOL_ID), // Protocol object
+        tx.object(this.constants.LENDING_PROTOCOL_ID), // Protocol object
         tx.pure.id(params.liquidatePositionId), // Position ID to liquidate
         tx.pure.u64(params.borrowMarketId), // Borrow market ID
         tx.pure.u64(params.withdrawMarketId), // Withdraw market ID
         params.repayCoin, // Coin to repay with
-        tx.object(constants.SUI_CLOCK_OBJECT_ID), // Clock object
+        tx.object(this.constants.SUI_CLOCK_OBJECT_ID), // Clock object
       ],
     });
     let coin2: TransactionObjectArgument | undefined;
@@ -465,9 +491,9 @@ export class AlphalendClient {
    */
   async createPosition(tx: Transaction): Promise<TransactionResult> {
     const positionCap = tx.moveCall({
-      target: `${constants.ALPHALEND_PACKAGE_ID}::alpha_lending::create_position`,
+      target: `${this.constants.ALPHALEND_PACKAGE_ID}::alpha_lending::create_position`,
       arguments: [
-        tx.object(constants.LENDING_PROTOCOL_ID), // Protocol object
+        tx.object(this.constants.LENDING_PROTOCOL_ID), // Protocol object
       ],
     });
 
@@ -586,52 +612,6 @@ export class AlphalendClient {
     return priceIdsToUpdate;
   }
 
-  private async setPrices(tx: Transaction) {
-    await setPrice(
-      tx,
-      "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin1::TESTCOIN1",
-      1,
-      1,
-      1,
-    );
-    await setPrice(
-      tx,
-      "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin2::TESTCOIN2",
-      1,
-      1,
-      1,
-    );
-    await setPrice(
-      tx,
-      "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin3::TESTCOIN3",
-      1,
-      1,
-      1,
-    );
-    await setPrice(
-      tx,
-      "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin4::TESTCOIN4",
-      1,
-      1,
-      1,
-    );
-    await setPrice(
-      tx,
-      "0xf357286b629e3fd7ab921faf9ab1344fdff30244a4ff0897181845546babb2e1::testcoin5::TESTCOIN5",
-      1,
-      1,
-      1,
-    );
-    await setPrice(
-      tx,
-      "0xf357286b629e3fd7ab921faf9ab1344fdff30244a4ff0897181845546babb2e1::testcoin6::TESTCOIN6",
-      1,
-      1,
-      1,
-    );
-    await setPrice(tx, "0x2::sui::SUI", 1, 1, 1);
-  }
-
   private async handlePromise(
     tx: Transaction,
     promise: any,
@@ -639,12 +619,12 @@ export class AlphalendClient {
   ): Promise<TransactionObjectArgument | undefined> {
     if (promise) {
       const coin = tx.moveCall({
-        target: `${constants.ALPHALEND_PACKAGE_ID}::alpha_lending::fulfill_promise`,
+        target: `${this.constants.ALPHALEND_PACKAGE_ID}::alpha_lending::fulfill_promise`,
         typeArguments: [coinType],
         arguments: [
-          tx.object(constants.LENDING_PROTOCOL_ID),
+          tx.object(this.constants.LENDING_PROTOCOL_ID),
           promise,
-          tx.object(constants.SUI_CLOCK_OBJECT_ID),
+          tx.object(this.constants.SUI_CLOCK_OBJECT_ID),
         ],
       });
       return coin;
