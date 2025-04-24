@@ -1,6 +1,6 @@
 import { SuiClient } from "@mysten/sui/client";
 import { Decimal } from "decimal.js";
-import { MarketConfigQueryType, MarketQueryType } from "../utils/queryTypes.js";
+import { MarketConfigQueryType, MarketQueryType, RewardDistributorQueryType } from "../utils/queryTypes.js";
 import { getConstants } from "../constants/index.js";
 import { Market } from "../core/types.js";
 
@@ -181,4 +181,148 @@ const calculateBorrowApr = (
     interestApr: new Decimal(rates[0]).div(10000),
     rewards: [], // Rewards would be added here if available
   };
+};
+
+const getTotalLiquidity = (market: MarketQueryType): bigint => {
+  const marketFields = market.content.fields.value.fields;
+  const total =
+    BigInt(marketFields.balance_holding) + BigInt(marketFields.borrowed_amount);
+  const deductions =
+    BigInt(marketFields.unclaimed_spread_fee) +
+    BigInt(marketFields.writeoff_amount) +
+    BigInt(marketFields.unclaimed_spread_fee_protocol);
+
+  if (total >= deductions) {
+    return total - deductions;
+  }
+  return 0n;
+};
+
+const getUtilizationRate = (market: MarketQueryType): Decimal => {
+  const marketFields = market.content.fields.value.fields;
+  const totalSupply = new Decimal(getTotalLiquidity(market).toString());
+  if (totalSupply.gt(0)) {
+    return new Decimal(marketFields.borrowed_amount).div(totalSupply);
+  }
+  return new Decimal(0);
+};
+
+const updateCompoundInterest = (market: MarketQueryType): void => {
+  const marketFields = market.content.fields.value.fields;
+  const currentTime = Date.now(); // Current time in milliseconds
+
+  if (marketFields.borrowed_amount !== "0") {
+    const timeDelta = Math.floor(
+      (currentTime - parseInt(marketFields.last_auto_compound)) / 1000,
+    );
+
+    if (timeDelta > 0) {
+      // Calculate utilization rate
+      const utilizationRate = getUtilizationRate(market);
+
+      // Calculate current interest rate
+      const marketConfig = marketFields.config.fields;
+      const borrowApr = calculateBorrowApr(utilizationRate, marketConfig);
+
+      // Calculate multiplier (1 + interest_rate_per_second)
+      const multiplier = new Decimal(1).add(
+        borrowApr.interestApr.div(31536000),
+      ); // 31536000 seconds in a year
+
+      // Calculate compounded multiplier using exponentiation
+      let result = BigInt(1e18);
+      let base = BigInt(multiplier.mul(1e18).toFixed(0));
+      let exponent = timeDelta;
+
+      while (exponent > 0) {
+        if (exponent % 2 === 1) {
+          result = (result * base) / BigInt(1e18);
+        }
+        base = (base * base) / BigInt(1e18);
+        exponent = Math.floor(exponent / 2);
+      }
+      const compoundedMultiplier = result;
+
+      // Calculate new borrowed amount using bigint to avoid overflow
+      let borrowed_u256 = BigInt(marketFields.borrowed_amount);
+      let new_borrowed = (borrowed_u256 * compoundedMultiplier) / BigInt(1e18);
+
+      // Update borrowed amount
+      marketFields.borrowed_amount =
+        new_borrowed.toString();
+      // Update compounded interest
+      marketFields.compounded_interest.fields.value = (
+        (BigInt(marketFields.compounded_interest.fields.value) *
+          compoundedMultiplier) /
+        BigInt(1e18)
+      ).toString();
+    }
+  }
+};
+
+const updateXTokenRatio = (market: MarketQueryType): void => {
+  const marketFields = market.content.fields.value.fields;
+  let newXTokenRatio = BigInt(1e18);
+  const totalLiquidity = getTotalLiquidity(market);
+  if (marketFields.xtoken_supply !== "0") {
+    const xTokenSupply = BigInt(marketFields.xtoken_supply);
+    newXTokenRatio = (totalLiquidity * BigInt(1e18)) / xTokenSupply;
+  }
+
+  const changedRatio =
+    newXTokenRatio - BigInt(marketFields.xtoken_ratio.fields.value);
+  const spreadFeeRatio =
+    (changedRatio * BigInt(marketFields.config.fields.spread_fee_bps)) /
+    BigInt(10000);
+  const addUnclaimedSpreadFee = totalLiquidity * spreadFeeRatio;
+  const protocolShare =
+    (addUnclaimedSpreadFee *
+      BigInt(marketFields.config.fields.protocol_spread_fee_share_bps)) /
+    BigInt(10000);
+
+  // Updates
+  marketFields.unclaimed_spread_fee_protocol = (
+    BigInt(marketFields.unclaimed_spread_fee_protocol) +
+    protocolShare / BigInt(1e18)
+  ).toString();
+
+  marketFields.unclaimed_spread_fee = (
+    BigInt(marketFields.unclaimed_spread_fee) +
+    (addUnclaimedSpreadFee - protocolShare) / BigInt(1e18)
+  ).toString();
+
+  marketFields.xtoken_ratio.fields.value = (
+    newXTokenRatio - spreadFeeRatio
+  ).toString();
+};
+
+const refreshDepositRewardDistributors = (rewardDistributor: RewardDistributorQueryType): void => {
+
+};
+
+const refreshBorrowRewardDistributors = (rewardDistributor: RewardDistributorQueryType): void => {
+
+};
+
+const refreshMarket = async (
+  market: MarketQueryType,
+): Promise<MarketQueryType> => {
+  const marketFields = market.content.fields.value.fields;
+
+  // 1. Compound interest
+  updateCompoundInterest(market);
+
+  // 2. Update xToken ratio
+  updateXTokenRatio(market);
+
+  // 4. Refresh reward distributors if they exist
+  if (marketFields.deposit_reward_distributor) {
+    refreshDepositRewardDistributors(marketFields.deposit_reward_distributor.fields);
+  }
+
+  if (marketFields.borrow_reward_distributor) {
+    refreshBorrowRewardDistributors(marketFields.borrow_reward_distributor.fields);
+  }
+
+  return market;
 };

@@ -81,7 +81,7 @@ export interface MarketQueryType {
   };
 }
 
-interface RewardDistributorQueryType {
+export interface RewardDistributorQueryType {
   id: {
     id: string;
   };
