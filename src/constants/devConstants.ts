@@ -4,35 +4,35 @@ export const devConstants = {
 
   // AlphaFi constants
   ALPHAFI_ORACLE_PACKAGE_ID:
-    "0xd487043371c7405c50c9c3a3130c6f866f313ad0538f16e72478ff2bd6bc8525",
+    "0x68a47d52922190b77f4ce816c0b95f7f70f3cdcb28b4a94c06f8022868c8e0b3",
 
   ALPHAFI_ORACLE_OBJECT_ID:
-    "0x355ed2a3110588dce4127e0c0548dbd2194e944fab73bdedcebe4d0a250a9e2a",
+    "0x861f999e74242e19d14ae9e4b63d3ed9d243f65103a3ab828553935e4aa2a076",
 
   ALPHAFI_ORACLE_ADMIN_CAP_ID:
-    "0x42c0b79773907f2348c8474de5fe334f691cec037f6162914e021d9949a92c0a",
+    "0xef2a27a5fbe7427b203db6a5d35909bed0a1f04028b19917940262c91cb1acc2",
 
   ALPHAFI_STDLIB_PACKAGE_ID:
-    "0xce9c2ecf1ff6768c2096516dd21bad3880bb71b88d330fb77e7cbd746a46a9ae",
+    "0x828bbbd018db947949ea75b0c1e53e66d5fada05a70f3e1fdb0683b18265def0",
 
   // AlphaLend constants
   ALPHALEND_PACKAGE_ID:
-    "0x27207f26b1fd8cf74d6c22255ad044e153dcaa82175ff74c99f94c690e4aa4f7", // Replace with actual package ID
+    "0x3158fcba720cd0982009e1c23b79715cf45fdd2797e66c0d3eace9ac41391ce1", // Replace with actual package ID
 
   LENDING_PROTOCOL_ID:
-    "0x995c0c8ca0b0dd676a855e6dd435e1fd9813305366baad3e8052bfa7f306f9a5", // Replace with actual protocol object ID
+    "0x2912352e71981b1add509c891b303d156152dcbdd3aedf255d4c92e625221c39", // Replace with actual protocol object ID
 
   LENDING_PROTOCOL_CAP_ID:
-    "0x1e8357fb9edd15dc6e83c4785318ba4cd8a1de3e4ef9ff543bd9f4e6a7be2879", // Replace with actual protocol cap ID
+    "0xe3fcf31ad5a3c444ab9c97dd6c8b038ca84f3afd3d80a42f4a17d0783e6435d8", // Replace with actual protocol cap ID
 
   POSITION_CAP_TYPE:
-    "0x06e65071782a787fee1a8d6833be20ee6104294be61e724e77f8faaadc4adb08::position::PositionCap", // Replace with actual position cap type
+    "0x3158fcba720cd0982009e1c23b79715cf45fdd2797e66c0d3eace9ac41391ce1::position::PositionCap", // Replace with actual position cap type
 
   POSITION_TABLE_ID:
-    "0xf0c5071d164de9d7e3c7cbeb692d2bcd3c59cbf67f870c9b35f88a049bba8f84", // Replace with actual position table ID
+    "0x4245829efc710180cfc0c41a7d7bc518271e45bbd58162a9682db24fc8403c50", // Replace with actual position table ID
 
   MARKETS_TABLE_ID:
-    "0xfb993d4f2e8ba871247f221b83db01aab72ae0c9778287c2577d76017dbe37bb",
+    "0x4659444499794cd964b3485c1f240110af0f608dbb21446f42b4bb57f0fcbf24",
 
   ACTIVE_MARKETS: [1, 3], // to-do: think of a way to store this outside sdk(db or seperate contract)
 
