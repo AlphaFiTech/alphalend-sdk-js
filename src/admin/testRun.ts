@@ -83,14 +83,6 @@ async function claimRewards() {
   const { suiClient, keypair } = getExecStuff();
   let tx: Transaction | undefined = new Transaction();
   // await addCoinToOracleCaller(tx);
-  // let alc = new AlphalendClient(suiClient);
-  // tx = await alc.claimRewards({
-  //   address:
-  //     "0xa511088cc13a632a5e8f9937028a77ae271832465e067360dd13f548fe934d1a",
-  //   positionCapId:
-  //     "0x5c455d275a6cd3d9bb5bf91f8a47bffc07574b5df0960093e016a33c6987de9c",
-  //   priceUpdateCoinTypes: [],
-  // });
   await setPrice(
     tx,
     "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin1::TESTCOIN1",
@@ -119,23 +111,16 @@ async function claimRewards() {
     1,
     1,
   );
+  let alc = new AlphalendClient(suiClient);
+  tx = await alc.claimRewards({
+    address:
+      "0xa511088cc13a632a5e8f9937028a77ae271832465e067360dd13f548fe934d1a",
+    positionCapId:
+      "0x8465d2416b01d3e76460912cd290e5dd9c4a36cfbe52f348cfe04e8ae769de4e",
+    priceUpdateCoinTypes: [],
+  });
   if (tx) {
-    // dryRunTransactionBlock(tx);
-    suiClient
-      .signAndExecuteTransaction({
-        signer: keypair,
-        transaction: tx,
-        requestType: "WaitForLocalExecution",
-        options: {
-          showEffects: true,
-        },
-      })
-      .then((res) => {
-        console.log(JSON.stringify(res, null, 2));
-      })
-      .catch((error) => {
-        console.error(error);
-      });
+    dryRunTransactionBlock(tx);
   }
 }
 // updatePricesCaller();
@@ -244,17 +229,17 @@ async function withdraw() {
   let alc = new AlphalendClient(suiClient);
   tx = await alc.withdraw({
     address:
-      "0x8948f801fa2325eedb4b0ad4eb0a55bfb318acc531f3a2f0cddd8daa9b4a8c94",
+      "0xa511088cc13a632a5e8f9937028a77ae271832465e067360dd13f548fe934d1a",
     positionCapId:
-      "0x04aef463126fea9cc518a37abc8ae8367f68c8eceeef31790b2da6be852d9d4b",
+      "0x8465d2416b01d3e76460912cd290e5dd9c4a36cfbe52f348cfe04e8ae769de4e",
     coinType:
-      "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin1::TESTCOIN1",
-    marketId: "1",
-    amount: new Decimal(100000000000),
+      "0x2::sui::SUI",
+    marketId: "6",
+    amount: new Decimal(1000000000),
     priceUpdateCoinTypes: [],
   });
   if (tx) {
     dryRunTransactionBlock(tx);
   }
 }
-// withdraw();
+withdraw();
