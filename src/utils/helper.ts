@@ -4,13 +4,14 @@ import { getConstants } from "../constants/index.js";
 import { PriceData } from "./queryTypes.js";
 import { pythPriceFeedIds } from "./priceFeedIds.js";
 import { getMarketFromChain } from "../models/market.js";
-import { getUserPosition } from "../models/position.js";
+import { getUserPosition } from "../models/position/functions.js";
 
 export async function getClaimRewardInput(
   suiClient: SuiClient,
+  network: string,
   userAddress: string,
 ): Promise<{ marketId: number; coinTypes: string[] }[]> {
-  const position = await getUserPosition(suiClient, userAddress);
+  const position = await getUserPosition(suiClient, network, userAddress);
 
   let rewardInput: {
     marketId: number;
@@ -41,7 +42,7 @@ export async function getClaimRewardInput(
   }
 
   for (const [marketId, { supply, borrow }] of marketActionMap) {
-    const market = await getMarketFromChain(suiClient, marketId);
+    const market = await getMarketFromChain(suiClient, network, marketId);
 
     let coinTypes = new Set<string>();
     if (supply) {

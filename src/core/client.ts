@@ -29,7 +29,7 @@ import {
 import { PythPriceInfo } from "../coin/types.js";
 import { getProtocolStats } from "../models/protocol.js";
 import { getAllMarkets } from "../models/market.js";
-import { getUserPortfolio } from "../models/position.js";
+import { getUserPortfolio } from "../models/position/posiiton.js";
 import {
   getClaimRewardInput,
   getEstimatedGasBudget,
@@ -410,7 +410,11 @@ export class AlphalendClient {
       await setPrices(tx);
     }
 
-    const rewardInput = await getClaimRewardInput(this.client, params.address);
+    const rewardInput = await getClaimRewardInput(
+      this.client,
+      this.network,
+      params.address,
+    );
     for (const data of rewardInput) {
       for (const coinType of data.coinTypes) {
         let [coin1, promise] = tx.moveCall({
@@ -509,7 +513,7 @@ export class AlphalendClient {
    */
   async getProtocolStats(): Promise<ProtocolStats | undefined> {
     try {
-      const stats = await getProtocolStats(this.client);
+      const stats = await getProtocolStats(this.client, this.network);
       return stats;
     } catch (error) {
       console.error("Error getting protocol stats:", error);
@@ -524,7 +528,7 @@ export class AlphalendClient {
    */
   async getAllMarkets(): Promise<Market[] | undefined> {
     try {
-      const markets = await getAllMarkets(this.client);
+      const markets = await getAllMarkets(this.client, this.network);
       return markets;
     } catch (error) {
       console.error("Error getting markets:", error);
@@ -540,7 +544,11 @@ export class AlphalendClient {
    */
   async getUserPortfolio(userAddress: string): Promise<Portfolio | undefined> {
     try {
-      const portfolio = await getUserPortfolio(this.client, userAddress);
+      const portfolio = await getUserPortfolio(
+        this.client,
+        this.network,
+        userAddress,
+      );
       return portfolio;
     } catch (error) {
       console.error("Error getting portfolio:", error);
