@@ -5,9 +5,10 @@ import { ProtocolStats } from "../core/types.js";
 
 export const getProtocolStats = async (
   suiClient: SuiClient,
+  network: string,
 ): Promise<ProtocolStats> => {
   try {
-    const markets = await getAllMarkets(suiClient);
+    const markets = await getAllMarkets(suiClient, network);
 
     let totalSuppliedUsd = 0;
     let totalBorrowedUsd = 0;

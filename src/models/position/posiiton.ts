@@ -1,24 +1,22 @@
 import { SuiClient } from "@mysten/sui/client";
 import { Decimal } from "decimal.js";
-import { getConstants } from "../constants/index.js";
 import {
   BorrowQueryType,
-  PositionCapQueryType,
   PositionQueryType,
   PriceData,
-} from "../utils/queryTypes.js";
-import { Market, Portfolio } from "../core/types.js";
-import { getAllMarkets } from "./market.js";
-
-const constants = getConstants("mainnet");
+} from "../../utils/queryTypes.js";
+import { Market, Portfolio } from "../../core/types.js";
+import { getAllMarkets } from "../market.js";
+import { getUserPosition } from "./functions.js";
 
 export const getUserPortfolio = async (
   suiClient: SuiClient,
+  network: string,
   userAddress: string,
 ): Promise<Portfolio | undefined> => {
   try {
-    const markets = await getAllMarkets(suiClient);
-    const position = await getUserPosition(suiClient, userAddress);
+    const markets = await getAllMarkets(suiClient, network);
+    const position = await getUserPosition(suiClient, network, userAddress);
     if (!position) {
       return {
         userAddress,
@@ -99,102 +97,6 @@ export const positionRefresh = async (
   const marketIds = new Set([...collateralMarketIds, ...loanMarketIds]);
 
   // for (const marketId of marketIds) {
-};
-
-// Function to check if an object is a PositionCap
-export const isPositionCapObject = (object: PositionCapQueryType): boolean => {
-  try {
-    if (object.content && object.content.type) {
-      return object.content.type === constants.POSITION_CAP_TYPE;
-    }
-    return false;
-  } catch (error) {
-    console.error("Error checking if object is PositionCap:", error);
-    return false;
-  }
-};
-
-// Function to fetch all owned objects and find the PositionCap
-export const getUserPositionCapId = async (
-  suiClient: SuiClient,
-  network: string,
-  userAddress: string,
-): Promise<string | undefined> => {
-  try {
-    const constants = getConstants(network);
-    // Fetch owned objects for the user
-    const response = await suiClient.getOwnedObjects({
-      owner: userAddress,
-      options: {
-        showContent: true, // Include object content to access fields
-      },
-      filter: {
-        StructType: constants.POSITION_CAP_TYPE,
-      },
-    });
-
-    if (!response || !response.data || response.data.length === 0) {
-      return undefined;
-    }
-    return response.data[0].data?.objectId;
-  } catch (error) {
-    console.error("Error fetching user positionCap ID:", error);
-  }
-};
-
-// Function to fetch all owned objects and find the PositionCap and return the positionId
-export const getUserPositionId = async (
-  suiClient: SuiClient,
-  userAddress: string,
-): Promise<string | undefined> => {
-  try {
-    // Fetch owned objects for the user
-    const response = await suiClient.getOwnedObjects({
-      owner: userAddress,
-      options: {
-        showContent: true, // Include object content to access fields
-      },
-      filter: {
-        StructType: constants.POSITION_CAP_TYPE,
-      },
-    });
-
-    if (!response || !response.data || response.data.length === 0) {
-      return undefined;
-    }
-
-    // Find the first PositionCap object and extract the positionCap ID
-    const positionCapObject = response.data.find((data) =>
-      isPositionCapObject(data.data as unknown as PositionCapQueryType),
-    );
-    if (positionCapObject) {
-      return (positionCapObject.data as unknown as PositionCapQueryType).content
-        .fields.position_id;
-    }
-  } catch (error) {
-    console.error("Error fetching user position ID:", error);
-  }
-};
-
-export const getUserPosition = async (
-  suiClient: SuiClient,
-  userAddress: string,
-): Promise<PositionQueryType | undefined> => {
-  const positionId = await getUserPositionId(suiClient, userAddress);
-  if (!positionId) {
-    console.error("No position ID found");
-    return undefined;
-  }
-
-  const response = await suiClient.getDynamicFieldObject({
-    parentId: constants.POSITION_TABLE_ID,
-    name: {
-      type: "0x2::object::ID",
-      value: positionId,
-    },
-  });
-
-  return response.data as unknown as PositionQueryType;
 };
 
 const createCollateralMap = (

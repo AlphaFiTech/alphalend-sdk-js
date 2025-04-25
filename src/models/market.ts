@@ -9,12 +9,12 @@ import { getConstants } from "../constants/index.js";
 import { Market } from "../core/types.js";
 import { getPricesFromPyth } from "../utils/helper.js";
 
-const constants = getConstants("mainnet");
-
 export const getMarketFromChain = async (
   suiClient: SuiClient,
+  network: string,
   marketId: number,
 ): Promise<MarketQueryType | undefined> => {
+  const constants = getConstants(network);
   const response = await suiClient.getDynamicFieldObject({
     parentId: constants.MARKETS_TABLE_ID,
     name: {
@@ -28,13 +28,15 @@ export const getMarketFromChain = async (
 
 const fetchAndRefreshMarket = async (
   suiClient: SuiClient,
+  network: string,
 ): Promise<MarketQueryType[]> => {
+  const constants = getConstants(network);
   const activeMarketIds = constants.ACTIVE_MARKETS;
 
   // Fetch and process each market from the active market IDs
   const markets: MarketQueryType[] = [];
   const responses = await Promise.all(
-    activeMarketIds.map((id) => getMarketFromChain(suiClient, id)),
+    activeMarketIds.map((id) => getMarketFromChain(suiClient, network, id)),
   );
 
   for (const marketObject of responses) {
@@ -64,12 +66,13 @@ const fetchAndRefreshMarket = async (
 };
 
 export const getAllMarkets = async (
-  suiClient: SuiClient,
+  suiClient: SuiClient, 
+  network: string,
 ): Promise<Market[]> => {
   try {
     // Fetch and process each market
     const markets: Market[] = [];
-    const responses = await fetchAndRefreshMarket(suiClient);
+    const responses = await fetchAndRefreshMarket(suiClient, network);
 
     for (const marketObject of responses) {
       const marketFields = marketObject.content.fields.value.fields;
