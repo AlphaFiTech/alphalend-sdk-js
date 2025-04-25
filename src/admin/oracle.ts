@@ -36,7 +36,9 @@ export async function addCoinToOracle(
   coinType: string,
   coinKind: number,
   circuitBreakerThresholdBPS: number,
+  network: string,
 ) {
+  const constants = getConstants(network);
   // getting coinType in move
   const coinTypeName = tx.moveCall({
     target: `0x1::type_name::get`,

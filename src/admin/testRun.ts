@@ -65,6 +65,7 @@ async function addCoinToOracleCaller(tx: Transaction) {
     "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin1::TESTCOIN1",
     1,
     1000,
+    "testnet",
   );
   await addCoinToOracle(
     tx,
@@ -72,6 +73,7 @@ async function addCoinToOracleCaller(tx: Transaction) {
     "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin2::TESTCOIN2",
     1,
     1000,
+    "testnet",
   );
   await addCoinToOracle(
     tx,
@@ -79,6 +81,7 @@ async function addCoinToOracleCaller(tx: Transaction) {
     "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin3::TESTCOIN3",
     1,
     1000,
+    "testnet",
   );
   await addCoinToOracle(
     tx,
@@ -86,6 +89,7 @@ async function addCoinToOracleCaller(tx: Transaction) {
     "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin4::TESTCOIN4",
     0,
     1000,
+    "testnet",
   );
   await addCoinToOracle(
     tx,
@@ -93,6 +97,7 @@ async function addCoinToOracleCaller(tx: Transaction) {
     "0xf357286b629e3fd7ab921faf9ab1344fdff30244a4ff0897181845546babb2e1::testcoin5::TESTCOIN5",
     0,
     1000,
+    "testnet",
   );
   await addCoinToOracle(
     tx,
@@ -100,8 +105,9 @@ async function addCoinToOracleCaller(tx: Transaction) {
     "0xf357286b629e3fd7ab921faf9ab1344fdff30244a4ff0897181845546babb2e1::testcoin6::TESTCOIN6",
     1,
     1000,
+    "testnet",
   );
-  await addCoinToOracle(tx, adminCapId, "0x2::sui::SUI", 1, 1000);
+  await addCoinToOracle(tx, adminCapId, "0x2::sui::SUI", 1, 1000, "testnet");
 
   return tx;
 }
