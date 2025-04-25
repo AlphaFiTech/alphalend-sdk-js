@@ -360,15 +360,10 @@ export class AlphalendClient {
         console.error("Coin object not found");
         return undefined;
       }
-
-      repayCoinA = tx.splitCoins(coin, [
-        params.amount.add(1).floor().toString(),
-      ]);
+      repayCoinA = tx.splitCoins(coin, [params.amount.floor().toString()]);
       tx.transferObjects([coin], params.address);
     } else {
-      repayCoinA = tx.splitCoins(tx.gas, [
-        params.amount.add(1).floor().toString(),
-      ]);
+      repayCoinA = tx.splitCoins(tx.gas, [params.amount.floor().toString()]);
     }
 
     // Build repay transaction
