@@ -1,7 +1,7 @@
 import { Transaction } from "@mysten/sui/transactions";
 import { SuiClient } from "@mysten/sui/client";
 import { getConstants } from "../constants/index.js";
-import { PriceData } from "./queryTypes.js";
+import { PriceData, RewardDistributorQueryType } from "./queryTypes.js";
 import { pythPriceFeedIds } from "./priceFeedIds.js";
 import { getMarketFromChain } from "../models/market.js";
 import { getUserPosition } from "../models/position/functions.js";
@@ -12,56 +12,59 @@ export async function getClaimRewardInput(
   userAddress: string,
 ): Promise<{ marketId: number; coinTypes: string[] }[]> {
   const position = await getUserPosition(suiClient, network, userAddress);
-
+  const positionFields = position!.content.fields.value.fields;
   let rewardInput: {
     marketId: number;
     coinTypes: string[];
   }[] = [];
 
-  let marketActionMap = new Map<number, { supply: boolean; borrow: boolean }>();
-  for (const collaterals of position!.content.fields.value.fields.collaterals
-    .fields.contents) {
-    marketActionMap.set(Number(collaterals.fields.key), {
-      supply: true,
-      borrow: false,
+  let marketActionMap: Map<number, string[]> = new Map();
+
+  for (const rewardDistributor of positionFields.reward_distributors) {
+    const marketId = Number(rewardDistributor.fields.market_id);
+    const coinTypes: Set<string> = new Set(marketActionMap.get(marketId) || []);
+    const lastUpdated = rewardDistributor.fields.last_updated;
+    const rewardDistributorObj = await getRewardDistributor(
+      suiClient,
+      network,
+      marketId,
+      rewardDistributor.fields.is_deposit,
+    );
+    if (!rewardDistributorObj) continue;
+
+    for (const reward of rewardDistributorObj.rewards) {
+      if (
+        reward &&
+        parseFloat(reward.fields.end_time) > parseFloat(lastUpdated)
+      ) {
+        coinTypes.add(reward.fields.coin_type.fields.name);
+      }
+    }
+    marketActionMap.set(marketId, [...coinTypes]);
+  }
+
+  for (const [marketId, coinTypes] of marketActionMap.entries()) {
+    rewardInput.push({
+      marketId,
+      coinTypes,
     });
   }
 
-  for (const loan of position!.content.fields.value.fields.loans) {
-    if (marketActionMap.has(Number(loan.fields.market_id))) {
-      marketActionMap.set(Number(loan.fields.market_id), {
-        supply: true,
-        borrow: true,
-      });
-    } else {
-      marketActionMap.set(Number(loan.fields.market_id), {
-        supply: false,
-        borrow: true,
-      });
-    }
-  }
-
-  for (const [marketId, { supply, borrow }] of marketActionMap) {
-    const market = await getMarketFromChain(suiClient, network, marketId);
-
-    let coinTypes = new Set<string>();
-    if (supply) {
-      for (const reward of market!.content.fields.value.fields
-        .deposit_reward_distributor.fields.rewards) {
-        coinTypes.add(String(reward?.fields.coin_type.fields.name));
-      }
-    }
-    if (borrow) {
-      for (const reward of market!.content.fields.value.fields
-        .borrow_reward_distributor.fields.rewards) {
-        coinTypes.add(String(reward?.fields.coin_type.fields.name));
-      }
-    }
-
-    rewardInput.push({ marketId: marketId, coinTypes: [...coinTypes] });
-  }
-
   return rewardInput;
+}
+
+async function getRewardDistributor(
+  suiClient: SuiClient,
+  network: string,
+  marketId: number,
+  isDepositRewardDistributor: boolean,
+): Promise<RewardDistributorQueryType | undefined> {
+  const market = await getMarketFromChain(suiClient, network, marketId);
+  if (!market) return undefined;
+
+  return isDepositRewardDistributor
+    ? market.content.fields.value.fields.deposit_reward_distributor.fields
+    : market.content.fields.value.fields.borrow_reward_distributor.fields;
 }
 
 export async function getEstimatedGasBudget(
