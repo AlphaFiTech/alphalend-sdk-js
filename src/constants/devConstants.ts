@@ -20,7 +20,7 @@ export const devConstants = {
     "0x3a5b20b8925a3e71a8fc11497c0ece0cd999a6d3b70b8aefc572db383206b960", // Replace with actual package ID
 
   LENDING_PROTOCOL_ID:
-    "0x3f4edc803168fb3512761982dcbfd3f44435437fdc72e09e94f619be7ea4bfe8", // Replace with actual protocol object ID
+    "0x7687dbadb05f85d698aaff53c51503bc4927243268e9cf244c0a4ee45af26b54", // Replace with actual protocol object ID
 
   LENDING_PROTOCOL_CAP_ID:
     "0x499e69292f3d48dac3d232a69492e7ed7637038b60c33166e6b438dbc5ef7bf8", // Replace with actual protocol cap ID
