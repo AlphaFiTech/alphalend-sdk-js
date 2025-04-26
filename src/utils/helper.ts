@@ -1,7 +1,7 @@
 import { Transaction } from "@mysten/sui/transactions";
-import { SuiClient } from "@mysten/sui/client";
-import { getConstants } from "../constants/index.js";
-import { PriceData, RewardDistributorQueryType } from "./queryTypes.js";
+import { PaginatedObjectsResponse, SuiClient } from "@mysten/sui/client";
+import { getAlphafiConstants, getConstants } from "../constants/index.js";
+import { PriceData, Receipt, RewardDistributorQueryType } from "./queryTypes.js";
 import { pythPriceFeedIds } from "./priceFeedIds.js";
 import { getMarketFromChain } from "../models/market.js";
 import { getUserPosition } from "../models/position/functions.js";
@@ -245,4 +245,46 @@ async function setPrice(
   });
 
   return tx;
+}
+
+export async function getAlphaReceipt(
+  suiClient: SuiClient,
+  address: string,
+): Promise<Receipt[]> {
+  const constants = getAlphafiConstants();
+  const nfts: Receipt[] = [];
+  if (constants.ALPHA_POOL_RECEIPT == "") {
+    return nfts;
+  }
+  let currentCursor: string | null | undefined = null;
+  while (true) {
+    const paginatedObjects: PaginatedObjectsResponse =
+      await suiClient.getOwnedObjects({
+        owner: address,
+        cursor: currentCursor,
+        filter: {
+          // StructType: `${first_package}::${module}::Receipt`,
+          StructType: constants.ALPHA_POOL_RECEIPT,
+        },
+        options: {
+          showContent: true,
+        },
+      });
+    // Traverse the current page data and push to coins array
+    paginatedObjects.data.forEach((obj) => {
+      const o = obj.data as Receipt;
+      if (o) {
+        if (constants.ALPHA_POOL_RECEIPT === o.content.fields.name) {
+          nfts.push(o);
+        }
+      }
+    });
+    // Check if there's a next page
+    if (paginatedObjects.hasNextPage && paginatedObjects.nextCursor) {
+      currentCursor = paginatedObjects.nextCursor;
+    } else {
+      break;
+    }
+  }
+  return nfts;
 }

@@ -3,7 +3,7 @@ import {
   SuiPriceServiceConnection,
   SuiPythClient,
 } from "@pythnetwork/pyth-sui-js";
-import { getConstants } from "../constants/index.js";
+import { getAlphafiConstants, getConstants } from "../constants/index.js";
 import {
   Transaction,
   TransactionObjectArgument,
@@ -31,10 +31,12 @@ import { getProtocolStats } from "../models/protocol.js";
 import { getAllMarkets } from "../models/market.js";
 import { getUserPortfolio } from "../models/position/posiiton.js";
 import {
+  getAlphaReceipt,
   getClaimRewardInput,
   getEstimatedGasBudget,
   setPrices,
 } from "../utils/helper.js";
+import { Receipt } from "../utils/queryTypes.js";
 
 /**
  * AlphaLend Client
@@ -412,43 +414,64 @@ export class AlphalendClient {
     );
     for (const data of rewardInput) {
       for (const coinType of data.coinTypes) {
-        let [coin1, promise] = tx.moveCall({
-          target: `${this.constants.ALPHALEND_PACKAGE_ID}::alpha_lending::collect_reward`,
-          typeArguments: [coinType],
-          arguments: [
-            tx.object(this.constants.LENDING_PROTOCOL_ID),
-            tx.pure.u64(data.marketId),
-            tx.object(params.positionCapId),
-            tx.object(this.constants.SUI_CLOCK_OBJECT_ID),
-          ],
-        });
-
-        if (params.claimAll) {
-          this.claimAndDepositTransaction(
-            tx,
-            coin1,
-            coinType,
-            data.marketId,
-            params.positionCapId,
-          );
+        let coin1: TransactionObjectArgument | undefined;
+        let promise: TransactionObjectArgument | undefined;
+        if (params.claimAll && !params.claimAlpha) {
+          [coin1, promise] = tx.moveCall({
+            target: `${this.constants.ALPHALEND_PACKAGE_ID}::alpha_lending::collect_reward`,
+            typeArguments: [coinType],
+            arguments: [
+              tx.object(this.constants.LENDING_PROTOCOL_ID),
+              tx.pure.u64(data.marketId),
+              tx.object(params.positionCapId),
+              tx.object(this.constants.SUI_CLOCK_OBJECT_ID),
+            ],
+          });
         } else {
-          tx.transferObjects([coin1], params.address);
+          [coin1, promise] = tx.moveCall({
+            target: `${this.constants.ALPHALEND_PACKAGE_ID}::alpha_lending::collect_reward`,
+            typeArguments: [coinType],
+            arguments: [
+              tx.object(this.constants.LENDING_PROTOCOL_ID),
+              tx.pure.u64(data.marketId),
+              tx.object(params.positionCapId),
+              tx.object(this.constants.SUI_CLOCK_OBJECT_ID),
+            ],
+          });
         }
 
         if (promise) {
           const coin2 = await this.handlePromise(tx, promise, coinType);
-          if (coin2) {
-            if (params.claimAll) {
-              this.claimAndDepositTransaction(
-                tx,
-                coin2,
-                coinType,
-                data.marketId,
-                params.positionCapId,
-              );
-            } else {
-              tx.transferObjects([coin2], params.address);
+          if (
+            params.claimAlpha &&
+            coinType === this.constants.ALPHA_COIN_TYPE
+          ) {
+            if (coin2 && coin1) {
+              const [coin] = tx.splitCoins(coin1, [0]);
+              tx.mergeCoins(coin, [coin1, coin2]);
+              this.depositAlphaTransaction(tx, coin, params.address);
+            } else if (coin2) {
+              this.depositAlphaTransaction(tx, coin2, params.address);
+            } else if (coin1) {
+              this.depositAlphaTransaction(tx, coin1, params.address);
             }
+          } else {
+            if (coin2 && coin1) {
+              tx.transferObjects([coin1, coin2], params.address);
+            } else if (coin2) {
+              tx.transferObjects([coin2], params.address);
+            } else if (coin1) {
+              tx.transferObjects([coin1], params.address);
+            }
+          }
+        } else if (coin1) {
+          if (
+            params.claimAlpha &&
+            coinType === this.constants.ALPHA_COIN_TYPE
+          ) {
+            this.depositAlphaTransaction(tx, coin1, params.address);
+          } else {
+            tx.transferObjects([coin1], params.address);
           }
         }
       }
@@ -654,23 +677,50 @@ export class AlphalendClient {
     return undefined;
   }
 
-  private async claimAndDepositTransaction(
+  private async depositAlphaTransaction(
     tx: Transaction,
-    supplyCoinA: any,
-    coinType: string,
-    marketId: number,
-    positionCapId: string,
+    supplyCoin: any,
+    address: string,
   ) {
-    tx.moveCall({
-      target: `${this.constants.ALPHALEND_PACKAGE_ID}::alpha_lending::add_collateral`,
-      typeArguments: [coinType],
-      arguments: [
-        tx.object(this.constants.LENDING_PROTOCOL_ID), // Protocol object
-        tx.object(positionCapId), // Position capability
-        tx.pure.u64(marketId), // Market ID
-        supplyCoinA, // Coin to supply as collateral
-        tx.object(this.constants.SUI_CLOCK_OBJECT_ID), // Clock object
-      ],
-    });
+    const constants = getAlphafiConstants();
+    const receipt: Receipt[] = await getAlphaReceipt(this.client, address);
+
+    if (receipt.length == 0) {
+      const [receipt] = tx.moveCall({
+        target: `0x1::option::none`,
+        typeArguments: [constants.ALPHA_POOL_RECEIPT],
+        arguments: [],
+      });
+      tx.moveCall({
+        target: `${constants.ALPHA_LATEST_PACKAGE_ID}::alphapool::user_deposit`,
+        typeArguments: [constants.ALPHA_COIN_TYPE],
+        arguments: [
+          tx.object(constants.VERSION),
+          receipt,
+          tx.object(constants.ALPHA_POOL),
+          tx.object(constants.ALPHA_DISTRIBUTOR),
+          supplyCoin,
+          tx.object(this.constants.SUI_CLOCK_OBJECT_ID),
+        ],
+      });
+    } else {
+      const [someReceipt] = tx.moveCall({
+        target: `0x1::option::some`,
+        typeArguments: [constants.ALPHA_POOL_RECEIPT],
+        arguments: [tx.object(receipt[0].objectId)],
+      });
+      tx.moveCall({
+        target: `${constants.ALPHA_LATEST_PACKAGE_ID}::alphapool::user_deposit`,
+        typeArguments: [constants.ALPHA_COIN_TYPE],
+        arguments: [
+          tx.object(constants.VERSION),
+          someReceipt,
+          tx.object(constants.ALPHA_POOL),
+          tx.object(constants.ALPHA_DISTRIBUTOR),
+          supplyCoin,
+          tx.object(this.constants.SUI_CLOCK_OBJECT_ID),
+        ],
+      });
+    }
   }
 }
