@@ -423,14 +423,33 @@ export class AlphalendClient {
           ],
         });
 
+        if (params.claimAndDeposit) {
+          this.claimAndDepositTransaction(
+            tx,
+            coin1,
+            coinType,
+            data.marketId,
+            params.positionCapId,
+          );
+        } else {
+          tx.transferObjects([coin1], params.address);
+        }
+
         if (promise) {
           const coin2 = await this.handlePromise(tx, promise, coinType);
           if (coin2) {
-            tx.transferObjects([coin1, coin2], params.address);
+            if (params.claimAndDeposit) {
+              this.claimAndDepositTransaction(
+                tx,
+                coin2,
+                coinType,
+                data.marketId,
+                params.positionCapId,
+              );
+            } else {
+              tx.transferObjects([coin2], params.address);
+            }
           }
-        } else {
-          // If no promise returned, just transfer coin1
-          tx.transferObjects([coin1], params.address);
         }
       }
     }
@@ -633,5 +652,25 @@ export class AlphalendClient {
       return coin;
     }
     return undefined;
+  }
+
+  private async claimAndDepositTransaction(
+    tx: Transaction,
+    supplyCoinA: any,
+    coinType: string,
+    marketId: number,
+    positionCapId: string,
+  ) {
+    tx.moveCall({
+      target: `${this.constants.ALPHALEND_PACKAGE_ID}::alpha_lending::add_collateral`,
+      typeArguments: [coinType],
+      arguments: [
+        tx.object(this.constants.LENDING_PROTOCOL_ID), // Protocol object
+        tx.object(positionCapId), // Position capability
+        tx.pure.u64(marketId), // Market ID
+        supplyCoinA, // Coin to supply as collateral
+        tx.object(this.constants.SUI_CLOCK_OBJECT_ID), // Clock object
+      ],
+    });
   }
 }

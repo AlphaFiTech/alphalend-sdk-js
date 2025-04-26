@@ -17,7 +17,7 @@ export const devConstants = {
 
   // AlphaLend constants
   ALPHALEND_PACKAGE_ID:
-    "0x59587f8e9685b40fb8056e7c37a343ac929eac66da7f6483cdbc7be8545ff893", // Replace with actual package ID
+    "0x968722c6a83d6df12458e3f3eec2480a9962df0af8f7d8b55f04318b0c7eacc6", // Replace with actual package ID
 
   LENDING_PROTOCOL_ID:
     "0x3f4edc803168fb3512761982dcbfd3f44435437fdc72e09e94f619be7ea4bfe8", // Replace with actual protocol object ID

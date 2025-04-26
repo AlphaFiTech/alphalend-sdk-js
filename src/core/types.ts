@@ -113,6 +113,8 @@ export interface ClaimRewardsParams {
   positionCapId: string;
   /** Address of the user supplying collateral */
   address: string;
+  /** Whether to claim and deposit rewards */
+  claimAndDeposit: boolean;
   /** Coin types of the coins whose price needs to be updated
    * (Will have to pass all market coin types that user has supplied or borrowed in and current market coin type in which user is claiming rewards) */
   priceUpdateCoinTypes: string[];
