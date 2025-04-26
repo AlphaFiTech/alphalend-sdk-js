@@ -135,6 +135,8 @@ async function claimRewards() {
     positionCapId:
       "0x8465d2416b01d3e76460912cd290e5dd9c4a36cfbe52f348cfe04e8ae769de4e",
     priceUpdateCoinTypes: [],
+    claimAll: false,
+    claimAlpha: false,
   });
   if (tx) {
     dryRunTransactionBlock(tx);
