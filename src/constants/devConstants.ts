@@ -23,16 +23,16 @@ export const devConstants = {
     "0x7687dbadb05f85d698aaff53c51503bc4927243268e9cf244c0a4ee45af26b54", // Replace with actual protocol object ID
 
   LENDING_PROTOCOL_CAP_ID:
-    "0x499e69292f3d48dac3d232a69492e7ed7637038b60c33166e6b438dbc5ef7bf8", // Replace with actual protocol cap ID
+    "0xcef4b7846621a528a3e81d058c82987c48b7c53313a69648e7230942841667d2", // Replace with actual protocol cap ID
 
   POSITION_CAP_TYPE:
-    "0xc38cff778ec27081dd2c59276e493b481e8f882450124b614bef06b19cf59fa7::position::PositionCap", // Replace with actual position cap type
+    "0x3a5b20b8925a3e71a8fc11497c0ece0cd999a6d3b70b8aefc572db383206b960::position::PositionCap", // Replace with actual position cap type
 
   POSITION_TABLE_ID:
-    "0xe63c3cd7f89ccd9aaef33c473e67475b6964ff0ea4b57ffe952408bee9d589a1", // Replace with actual position table ID
+    "0xe5f512e065720d4f6c29a4e11a57c698386374619677221ec544c428d5b291ff", // Replace with actual position table ID
 
   MARKETS_TABLE_ID:
-    "0x4e85a7deaad8bd35ec74e35129e94cdfbed640b5dee07b8c63c4df7b7bb6d6cd",
+    "0x22917aba168825b58f1a75d13c6423b54a2a64bde2b706688ee13d4ecb288d85",
 
   ACTIVE_MARKETS: [1, 3], // to-do: think of a way to store this outside sdk(db or seperate contract)
 
