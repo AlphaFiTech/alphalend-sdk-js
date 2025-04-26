@@ -165,8 +165,8 @@ export async function setPrices(tx: Transaction) {
   await setPrice(
     tx,
     "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin3::TESTCOIN3",
-    1,
-    1,
+    90000,
+    90000,
     1,
   );
   await setPrice(
@@ -190,7 +190,7 @@ export async function setPrices(tx: Transaction) {
     1,
     1,
   );
-  await setPrice(tx, "0x2::sui::SUI", 1, 1, 1);
+  await setPrice(tx, "0x2::sui::SUI", 3.5, 3.5, 1);
 }
 
 async function setPrice(
