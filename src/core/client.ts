@@ -423,7 +423,7 @@ export class AlphalendClient {
           ],
         });
 
-        if (params.claimAndDeposit) {
+        if (params.claimAll) {
           this.claimAndDepositTransaction(
             tx,
             coin1,
@@ -438,7 +438,7 @@ export class AlphalendClient {
         if (promise) {
           const coin2 = await this.handlePromise(tx, promise, coinType);
           if (coin2) {
-            if (params.claimAndDeposit) {
+            if (params.claimAll) {
               this.claimAndDepositTransaction(
                 tx,
                 coin2,
