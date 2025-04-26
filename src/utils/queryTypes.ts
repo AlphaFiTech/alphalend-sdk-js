@@ -92,7 +92,7 @@ export interface RewardDistributorQueryType {
 }
 
 interface RewardQueryType {
-  type:string;
+  type: string;
   fields: {
     id: {
       id: string;
@@ -298,5 +298,70 @@ export interface PriceData {
     conf: string;
     expo: number;
     publish_time: number;
+  };
+}
+
+export interface Receipt {
+  objectId: string;
+  version: string;
+  digest: string;
+  content: {
+    dataType: string;
+    type: string;
+    hasPublicTransfer: boolean;
+    fields: {
+      id: { id: string };
+      image_url: string;
+      last_acc_reward_per_xtoken: {
+        type: string;
+        fields: {
+          contents: {
+            type: string;
+            fields: {
+              value: string;
+              key: {
+                type: string;
+                fields: {
+                  name: string;
+                };
+              };
+            };
+          }[];
+        };
+      };
+      locked_balance:
+        | {
+            type: string;
+            fields: {
+              head: string;
+              id: { id: string };
+              size: string;
+              tail: string;
+            };
+          }
+        | undefined;
+      name: string;
+      owner: string;
+      pending_rewards: {
+        type: string;
+        fields: {
+          contents: {
+            fields: {
+              key: {
+                type: string;
+                fields: {
+                  name: string;
+                };
+              };
+              value: string;
+            };
+            type: string;
+          }[];
+        };
+      };
+      pool_id: string;
+      xTokenBalance: string;
+      unlocked_xtokens: string | undefined;
+    };
   };
 }
