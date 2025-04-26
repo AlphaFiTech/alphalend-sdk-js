@@ -190,7 +190,7 @@ export async function setPrices(tx: Transaction) {
     1,
     1,
   );
-  await setPrice(tx, "0x2::sui::SUI", 3.5, 3.5, 1);
+  await setPrice(tx, "0x2::sui::SUI", 4, 4, 1);
 }
 
 async function setPrice(
