@@ -37,6 +37,7 @@ import {
   setPrices,
 } from "../utils/helper.js";
 import { Receipt } from "../utils/queryTypes.js";
+import { Constants } from "../constants/types.js";
 
 /**
  * AlphaLend Client
@@ -54,7 +55,7 @@ export class AlphalendClient {
   pythClient: SuiPythClient;
   pythConnection: SuiPriceServiceConnection;
   network: string;
-  constants: any;
+  constants: Constants;
 
   constructor(network: string, client: SuiClient) {
     this.network = network;
@@ -181,7 +182,7 @@ export class AlphalendClient {
     if (params.positionCapId) {
       // Build add_collateral transaction
       tx.moveCall({
-        target: `${this.constants.ALPHALEND_PACKAGE_ID}::alpha_lending::add_collateral`,
+        target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::add_collateral`,
         typeArguments: [params.coinType],
         arguments: [
           tx.object(this.constants.LENDING_PROTOCOL_ID), // Protocol object
@@ -195,7 +196,7 @@ export class AlphalendClient {
       const positionCap = await this.createPosition(tx);
       // Build add_collateral transaction
       tx.moveCall({
-        target: `${this.constants.ALPHALEND_PACKAGE_ID}::alpha_lending::add_collateral`,
+        target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::add_collateral`,
         typeArguments: [params.coinType],
         arguments: [
           tx.object(this.constants.LENDING_PROTOCOL_ID), // Protocol object
@@ -234,7 +235,7 @@ export class AlphalendClient {
     }
 
     const promise = tx.moveCall({
-      target: `${this.constants.ALPHALEND_PACKAGE_ID}::alpha_lending::remove_collateral`,
+      target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::remove_collateral`,
       typeArguments: [params.coinType],
       arguments: [
         tx.object(this.constants.LENDING_PROTOCOL_ID), // Protocol object
@@ -248,7 +249,7 @@ export class AlphalendClient {
     let coin: string | TransactionObjectArgument | undefined;
     if (isSui) {
       coin = tx.moveCall({
-        target: `${this.constants.ALPHALEND_PACKAGE_ID}::alpha_lending::fulfill_promise_SUI`,
+        target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::fulfill_promise_SUI`,
         arguments: [
           tx.object(this.constants.LENDING_PROTOCOL_ID),
           promise,
@@ -289,7 +290,7 @@ export class AlphalendClient {
     }
 
     const promise = tx.moveCall({
-      target: `${this.constants.ALPHALEND_PACKAGE_ID}::alpha_lending::borrow`,
+      target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::borrow`,
       typeArguments: [params.coinType],
       arguments: [
         tx.object(this.constants.LENDING_PROTOCOL_ID), // Protocol object
@@ -303,7 +304,7 @@ export class AlphalendClient {
     let coin;
     if (isSui) {
       coin = tx.moveCall({
-        target: `${this.constants.ALPHALEND_PACKAGE_ID}::alpha_lending::fulfill_promise_SUI`,
+        target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::fulfill_promise_SUI`,
         arguments: [
           tx.object(this.constants.LENDING_PROTOCOL_ID),
           promise,
@@ -313,7 +314,7 @@ export class AlphalendClient {
       });
     } else {
       coin = tx.moveCall({
-        target: `${this.constants.ALPHALEND_PACKAGE_ID}::alpha_lending::fulfill_promise`,
+        target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::fulfill_promise`,
         typeArguments: [params.coinType],
         arguments: [
           tx.object(this.constants.LENDING_PROTOCOL_ID),
@@ -370,7 +371,7 @@ export class AlphalendClient {
 
     // Build repay transaction
     const repayCoin = tx.moveCall({
-      target: `${this.constants.ALPHALEND_PACKAGE_ID}::alpha_lending::repay`,
+      target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::repay`,
       typeArguments: [params.coinType],
       arguments: [
         tx.object(this.constants.LENDING_PROTOCOL_ID), // Protocol object
@@ -418,7 +419,7 @@ export class AlphalendClient {
         let promise: TransactionObjectArgument | undefined;
         if (params.claimAll && !params.claimAlpha) {
           [coin1, promise] = tx.moveCall({
-            target: `${this.constants.ALPHALEND_PACKAGE_ID}::alpha_lending::collect_reward_and_deposit`,
+            target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::collect_reward_and_deposit`,
             typeArguments: [coinType],
             arguments: [
               tx.object(this.constants.LENDING_PROTOCOL_ID),
@@ -429,7 +430,7 @@ export class AlphalendClient {
           });
         } else {
           [coin1, promise] = tx.moveCall({
-            target: `${this.constants.ALPHALEND_PACKAGE_ID}::alpha_lending::collect_reward`,
+            target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::collect_reward`,
             typeArguments: [coinType],
             arguments: [
               tx.object(this.constants.LENDING_PROTOCOL_ID),
@@ -506,7 +507,7 @@ export class AlphalendClient {
     // Build liquidate transaction
 
     const [promise, coin1] = tx.moveCall({
-      target: `${this.constants.ALPHALEND_PACKAGE_ID}::alpha_lending::liquidate`,
+      target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::liquidate`,
       typeArguments: [params.borrowCoinType, params.withdrawCoinType],
       arguments: [
         tx.object(this.constants.LENDING_PROTOCOL_ID), // Protocol object
@@ -532,7 +533,7 @@ export class AlphalendClient {
    */
   async createPosition(tx: Transaction): Promise<TransactionResult> {
     const positionCap = tx.moveCall({
-      target: `${this.constants.ALPHALEND_PACKAGE_ID}::alpha_lending::create_position`,
+      target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::create_position`,
       arguments: [
         tx.object(this.constants.LENDING_PROTOCOL_ID), // Protocol object
       ],
@@ -664,7 +665,7 @@ export class AlphalendClient {
   ): Promise<TransactionObjectArgument | undefined> {
     if (promise) {
       const coin = tx.moveCall({
-        target: `${this.constants.ALPHALEND_PACKAGE_ID}::alpha_lending::fulfill_promise`,
+        target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::fulfill_promise`,
         typeArguments: [coinType],
         arguments: [
           tx.object(this.constants.LENDING_PROTOCOL_ID),

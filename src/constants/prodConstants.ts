@@ -1,5 +1,8 @@
-export const prodConstants = {
+import { Constants } from "./types.js";
+
+export const prodConstants: Constants = {
   SUI_CLOCK_OBJECT_ID: "0x6",
+
   SUI_SYSTEM_STATE_ID: "0x5",
 
   // AlphaFi constants
@@ -82,4 +85,7 @@ export const prodConstants = {
 
   STSUI_COIN_TYPE:
     "0xd1b72982e40348d069bb1ff701e634c117bb5f741f44dff91e472d3b01461e55::stsui::STSUI",
+
+  ALPHA_COIN_TYPE:
+    "0xfe3afec26c59e874f3c1d60b8203cb3852d2bb2aa415df9548b8d688e6683f93::alpha::ALPHA",
 };

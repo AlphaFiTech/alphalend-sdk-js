@@ -1,4 +1,6 @@
-export const devConstants = {
+import { Constants } from "./types.js";
+
+export const devConstants: Constants = {
   SUI_CLOCK_OBJECT_ID: "0x6",
   SUI_SYSTEM_STATE_ID: "0x5",
 
@@ -82,4 +84,6 @@ export const devConstants = {
 
   STSUI_COIN_TYPE:
     "0xd1b72982e40348d069bb1ff701e634c117bb5f741f44dff91e472d3b01461e55::stsui::STSUI",
+
+  ALPHA_COIN_TYPE: "",
 };
