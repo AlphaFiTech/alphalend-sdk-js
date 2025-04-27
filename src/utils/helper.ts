@@ -202,15 +202,15 @@ async function setPrice(
 ) {
   const constants = getConstants("testnet");
   const priceNumnber = tx.moveCall({
-    target: `${constants.ALPHAFI_STDLIB_PACKAGE_ID}::math::from`,
+    target: `${constants.ALPHAFI_LATEST_STDLIB_PACKAGE_ID}::math::from`,
     arguments: [tx.pure.u64(price)],
   });
   const emaPriceNumnber = tx.moveCall({
-    target: `${constants.ALPHAFI_STDLIB_PACKAGE_ID}::math::from`,
+    target: `${constants.ALPHAFI_LATEST_STDLIB_PACKAGE_ID}::math::from`,
     arguments: [tx.pure.u64(ema)],
   });
   const confNumnber = tx.moveCall({
-    target: `${constants.ALPHAFI_STDLIB_PACKAGE_ID}::math::from`,
+    target: `${constants.ALPHAFI_LATEST_STDLIB_PACKAGE_ID}::math::from`,
     arguments: [tx.pure.u64(conf)],
   });
   const coinTypeName = tx.moveCall({
@@ -218,7 +218,7 @@ async function setPrice(
     typeArguments: [coinType],
   });
   tx.moveCall({
-    target: `${constants.ALPHAFI_ORACLE_PACKAGE_ID}::oracle::set_price_remove_for_mainnet`,
+    target: `${constants.ALPHAFI_LATEST_ORACLE_PACKAGE_ID}::oracle::set_price_remove_for_mainnet`,
     arguments: [
       tx.object(constants.ALPHAFI_ORACLE_OBJECT_ID),
       coinTypeName,
@@ -235,12 +235,12 @@ async function setPrice(
   });
 
   const oraclePriceInfo = tx.moveCall({
-    target: `${constants.ALPHAFI_ORACLE_PACKAGE_ID}::oracle::get_price_info`,
+    target: `${constants.ALPHAFI_LATEST_ORACLE_PACKAGE_ID}::oracle::get_price_info`,
     arguments: [tx.object(constants.ALPHAFI_ORACLE_OBJECT_ID), coinTypeName1],
   });
 
   tx.moveCall({
-    target: `${constants.ALPHALEND_PACKAGE_ID}::alpha_lending::update_price`,
+    target: `${constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::update_price`,
     arguments: [tx.object(constants.LENDING_PROTOCOL_ID), oraclePriceInfo],
   });
 
