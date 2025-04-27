@@ -3,31 +3,47 @@ export const prodConstants = {
   SUI_SYSTEM_STATE_ID: "0x5",
 
   // AlphaFi constants
-  ALPHAFI_ORACLE_PACKAGE_ID:
-    "0xfa586dca0c394eb1b1a963c9dcd6a834a7b7cad05eae9ccf0f4f0de6fa13590a",
+  ALPHAFI_FIRST_ORACLE_PACKAGE_ID:
+    "0x378b2a104e8bcd7ed0317f5e6a0ec4fd271d4d12e2fe6c99bcd1f12be725cf4f",
+
+  ALPHAFI_LATEST_ORACLE_PACKAGE_ID:
+    "0x378b2a104e8bcd7ed0317f5e6a0ec4fd271d4d12e2fe6c99bcd1f12be725cf4f",
 
   ALPHAFI_ORACLE_OBJECT_ID:
-    "0x880656d2ea985abc7c9db203595d203cdfb1c511bba44302ea1465ff744b5ebb",
+    "0xce4ca140eb264bdc5b03f3268eeb013495f04561e38473aadcf654fb0db6b096",
 
   ALPHAFI_ORACLE_ADMIN_CAP_ID:
-    "0x16567b0eb680c5b3d3e1b707702880c230d313dc97e6a768d957c65c754602c8",
+    "0xefa050ffa6a2f5521c37d176a3502c6a026f9b6d27ad2fe54ed329ee5679a283",
 
-  ALPHAFI_STDLIB_PACKAGE_ID: "",
+  ALPHAFI_FIRST_STDLIB_PACKAGE_ID:
+    "0x4b591bbc246c9fadd28e7ac895e0778fb0e102f1b0d9f441e78d35f0d1ea1fcc",
+
+  ALPHAFI_LATEST_STDLIB_PACKAGE_ID:
+    "0x4b591bbc246c9fadd28e7ac895e0778fb0e102f1b0d9f441e78d35f0d1ea1fcc",
 
   // AlphaLend constants
-  ALPHALEND_PACKAGE_ID: "", // Replace with actual package ID
+  ALPHALEND_FIRST_PACKAGE_ID:
+    "0xd631cd66138909636fc3f73ed75820d0c5b76332d1644608ed1c85ea2b8219b4",
 
-  LENDING_PROTOCOL_ID: "", // Replace with actual protocol object ID
+  ALPHALEND_LATEST_PACKAGE_ID:
+    "0xd631cd66138909636fc3f73ed75820d0c5b76332d1644608ed1c85ea2b8219b4",
 
-  LENDING_PROTOCOL_CAP_ID: "", // Replace with actual protocol cap ID
+  LENDING_PROTOCOL_ID:
+    "0x01d9cf05d65fa3a9bb7163095139120e3c4e414dfbab153a49779a7d14010b93",
 
-  POSITION_CAP_TYPE: "", // Replace with actual position cap type
+  LENDING_PROTOCOL_CAP_ID:
+    "0x3aa48bc9692e326c6430199db986c353fd2c64f74d789dd378f237b6e9f91c5c",
 
-  POSITION_TABLE_ID: "", // Replace with actual position table ID
+  POSITION_CAP_TYPE:
+    "0xd631cd66138909636fc3f73ed75820d0c5b76332d1644608ed1c85ea2b8219b4::position::PositionCap",
+
+  POSITION_TABLE_ID:
+    "0x9923cec7b613e58cc3feec1e8651096ad7970c0b4ef28b805c7d97fe58ff91ba",
+
+  MARKETS_TABLE_ID:
+    "0x2326d387ba8bb7d24aa4cfa31f9a1e58bf9234b097574afb06c5dfb267df4c2e",
 
   ACTIVE_MARKETS: [1, 3], // to-do: think of a way to store this outside sdk(db or seperate contract)
-
-  MARKETS_TABLE_ID: "",
 
   // Pyth Constants
   PYTH_PACKAGE_ID:
