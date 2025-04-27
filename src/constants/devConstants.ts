@@ -17,22 +17,22 @@ export const devConstants = {
 
   // AlphaLend constants
   ALPHALEND_PACKAGE_ID:
-    "0xeee2dcfef8b5cb76b344065926c3c83588e081251b58fe9880b5a5cb4af6465b", // Replace with actual package ID
+    "0xf4d973212e8c03488e30837d75ae9374feead9b8d0c168f587b4f8e2f4c2641a", // Replace with actual package ID
 
   LENDING_PROTOCOL_ID:
-    "0x7687dbadb05f85d698aaff53c51503bc4927243268e9cf244c0a4ee45af26b54", // Replace with actual protocol object ID
+    "0x8577bb7f4450e0d342f870b74e3a94922c991a344ad2c539985bdd94a7dca130", // Replace with actual protocol object ID
 
   LENDING_PROTOCOL_CAP_ID:
-    "0xcef4b7846621a528a3e81d058c82987c48b7c53313a69648e7230942841667d2", // Replace with actual protocol cap ID
+    "0xcc3b0e3a8842b8a68c0c55467da0f420a73dc968e6a8849e2e355cc8f14be546", // Replace with actual protocol cap ID
 
   POSITION_CAP_TYPE:
-    "0x3a5b20b8925a3e71a8fc11497c0ece0cd999a6d3b70b8aefc572db383206b960::position::PositionCap", // Replace with actual position cap type
+    "0xf4d973212e8c03488e30837d75ae9374feead9b8d0c168f587b4f8e2f4c2641a::position::PositionCap", // Replace with actual position cap type
 
   POSITION_TABLE_ID:
-    "0xe5f512e065720d4f6c29a4e11a57c698386374619677221ec544c428d5b291ff", // Replace with actual position table ID
+    "0x3c2014a7428874a8d9b25fd54550d8926f5fcb71fe5a206b7a0ec970b4130264", // Replace with actual position table ID
 
   MARKETS_TABLE_ID:
-    "0x22917aba168825b58f1a75d13c6423b54a2a64bde2b706688ee13d4ecb288d85",
+    "0x4002bda4327e50715a4b1a2e9789156b31f4f30db33dcf3cb627b3a674366f0d",
 
   ACTIVE_MARKETS: [1, 3], // to-do: think of a way to store this outside sdk(db or seperate contract)
 
