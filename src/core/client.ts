@@ -418,7 +418,7 @@ export class AlphalendClient {
         let promise: TransactionObjectArgument | undefined;
         if (params.claimAll && !params.claimAlpha) {
           [coin1, promise] = tx.moveCall({
-            target: `${this.constants.ALPHALEND_PACKAGE_ID}::alpha_lending::collect_reward`,
+            target: `${this.constants.ALPHALEND_PACKAGE_ID}::alpha_lending::collect_reward_and_deposit`,
             typeArguments: [coinType],
             arguments: [
               tx.object(this.constants.LENDING_PROTOCOL_ID),
