@@ -29,11 +29,4 @@ export const pythPriceFeedIds: { [key: string]: HexString } = {
     "eaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a",
   "0x356a26eb9e012a68958082340d4c4116e7f55615cf27affcff209cf0ae544f59::wal::WAL":
     "eba0732395fae9dec4bae12e52760b35fc1c5671e2da8b449c9af4efe5d54341",
-
-  // Testnet price feed IDs (commented out)
-  // SUI: "50c67b3fd225db8912a424dd4baed60ffdde625ed2feaaf283724f9608fea266",
-  // STSUI: "0c723d5e6759de43502f5a10a51bce0858f25ab299147bb7d4fdceaf414cadca",
-  // USDC: "41f3625971ca2ed2263e78573fe5ce23e13d2558ed3f2e47ab0f84fb9e7ae722",
-  // BTC: "f9c0172ba10dfa4d19088d94f5bf61d3b54d5bd7483a322a982e1373ee8ea31b",
-  // CETUS: "cb324dafd531712dd31c39969ae0246ee4c6ae167257bcf8ac27e28ca35e6a0c",
 };

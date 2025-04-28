@@ -25,6 +25,8 @@ export interface Constants {
 
   LENDING_PROTOCOL_CAP_ID: string;
 
+  LENDING_PROTOCOL_ADMIN_CAP_ID: string;
+
   POSITION_CAP_TYPE: string;
 
   POSITION_TABLE_ID: string;

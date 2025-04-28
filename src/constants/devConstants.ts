@@ -36,6 +36,9 @@ export const devConstants: Constants = {
   LENDING_PROTOCOL_CAP_ID:
     "0xcc3b0e3a8842b8a68c0c55467da0f420a73dc968e6a8849e2e355cc8f14be546",
 
+  LENDING_PROTOCOL_ADMIN_CAP_ID:
+    "0x832ffa50b2da750828a40a3df04bd130a39442dd33626ded20f79d3fca9c9fd6",
+
   POSITION_CAP_TYPE:
     "0xf4d973212e8c03488e30837d75ae9374feead9b8d0c168f587b4f8e2f4c2641a::position::PositionCap",
 
