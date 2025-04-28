@@ -15,6 +15,8 @@ import { setPrices } from "../utils/helper.js";
 import path from "path";
 import { homedir } from "os";
 import { execSync } from "child_process";
+import { SuiPriceServiceConnection } from "@pythnetwork/pyth-sui-js";
+import { SuiPythClient } from "@pythnetwork/pyth-sui-js";
 
 dotenv.config();
 
@@ -189,10 +191,17 @@ async function borrow() {
 }
 
 export async function executeTransactionBlock() {
-  const { keypair, suiClient } = getExecStuff();
-  const tx = new Transaction();
-  const alphalendClient = new AlphalendClient("testnet", suiClient);
-  await alphalendClient.updatePrices(tx, ["0x2::sui::SUI"]);
+  const { keypair, suiClient, address } = getExecStuff();
+  const alphalendClient = new AlphalendClient("mainnet", suiClient);
+  const tx = await alphalendClient.withdraw({
+    address,
+    positionCapId:
+      "0xf9ca35f404dd3c1ea10c381dd3e1fe8a0c4586adf5e186f4eb52307462a5af7d",
+    coinType: "0x2::sui::SUI",
+    marketId: "1",
+    amount: new Decimal(100_000_000),
+    priceUpdateCoinTypes: ["0x2::sui::SUI"],
+  });
   await suiClient
     .signAndExecuteTransaction({
       signer: keypair,
@@ -216,24 +225,32 @@ export async function executeTransactionBlock() {
 async function setPriceCaller() {
   const tx = new Transaction();
   const { suiClient } = getExecStuff();
-  // await updatePythIdentifierForCoin(
-  //   tx,
-  //   "0xd1b72982e40348d069bb1ff701e634c117bb5f741f44dff91e472d3b01461e55::stsui::STSUI",
-  //   suiClient,
-  //   "mainnet",
-  // );
-
-  updatePythIdentifierForCoin(
-    tx,
-    "0xd1b72982e40348d069bb1ff701e634c117bb5f741f44dff91e472d3b01461e55::stsui::STSUI",
+  const constants = getConstants("mainnet");
+  // await updatePythIdentifierForCoin(tx, "0x2::sui::SUI", suiClient, "mainnet");
+  const pythClient = new SuiPythClient(
     suiClient,
-    "mainnet"
+    constants.PYTH_STATE_ID,
+    constants.WORMHOLE_STATE_ID,
   );
-
-  if (tx) {
-    dryRunTransactionBlock(tx);
-    // executeTransactionBlock(tx);
-  }
+  const pythConnection = new SuiPriceServiceConnection(
+    "https://hermes.pyth.network",
+  );
+  const priceIDs = [
+    // "0xd1b72982e40348d069bb1ff701e634c117bb5f741f44dff91e472d3b01461e55::stsui::STSUI",
+    "0x0b3eae8cb6e221e7388a435290e0f2211172563f94769077b7f4c4c6a11eea76",
+  ];
+  const priceFeedUpdateData =
+    await pythConnection.getPriceFeedsUpdateData(priceIDs);
+  const priceInfoObjectIds = await pythClient.updatePriceFeeds(
+    tx,
+    priceFeedUpdateData,
+    priceIDs,
+  );
+  console.log(priceInfoObjectIds);
+  // if (tx) {
+  //   dryRunTransactionBlock(tx);
+  //   // executeTransactionBlock(tx);
+  // }
 }
 setPriceCaller();
 

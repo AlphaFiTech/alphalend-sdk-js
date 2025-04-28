@@ -84,53 +84,30 @@ export class AlphalendClient {
     coinTypes: string[],
   ): Promise<Transaction | undefined> {
     // Get price feed IDs for the coin types, filtering out undefined ones
-    const priceFeedToCoinTypeMap = new Map<string, string>();
-    const priceFeedIds: string[] = [];
-    coinTypes.forEach((coinType) => {
-      const priceFeedId = pythPriceFeedIds[coinType];
-      if (priceFeedId) {
-        priceFeedToCoinTypeMap.set(priceFeedId, coinType);
-        priceFeedIds.push(priceFeedId);
-      }
+    const priceFeedIds: string[] = coinTypes.map((coinType) => {
+      return pythPriceFeedIds[coinType];
     });
 
     if (priceFeedIds.length === 0) {
       return undefined; // Return undefined if no valid price feeds found
     }
 
-    const priceFeedToInfoIdMap = new Map<string, string>();
-    (
-      await getPriceInfoObjectIdsWithoutUpdate(priceFeedIds, this.pythClient)
-    ).forEach((infoId, index) => {
-      if (infoId) {
-        priceFeedToInfoIdMap.set(priceFeedIds[index], infoId);
-      }
-    });
+    // const priceInfoObjectIds = await getPriceInfoObjectIdsWithUpdate(
+    //   tx,
+    //   priceFeedIds,
+    //   this.pythClient,
+    //   this.pythConnection,
+    // );
 
-    const current_timestamp = (new Date().getTime() / 1000).toFixed(0);
-    const priceFeedIdsToUpdate = await this.getPriceIdsToUpdate(
-      priceFeedToInfoIdMap,
-      current_timestamp,
+    const priceInfoObjectIds = await getPriceInfoObjectIdsWithoutUpdate(
+      priceFeedIds,
+      this.pythClient,
     );
 
-    if (priceFeedIdsToUpdate.length > 0) {
-      const updatedPriceInfoObjectIds = await getPriceInfoObjectIdsWithUpdate(
-        tx,
-        priceFeedIdsToUpdate,
-        this.pythClient,
-        this.pythConnection,
-      );
-      priceFeedIdsToUpdate.forEach((priceFeedId, index) => {
-        priceFeedToInfoIdMap.set(priceFeedId, updatedPriceInfoObjectIds[index]);
-      });
-    }
-
-    for (const [
-      priceFeedId,
-      priceInfoObjectId,
-    ] of priceFeedToInfoIdMap.entries()) {
-      const coinType = priceFeedToCoinTypeMap.get(priceFeedId);
-      if (coinType) {
+    for (let i = 0; i < coinTypes.length; i++) {
+      const priceInfoObjectId = priceInfoObjectIds[i];
+      const coinType = coinTypes[i];
+      if (priceInfoObjectId) {
         updatePriceTransaction(
           tx,
           {
@@ -632,31 +609,31 @@ export class AlphalendClient {
     }
   }
 
-  private async getPriceIdsToUpdate(
-    priceFeedToInfoIdMap: Map<string, string>,
-    current_timestamp: string,
-  ): Promise<string[]> {
-    const priceIdsToUpdate: string[] = [];
-    for (const [priceFeedId, infoObjectId] of priceFeedToInfoIdMap.entries()) {
-      const res = await this.client.getObject({
-        id: infoObjectId,
-        options: {
-          showContent: true,
-        },
-      });
+  // private async getPriceIdsToUpdate(
+  //   priceFeedToInfoIdMap: Map<string, string>,
+  //   current_timestamp: string,
+  // ): Promise<string[]> {
+  //   const priceIdsToUpdate: string[] = [];
+  //   for (const [priceFeedId, infoObjectId] of priceFeedToInfoIdMap.entries()) {
+  //     const res = await this.client.getObject({
+  //       id: infoObjectId,
+  //       options: {
+  //         showContent: true,
+  //       },
+  //     });
 
-      if (res.data) {
-        const content = res.data.content as unknown as PythPriceInfo;
-        const attestation_time =
-          content.fields.price_info.fields.attestation_time;
-        if (parseFloat(current_timestamp) - parseFloat(attestation_time) > 20) {
-          priceIdsToUpdate.push(priceFeedId);
-        }
-      }
-    }
+  //     if (res.data) {
+  //       const content = res.data.content as unknown as PythPriceInfo;
+  //       const attestation_time =
+  //         content.fields.price_info.fields.attestation_time;
+  //       if (parseFloat(current_timestamp) - parseFloat(attestation_time) > 20) {
+  //         priceIdsToUpdate.push(priceFeedId);
+  //       }
+  //     }
+  //   }
 
-    return priceIdsToUpdate;
-  }
+  //   return priceIdsToUpdate;
+  // }
 
   private async handlePromise(
     tx: Transaction,
