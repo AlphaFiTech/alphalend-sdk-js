@@ -1,13 +1,20 @@
 import { getFullnodeUrl, SuiClient } from "@mysten/sui/client";
 import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
-import { Transaction } from "@mysten/sui/transactions";
+import {
+  ObjectRef,
+  Transaction,
+  UpgradePolicy,
+} from "@mysten/sui/transactions";
 import { fromB64 } from "@mysten/sui/utils";
 import { getConstants } from "../constants/index.js";
-import { addCoinToOracle } from "./oracle.js";
+import { addCoinToOracle, updatePythIdentifierForCoin } from "./oracle.js";
 import { AlphalendClient } from "../core/client.js";
 import * as dotenv from "dotenv";
 import { Decimal } from "decimal.js";
 import { setPrices } from "../utils/helper.js";
+import path from "path";
+import { homedir } from "os";
+import { execSync } from "child_process";
 
 dotenv.config();
 
@@ -36,10 +43,11 @@ export function getExecStuff() {
 }
 
 export async function dryRunTransactionBlock(txb: Transaction) {
-  const { suiClient, address } = getExecStuff();
-  txb.setSender(address);
-  // txb.setGasBudget(4e9);
-  console.log("address", address);
+  const { suiClient } = getExecStuff();
+  txb.setSender(
+    "0xa1eb94d1700652aa85b417b46fa6775575b8b98d3352d864fb5146eb45d335fb",
+  );
+  txb.setGasBudget(1e9);
   try {
     let serializedTxb = await txb.build({ client: suiClient });
     suiClient
@@ -47,7 +55,8 @@ export async function dryRunTransactionBlock(txb: Transaction) {
         transactionBlock: serializedTxb,
       })
       .then((res) => {
-        console.log(res.effects.status, res.balanceChanges);
+        console.log(JSON.stringify(res, null, 2));
+        // console.log(res.effects.status, res.balanceChanges);
       })
       .catch((error) => {
         console.error(error);
@@ -58,6 +67,7 @@ export async function dryRunTransactionBlock(txb: Transaction) {
 }
 
 async function addCoinToOracleCaller(tx: Transaction) {
+  const { suiClient } = getExecStuff();
   const adminCapId = constants.ALPHAFI_ORACLE_ADMIN_CAP_ID;
   await addCoinToOracle(
     tx,
@@ -66,6 +76,7 @@ async function addCoinToOracleCaller(tx: Transaction) {
     1,
     1000,
     "testnet",
+    suiClient,
   );
   await addCoinToOracle(
     tx,
@@ -74,6 +85,7 @@ async function addCoinToOracleCaller(tx: Transaction) {
     1,
     1000,
     "testnet",
+    suiClient,
   );
   await addCoinToOracle(
     tx,
@@ -82,6 +94,7 @@ async function addCoinToOracleCaller(tx: Transaction) {
     1,
     1000,
     "testnet",
+    suiClient,
   );
   await addCoinToOracle(
     tx,
@@ -90,6 +103,7 @@ async function addCoinToOracleCaller(tx: Transaction) {
     0,
     1000,
     "testnet",
+    suiClient,
   );
   await addCoinToOracle(
     tx,
@@ -98,6 +112,7 @@ async function addCoinToOracleCaller(tx: Transaction) {
     0,
     1000,
     "testnet",
+    suiClient,
   );
   await addCoinToOracle(
     tx,
@@ -106,8 +121,17 @@ async function addCoinToOracleCaller(tx: Transaction) {
     1,
     1000,
     "testnet",
+    suiClient,
   );
-  await addCoinToOracle(tx, adminCapId, "0x2::sui::SUI", 1, 1000, "testnet");
+  await addCoinToOracle(
+    tx,
+    adminCapId,
+    "0x2::sui::SUI",
+    1,
+    1000,
+    "testnet",
+    suiClient,
+  );
 
   return tx;
 }
@@ -167,7 +191,8 @@ async function borrow() {
 export async function executeTransactionBlock() {
   const { keypair, suiClient } = getExecStuff();
   const tx = new Transaction();
-  await addCoinToOracleCaller(tx);
+  const alphalendClient = new AlphalendClient("testnet", suiClient);
+  await alphalendClient.updatePrices(tx, ["0x2::sui::SUI"]);
   await suiClient
     .signAndExecuteTransaction({
       signer: keypair,
@@ -186,18 +211,31 @@ export async function executeTransactionBlock() {
       console.error(error);
     });
 }
-executeTransactionBlock();
+// executeTransactionBlock();
 
 async function setPriceCaller() {
   const tx = new Transaction();
-  await setPrices(tx);
+  const { suiClient } = getExecStuff();
+  // await updatePythIdentifierForCoin(
+  //   tx,
+  //   "0xd1b72982e40348d069bb1ff701e634c117bb5f741f44dff91e472d3b01461e55::stsui::STSUI",
+  //   suiClient,
+  //   "mainnet",
+  // );
+
+  updatePythIdentifierForCoin(
+    tx,
+    "0xd1b72982e40348d069bb1ff701e634c117bb5f741f44dff91e472d3b01461e55::stsui::STSUI",
+    suiClient,
+    "mainnet"
+  );
 
   if (tx) {
-    // dryRunTransactionBlock(tx);
+    dryRunTransactionBlock(tx);
     // executeTransactionBlock(tx);
   }
 }
-// setPriceCaller();
+setPriceCaller();
 
 // withdraw();
 
@@ -223,3 +261,85 @@ async function withdraw() {
   }
 }
 // withdraw();
+
+async function upgradePackageDryRun() {
+  const { suiClient } = getExecStuff();
+  const txb = new Transaction();
+  const multiSigAddress =
+    "0xa1eb94d1700652aa85b417b46fa6775575b8b98d3352d864fb5146eb45d335fb";
+  // <------------  -------------->
+
+  // Path to Move contracts
+  const pathToContracts = path.join(
+    homedir(),
+    "work",
+    "alphalend",
+    "alphalend-contracts",
+    "alphafi_oracle",
+  );
+  const { modules, dependencies, digest } = JSON.parse(
+    execSync(
+      `sui move build --dump-bytecode-as-base64 --path ${pathToContracts}`,
+      { encoding: "utf-8" },
+    ),
+  );
+
+  const packageId =
+    "0x378b2a104e8bcd7ed0317f5e6a0ec4fd271d4d12e2fe6c99bcd1f12be725cf4f";
+
+  const upgradeCapId =
+    "0x003f74baef0bc40394b59dfc134516435ac0750a1b55dd3bfdb0ffc68559019d";
+
+  const cap = txb.object(upgradeCapId);
+
+  // // Create a ticket for the upgrade
+  const ticket = txb.moveCall({
+    target: `0x2::package::authorize_upgrade`,
+    arguments: [
+      cap,
+      txb.pure.u8(UpgradePolicy.COMPATIBLE),
+      txb.pure.vector("u8", digest),
+    ],
+  });
+
+  // // Define the upgrade transaction
+  const result = txb.upgrade({
+    modules,
+    dependencies,
+    package: packageId,
+    ticket,
+  });
+
+  // // Commit the upgrade
+  txb.moveCall({
+    target: `0x2::package::commit_upgrade`,
+    arguments: [cap, result],
+  });
+
+  // Fetch coins to set as gas payment
+  const res = await suiClient.getCoins({
+    owner: multiSigAddress,
+    coinType: "0x2::sui::SUI",
+  });
+
+  const coin = res.data.find((coin) => {
+    return Number(coin.balance) >= 1_000_000_000;
+  });
+
+  if (!coin) {
+    console.error("Multisig address has less than 1 Sui");
+    process.exit(1);
+  }
+  txb.setGasPayment([
+    {
+      objectId: coin.coinObjectId,
+      version: coin.version,
+      digest: coin.digest,
+    } as ObjectRef,
+  ]);
+
+  if (txb) {
+    dryRunTransactionBlock(txb);
+  }
+}
+// upgradePackageDryRun();

@@ -6,7 +6,7 @@ export const devConstants: Constants = {
 
   // AlphaFi constants
   ALPHAFI_LATEST_ORACLE_PACKAGE_ID:
-    "0x89580b04cbd27ad924f8aadffd7722934d35e597477b22c9c8cf01f29bfecce4",
+    "0x4ae16ac5c15421cc738862c8a625c19dc6df17f60acaf9432e3c76462f068c2b",
 
   ALPHAFI_FIRST_ORACLE_PACKAGE_ID:
     "0x1e61b87eb037e18980aff9e9d9f64ef9b5944404b9ecac282630e01af6c2f8f1",

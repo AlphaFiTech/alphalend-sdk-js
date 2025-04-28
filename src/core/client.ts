@@ -58,7 +58,6 @@ export class AlphalendClient {
   constants: Constants;
 
   constructor(network: string, client: SuiClient) {
-    console.log("Initializing AlphalendClient", network, client);
     this.network = network;
     this.client = client;
     this.constants = getConstants(network);
@@ -157,7 +156,6 @@ export class AlphalendClient {
 
     // First update prices to ensure latest oracle values
     if (this.network === "mainnet") {
-      console.log("Updating prices", params);
       await this.updatePrices(tx, params.priceUpdateCoinTypes);
     }
 
