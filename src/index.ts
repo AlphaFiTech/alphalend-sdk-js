@@ -7,6 +7,7 @@ export * from "./core/types.js";
 export * from "./utils/oracle.js";
 export * from "./utils/priceFeedIds.js";
 export * from "./coin/index.js";
+export { updatePythIdentifierForCoin } from "./admin/oracle.js";
 export { getUserPositionCapId } from "./models/position/functions.js";
 
 // Re-export key types for easier access
@@ -27,9 +28,7 @@ export {
   TransactionResponse,
 } from "./core/types.js";
 
-export function getSuiClient(
-  network?: string,
-) {
+export function getSuiClient(network?: string) {
   return new SuiClient({
     url: getFullnodeUrl(
       (network || "mainnet") as "mainnet" | "testnet" | "devnet" | "localnet",

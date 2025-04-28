@@ -10,7 +10,7 @@ export const prodConstants: Constants = {
     "0x378b2a104e8bcd7ed0317f5e6a0ec4fd271d4d12e2fe6c99bcd1f12be725cf4f",
 
   ALPHAFI_LATEST_ORACLE_PACKAGE_ID:
-    "0x378b2a104e8bcd7ed0317f5e6a0ec4fd271d4d12e2fe6c99bcd1f12be725cf4f",
+    "0xabf1f1cf49730f85a88eb5b2db4fee7f712c20d1a68b7644f8183674a01a0160",
 
   ALPHAFI_ORACLE_OBJECT_ID:
     "0xce4ca140eb264bdc5b03f3268eeb013495f04561e38473aadcf654fb0db6b096",
@@ -36,6 +36,9 @@ export const prodConstants: Constants = {
 
   LENDING_PROTOCOL_CAP_ID:
     "0x3aa48bc9692e326c6430199db986c353fd2c64f74d789dd378f237b6e9f91c5c",
+
+  LENDING_PROTOCOL_ADMIN_CAP_ID:
+    "0x0d6365dfebda2264944e54b8912c7bae93c05d0cfb324b4170e68678d743e22b",
 
   POSITION_CAP_TYPE:
     "0xd631cd66138909636fc3f73ed75820d0c5b76332d1644608ed1c85ea2b8219b4::position::PositionCap",

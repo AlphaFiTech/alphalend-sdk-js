@@ -11,6 +11,7 @@ import {
   SuiPriceServiceConnection,
   SuiPythClient,
 } from "@pythnetwork/pyth-sui-js";
+import { Constants } from "../constants/types.js";
 
 export interface UpdatePriceTransactionArgs {
   priceInfoObject: string;
@@ -50,10 +51,10 @@ export async function getPriceInfoObjectIdsWithoutUpdate(
 export function updatePriceTransaction(
   tx: Transaction,
   args: UpdatePriceTransactionArgs,
-  constants: any,
+  constants: Constants,
 ) {
   tx.moveCall({
-    target: `${constants.ALPHAFI_ORACLE_PACKAGE_ID}::oracle::update_price_from_pyth`,
+    target: `${constants.ALPHAFI_LATEST_ORACLE_PACKAGE_ID}::oracle::update_price_from_pyth`,
     arguments: [
       tx.object(constants.ALPHAFI_ORACLE_OBJECT_ID),
       tx.object(args.priceInfoObject),
@@ -67,17 +68,12 @@ export function updatePriceTransaction(
   });
 
   const oraclePriceInfo = tx.moveCall({
-    target: `${constants.ALPHAFI_ORACLE_PACKAGE_ID}::oracle::get_price_info`,
+    target: `${constants.ALPHAFI_LATEST_ORACLE_PACKAGE_ID}::oracle::get_price_info`,
     arguments: [tx.object(constants.ALPHAFI_ORACLE_OBJECT_ID), coinTypeName],
   });
 
-  const oracleMutObject = tx.moveCall({
-    target: `${constants.ALPHALEND_PACKAGE_ID}::alpha_lending::get_oracle_mut`,
-    arguments: [tx.object(constants.LENDING_PROTOCOL_ID)],
-  });
-
   tx.moveCall({
-    target: `${constants.ALPHALEND_PACKAGE_ID}::oracle::update_price`,
-    arguments: [oracleMutObject, oraclePriceInfo],
+    target: `${constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::update_price`,
+    arguments: [tx.object(constants.LENDING_PROTOCOL_ID), oraclePriceInfo],
   });
 }

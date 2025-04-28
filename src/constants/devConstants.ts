@@ -6,7 +6,7 @@ export const devConstants: Constants = {
 
   // AlphaFi constants
   ALPHAFI_LATEST_ORACLE_PACKAGE_ID:
-    "0x89580b04cbd27ad924f8aadffd7722934d35e597477b22c9c8cf01f29bfecce4",
+    "0x4ae16ac5c15421cc738862c8a625c19dc6df17f60acaf9432e3c76462f068c2b",
 
   ALPHAFI_FIRST_ORACLE_PACKAGE_ID:
     "0x1e61b87eb037e18980aff9e9d9f64ef9b5944404b9ecac282630e01af6c2f8f1",
@@ -35,6 +35,9 @@ export const devConstants: Constants = {
 
   LENDING_PROTOCOL_CAP_ID:
     "0xcc3b0e3a8842b8a68c0c55467da0f420a73dc968e6a8849e2e355cc8f14be546",
+
+  LENDING_PROTOCOL_ADMIN_CAP_ID:
+    "0x832ffa50b2da750828a40a3df04bd130a39442dd33626ded20f79d3fca9c9fd6",
 
   POSITION_CAP_TYPE:
     "0xf4d973212e8c03488e30837d75ae9374feead9b8d0c168f587b4f8e2f4c2641a::position::PositionCap",
