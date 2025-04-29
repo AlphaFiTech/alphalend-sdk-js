@@ -169,7 +169,7 @@ export class AlphalendClient {
         ],
       });
     } else {
-      const positionCap = await this.createPosition(tx);
+      const positionCap = this.createPosition(tx);
       // Build add_collateral transaction
       tx.moveCall({
         target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::add_collateral`,
@@ -502,7 +502,7 @@ export class AlphalendClient {
    *
    * @returns Transaction object for creating a new position
    */
-  async createPosition(tx: Transaction): Promise<TransactionResult> {
+  createPosition(tx: Transaction): TransactionResult {
     const positionCap = tx.moveCall({
       target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::create_position`,
       arguments: [
