@@ -1,7 +1,7 @@
 import { Transaction } from "@mysten/sui/transactions";
 import { getConstants } from "../constants/index.js";
 import { SuiPythClient } from "@pythnetwork/pyth-sui-js";
-import { pythPriceFeedIds } from "../utils/priceFeedIds.js";
+import { pythPriceFeedIdMap } from "../utils/priceFeedIds.js";
 import { SuiClient } from "@mysten/sui/client";
 
 export function createAdditionalAdminCap(
@@ -48,7 +48,7 @@ export async function updatePythIdentifierForCoin(
     constants.WORMHOLE_STATE_ID,
   );
   const priceInfoObjectId = await pythClient.getPriceFeedObjectId(
-    pythPriceFeedIds[coinType],
+    pythPriceFeedIdMap[coinType],
   );
 
   if (!priceInfoObjectId) {

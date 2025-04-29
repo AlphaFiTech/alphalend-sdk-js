@@ -10,11 +10,13 @@ import {
   TransactionResult,
 } from "@mysten/sui/transactions";
 import {
-  getPriceInfoObjectIdsWithoutUpdate,
   getPriceInfoObjectIdsWithUpdate,
   updatePriceTransaction,
 } from "../utils/oracle.js";
-import { pythPriceFeedIds } from "../utils/priceFeedIds.js";
+import {
+  priceInfoObjectIdMap,
+  pythPriceFeedIdMap,
+} from "../utils/priceFeedIds.js";
 import {
   SupplyParams,
   WithdrawParams,
@@ -26,7 +28,6 @@ import {
   Portfolio,
   ProtocolStats,
 } from "./types.js";
-import { PythPriceInfo } from "../coin/types.js";
 import { getProtocolStats } from "../models/protocol.js";
 import { getAllMarkets } from "../models/market.js";
 import { getUserPortfolio } from "../models/position/posiiton.js";
@@ -79,47 +80,50 @@ export class AlphalendClient {
    * @param coinTypes Array of coin types or symbols
    * @returns Transaction object with price update calls
    */
-  async updatePrices(
-    tx: Transaction,
-    coinTypes: string[],
-  ): Promise<Transaction | undefined> {
-    // Get price feed IDs for the coin types, filtering out undefined ones
-    const priceFeedIds: string[] = coinTypes.map((coinType) => {
-      return pythPriceFeedIds[coinType];
-    });
-
-    if (priceFeedIds.length === 0) {
-      return undefined; // Return undefined if no valid price feeds found
+  async updatePrices(tx: Transaction, coinTypes: string[]) {
+    const updatePriceFeedIds: string[] = [];
+    if (
+      coinTypes.includes(
+        "0xd1b72982e40348d069bb1ff701e634c117bb5f741f44dff91e472d3b01461e55::stsui::STSUI",
+      )
+    ) {
+      updatePriceFeedIds.push(
+        pythPriceFeedIdMap[
+          "0xd1b72982e40348d069bb1ff701e634c117bb5f741f44dff91e472d3b01461e55::stsui::STSUI"
+        ],
+      );
+    }
+    if (
+      coinTypes.includes(
+        "0x356a26eb9e012a68958082340d4c4116e7f55615cf27affcff209cf0ae544f59::wal::WAL",
+      )
+    ) {
+      updatePriceFeedIds.push(
+        pythPriceFeedIdMap[
+          "0x356a26eb9e012a68958082340d4c4116e7f55615cf27affcff209cf0ae544f59::wal::WAL"
+        ],
+      );
+    }
+    if (updatePriceFeedIds.length > 0) {
+      await getPriceInfoObjectIdsWithUpdate(
+        tx,
+        updatePriceFeedIds,
+        this.pythClient,
+        this.pythConnection,
+      );
     }
 
-    // const priceInfoObjectIds = await getPriceInfoObjectIdsWithUpdate(
-    //   tx,
-    //   priceFeedIds,
-    //   this.pythClient,
-    //   this.pythConnection,
-    // );
-
-    const priceInfoObjectIds = await getPriceInfoObjectIdsWithoutUpdate(
-      priceFeedIds,
-      this.pythClient,
-    );
-
-    for (let i = 0; i < coinTypes.length; i++) {
-      const priceInfoObjectId = priceInfoObjectIds[i];
-      const coinType = coinTypes[i];
-      if (priceInfoObjectId) {
-        updatePriceTransaction(
-          tx,
-          {
-            priceInfoObject: priceInfoObjectId,
-            coinType: coinType,
-          },
-          this.constants,
-        );
-      }
+    for (const coinType of coinTypes) {
+      const priceInfoObjectId = priceInfoObjectIdMap[coinType];
+      updatePriceTransaction(
+        tx,
+        {
+          priceInfoObject: priceInfoObjectId,
+          coinType: coinType,
+        },
+        this.constants,
+      );
     }
-
-    return tx;
   }
 
   /**
@@ -130,11 +134,6 @@ export class AlphalendClient {
    */
   async supply(params: SupplyParams): Promise<Transaction | undefined> {
     const tx = new Transaction();
-
-    // First update prices to ensure latest oracle values
-    if (this.network === "mainnet") {
-      await this.updatePrices(tx, params.priceUpdateCoinTypes);
-    }
 
     // Get coin object
     const isSui = params.coinType === this.constants.SUI_COIN_TYPE;
@@ -320,11 +319,6 @@ export class AlphalendClient {
    */
   async repay(params: RepayParams): Promise<Transaction | undefined> {
     const tx = new Transaction();
-
-    // First update prices to ensure latest oracle values
-    if (this.network === "mainnet") {
-      await this.updatePrices(tx, params.priceUpdateCoinTypes);
-    }
 
     // Get coin object
     // Add 1 to the amount to repay to avoid rounding errors since contract returns the remaining amount.

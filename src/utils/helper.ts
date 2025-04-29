@@ -2,7 +2,7 @@ import { Transaction } from "@mysten/sui/transactions";
 import { PaginatedObjectsResponse, SuiClient } from "@mysten/sui/client";
 import { getAlphafiConstants, getConstants } from "../constants/index.js";
 import { PriceData, Receipt, RewardDistributorQueryType } from "./queryTypes.js";
-import { pythPriceFeedIds } from "./priceFeedIds.js";
+import { pythPriceFeedIdMap } from "./priceFeedIds.js";
 import { getMarketFromChain } from "../models/market.js";
 import { getUserPosition } from "../models/position/functions.js";
 
@@ -100,7 +100,7 @@ export const getPricesFromPyth = async (
     const feedIdToCoinType: Record<string, string> = {};
     // Collect feed IDs for given coin IDs
     coinTypes.forEach((coinType) => {
-      const id = pythPriceFeedIds[coinType];
+      const id = pythPriceFeedIdMap[coinType];
       if (!id) {
         console.error(`Coin ID not supported: ${coinType}`);
       }
