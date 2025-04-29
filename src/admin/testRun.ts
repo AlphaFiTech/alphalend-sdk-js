@@ -1,4 +1,3 @@
-import { getFullnodeUrl, SuiClient } from "@mysten/sui/client";
 import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
 import {
   ObjectRef,
@@ -17,6 +16,7 @@ import { homedir } from "os";
 import { execSync } from "child_process";
 import { SuiPriceServiceConnection } from "@pythnetwork/pyth-sui-js";
 import { SuiPythClient } from "@pythnetwork/pyth-sui-js";
+import { getSuiClient } from "../index.js";
 
 dotenv.config();
 
@@ -35,11 +35,7 @@ export function getExecStuff() {
     throw new Error("env var NETWORK not configured");
   }
 
-  const suiClient = new SuiClient({
-    url: getFullnodeUrl(
-      process.env.NETWORK as "mainnet" | "testnet" | "devnet" | "localnet",
-    ),
-  });
+  const suiClient = getSuiClient(process.env.NETWORK);
 
   return { address, keypair, suiClient };
 }
@@ -235,16 +231,19 @@ async function setPriceCaller() {
   const pythConnection = new SuiPriceServiceConnection(
     "https://hermes.pyth.network",
   );
-  const priceIDs = [
-    // "0xd1b72982e40348d069bb1ff701e634c117bb5f741f44dff91e472d3b01461e55::stsui::STSUI",
-    "0x0b3eae8cb6e221e7388a435290e0f2211172563f94769077b7f4c4c6a11eea76",
-  ];
-  const priceFeedUpdateData =
-    await pythConnection.getPriceFeedsUpdateData(priceIDs);
-  const priceInfoObjectIds = await pythClient.updatePriceFeeds(
-    tx,
-    priceFeedUpdateData,
-    priceIDs,
+  // const priceIDs = [
+  //   // "0xd1b72982e40348d069bb1ff701e634c117bb5f741f44dff91e472d3b01461e55::stsui::STSUI",
+  //   "0x0b3eae8cb6e221e7388a435290e0f2211172563f94769077b7f4c4c6a11eea76",
+  // ];
+  // const priceFeedUpdateData =
+  //   await pythConnection.getPriceFeedsUpdateData(priceIDs);
+  // const priceInfoObjectIds = await pythClient.updatePriceFeeds(
+  //   tx,
+  //   priceFeedUpdateData,
+  //   priceIDs,
+  // );
+  const priceInfoObjectIds = await pythClient.getPriceFeedObjectId(
+    "0xf2c5249856da2fbe0221e163b3fed678dd6f76515ab933292dfb4f15a1de8f8c",
   );
   console.log(priceInfoObjectIds);
   // if (tx) {
