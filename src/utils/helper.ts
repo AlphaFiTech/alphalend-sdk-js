@@ -1,7 +1,11 @@
 import { Transaction } from "@mysten/sui/transactions";
 import { PaginatedObjectsResponse, SuiClient } from "@mysten/sui/client";
 import { getAlphafiConstants, getConstants } from "../constants/index.js";
-import { PriceData, Receipt, RewardDistributorQueryType } from "./queryTypes.js";
+import {
+  PriceData,
+  Receipt,
+  RewardDistributorQueryType,
+} from "./queryTypes.js";
 import { pythPriceFeedIdMap } from "./priceFeedIds.js";
 import { getMarketFromChain } from "../models/market.js";
 import { getUserPosition } from "../models/position/functions.js";
@@ -24,20 +28,51 @@ export async function getClaimRewardInput(
     const marketId = Number(rewardDistributor.fields.market_id);
     const coinTypes: Set<string> = new Set(marketActionMap.get(marketId) || []);
     const lastUpdated = rewardDistributor.fields.last_updated;
-    const rewardDistributorObj = await getRewardDistributor(
+    const marketRewardDistributorObj = await getRewardDistributor(
       suiClient,
       network,
       marketId,
       rewardDistributor.fields.is_deposit,
     );
-    if (!rewardDistributorObj) continue;
+    const userRewardDistributorObj = rewardDistributor.fields.rewards;
+    if (!marketRewardDistributorObj) continue;
 
-    for (const reward of rewardDistributorObj.rewards) {
-      if (
-        reward &&
-        parseFloat(reward.fields.end_time) > parseFloat(lastUpdated)
+    for (let i = 0; i < marketRewardDistributorObj.rewards.length; i++) {
+      const marketReward = marketRewardDistributorObj.rewards[i];
+      if (!marketReward) continue;
+      const userReward =
+        i < userRewardDistributorObj.length
+          ? userRewardDistributorObj[i]
+          : null;
+
+      const timeElapsed =
+        Math.min(parseFloat(marketReward.fields.end_time), Date.now()) -
+        Math.max(
+          parseFloat(marketReward.fields.start_time),
+          parseFloat(lastUpdated),
+        );
+      
+        // reward currently ruuning and user has share
+      if (timeElapsed > 0 && parseFloat(rewardDistributor.fields.share) > 0) {
+        coinTypes.add(marketReward.fields.coin_type.fields.name);
+      } else if (userReward) {
+        // user has earned rewards in past and not claimed
+        if (parseFloat(userReward.earned_rewards.fields.value) !== 0) {
+          coinTypes.add(marketReward.fields.coin_type.fields.name);
+        } else if (
+          // user has share and some rewards have been distributed after last update
+          parseFloat(marketReward.fields.cummulative_rewards_per_share) >
+            parseFloat(userReward.cummulative_rewards_per_share.fields.value) &&
+          parseFloat(rewardDistributor.fields.share) > 0
+        ) {
+          coinTypes.add(marketReward.fields.coin_type.fields.name);
+        }
+      } else if (
+        // new reward started and finished after last update and user has share
+        parseFloat(rewardDistributor.fields.share) > 0 &&
+        parseFloat(marketReward.fields.cummulative_rewards_per_share) > 0
       ) {
-        coinTypes.add(reward.fields.coin_type.fields.name);
+        coinTypes.add(marketReward.fields.coin_type.fields.name);
       }
     }
     marketActionMap.set(marketId, [...coinTypes]);

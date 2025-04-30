@@ -372,13 +372,6 @@ export class AlphalendClient {
   async claimRewards(params: ClaimRewardsParams): Promise<Transaction> {
     const tx = new Transaction();
 
-    // First update prices to ensure latest oracle values
-    if (this.network === "mainnet") {
-      await this.updatePrices(tx, params.priceUpdateCoinTypes);
-    } else {
-      await setPrices(tx);
-    }
-
     const rewardInput = await getClaimRewardInput(
       this.client,
       this.network,
