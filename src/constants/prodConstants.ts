@@ -10,7 +10,7 @@ export const prodConstants: Constants = {
     "0x378b2a104e8bcd7ed0317f5e6a0ec4fd271d4d12e2fe6c99bcd1f12be725cf4f",
 
   ALPHAFI_LATEST_ORACLE_PACKAGE_ID:
-    "0xabf1f1cf49730f85a88eb5b2db4fee7f712c20d1a68b7644f8183674a01a0160",
+    "0x39850d8deb783ef11b10487dc8a80a701506b1471ce11cde83124f35ba3da699",
 
   ALPHAFI_ORACLE_OBJECT_ID:
     "0xce4ca140eb264bdc5b03f3268eeb013495f04561e38473aadcf654fb0db6b096",

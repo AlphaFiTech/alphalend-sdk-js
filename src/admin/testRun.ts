@@ -6,7 +6,11 @@ import {
 } from "@mysten/sui/transactions";
 import { fromB64 } from "@mysten/sui/utils";
 import { getConstants } from "../constants/index.js";
-import { addCoinToOracle, updatePythIdentifierForCoin } from "./oracle.js";
+import {
+  addCoinToOracle,
+  removeCoinFromOracle,
+  updatePythIdentifierForCoin,
+} from "./oracle.js";
 import { AlphalendClient } from "../core/client.js";
 import * as dotenv from "dotenv";
 import { Decimal } from "decimal.js";
@@ -16,7 +20,7 @@ import { homedir } from "os";
 import { execSync } from "child_process";
 import { SuiPriceServiceConnection } from "@pythnetwork/pyth-sui-js";
 import { SuiPythClient } from "@pythnetwork/pyth-sui-js";
-import { getSuiClient } from "../index.js";
+import { getSuiClient, updatePriceTransaction } from "../index.js";
 
 dotenv.config();
 
@@ -164,7 +168,6 @@ async function claimRewards() {
     dryRunTransactionBlock(tx);
   }
 }
-// updatePricesCaller();
 
 async function borrow() {
   const { suiClient, keypair } = getExecStuff();
@@ -186,18 +189,63 @@ async function borrow() {
   }
 }
 
-export async function executeTransactionBlock() {
-  const { keypair, suiClient, address } = getExecStuff();
-  const alphalendClient = new AlphalendClient("mainnet", suiClient);
-  const tx = await alphalendClient.withdraw({
-    address,
-    positionCapId:
-      "0xf9ca35f404dd3c1ea10c381dd3e1fe8a0c4586adf5e186f4eb52307462a5af7d",
-    coinType: "0x2::sui::SUI",
-    marketId: "1",
-    amount: new Decimal(100_000_000),
-    priceUpdateCoinTypes: ["0x2::sui::SUI"],
+function setAlternate(txb: Transaction) {
+  const constants = getConstants("testnet");
+  const suiTypeName = txb.moveCall({
+    target: `0x1::type_name::get`,
+    typeArguments: ["0x2::sui::SUI"],
   });
+  const walTypeName = txb.moveCall({
+    target: `0x1::type_name::get`,
+    typeArguments: [
+      "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin2::TESTCOIN2",
+    ],
+  });
+  txb.moveCall({
+    target: `${constants.ALPHAFI_LATEST_ORACLE_PACKAGE_ID}::oracle::add_alternate_price_identifier`,
+    arguments: [
+      txb.object(constants.ALPHAFI_ORACLE_OBJECT_ID),
+      txb.object(constants.ALPHAFI_ORACLE_ADMIN_CAP_ID),
+      walTypeName,
+      suiTypeName,
+    ],
+  });
+}
+
+function removeAlternate(txb: Transaction) {
+  const constants = getConstants("testnet");
+  const walTypeName = txb.moveCall({
+    target: `0x1::type_name::get`,
+    typeArguments: [
+      "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin2::TESTCOIN2",
+    ],
+  });
+  txb.moveCall({
+    target: `${constants.ALPHAFI_LATEST_ORACLE_PACKAGE_ID}::oracle::remove_alternate_price_identifier`,
+    arguments: [
+      txb.object(constants.ALPHAFI_ORACLE_OBJECT_ID),
+      txb.object(constants.ALPHAFI_ORACLE_ADMIN_CAP_ID),
+      walTypeName,
+    ],
+  });
+}
+
+export async function executeTransactionBlock() {
+  const { keypair, suiClient } = getExecStuff();
+  const tx = new Transaction();
+  const constants = getConstants("testnet");
+  // removeAlternate(tx);
+  // await removeCoinFromOracle(
+  //   tx,
+  //   constants.ALPHAFI_ORACLE_ADMIN_CAP_ID,
+  //   "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin2::TESTCOIN2",
+  //   "testnet",
+  // );
+  // await setPrice(tx, "0x2::sui::SUI", 10, 10, 1);
+  updatePriceTransaction(tx, {
+    priceInfoObject: "0x8270feb7375eee355e64fdb69c50abb6b5f9393a722883c1cf45f8e26048810a::wal::WAL",
+    coinType: "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin2::TESTCOIN2",
+  }, constants);
   await suiClient
     .signAndExecuteTransaction({
       signer: keypair,
@@ -216,47 +264,13 @@ export async function executeTransactionBlock() {
       console.error(error);
     });
 }
-// executeTransactionBlock();
+executeTransactionBlock();
 
 async function setPriceCaller() {
   const tx = new Transaction();
   const { suiClient } = getExecStuff();
-  const constants = getConstants("mainnet");
-  // await updatePythIdentifierForCoin(tx, "0x2::sui::SUI", suiClient, "mainnet");
-  const pythClient = new SuiPythClient(
-    suiClient,
-    constants.PYTH_STATE_ID,
-    constants.WORMHOLE_STATE_ID,
-  );
-  const pythConnection = new SuiPriceServiceConnection(
-    "https://hermes.pyth.network",
-  );
-  // const priceIDs = [
-  //   // "0xd1b72982e40348d069bb1ff701e634c117bb5f741f44dff91e472d3b01461e55::stsui::STSUI",
-  //   "0x0b3eae8cb6e221e7388a435290e0f2211172563f94769077b7f4c4c6a11eea76",
-  // ];
-  // const priceFeedUpdateData =
-  //   await pythConnection.getPriceFeedsUpdateData(priceIDs);
-  // const priceInfoObjectIds = await pythClient.updatePriceFeeds(
-  //   tx,
-  //   priceFeedUpdateData,
-  //   priceIDs,
-  // );
-  const priceInfoObjectIds = await pythClient.getPriceFeedObjectId(
-    "0xf2c5249856da2fbe0221e163b3fed678dd6f76515ab933292dfb4f15a1de8f8c",
-  );
-  console.log(priceInfoObjectIds);
-  // if (tx) {
-  //   dryRunTransactionBlock(tx);
-  //   // executeTransactionBlock(tx);
-  // }
+  const constants = getConstants("testnet");
 }
-setPriceCaller();
-
-// withdraw();
-
-// borrow();
-// claimRewards();
 
 async function withdraw() {
   const { suiClient, keypair } = getExecStuff();
@@ -276,7 +290,6 @@ async function withdraw() {
     dryRunTransactionBlock(tx);
   }
 }
-// withdraw();
 
 async function upgradePackageDryRun() {
   const { suiClient } = getExecStuff();
@@ -358,4 +371,3 @@ async function upgradePackageDryRun() {
     dryRunTransactionBlock(txb);
   }
 }
-// upgradePackageDryRun();
