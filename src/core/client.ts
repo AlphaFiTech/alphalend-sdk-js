@@ -484,7 +484,7 @@ export class AlphalendClient {
     });
     let coin2: TransactionObjectArgument | undefined;
     if (promise) {
-      coin2 = await this.handlePromise(tx, promise, params.borrowCoinType);
+      coin2 = await this.handlePromise(tx, promise, params.withdrawCoinType);
     }
 
     return [coin1, coin2];
