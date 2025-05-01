@@ -39,9 +39,6 @@ export interface SupplyParams {
   positionCapId?: string;
   /** Address of the user supplying collateral */
   address: string;
-  /** Coin types of the coins whose price needs to be updated
-   * (Will have to pass all market coin types that user has supplied or borrowed in and current market coin type in which user is supplying) */
-  priceUpdateCoinTypes: string[];
 }
 
 /**
@@ -99,9 +96,6 @@ export interface RepayParams {
   positionCapId: string;
   /** Address of the user repaying the debt */
   address: string;
-  /** Coin types of the coins whose price needs to be updated
-   * (Will have to pass all market coin types that user has supplied or borrowed in and current market coin type in which user is repaying) */
-  priceUpdateCoinTypes: string[];
 }
 
 /**
@@ -117,9 +111,6 @@ export interface ClaimRewardsParams {
   claimAlpha: boolean;
   /** Whether to claim all rewards (except alpha) */
   claimAll: boolean;
-  /** Coin types of the coins whose price needs to be updated
-   * (Will have to pass all market coin types that user has supplied or borrowed in and current market coin type in which user is claiming rewards) */
-  priceUpdateCoinTypes: string[];
 }
 
 /**
