@@ -51,18 +51,22 @@ export async function getClaimRewardInput(
           parseFloat(marketReward.fields.start_time),
           parseFloat(lastUpdated),
         );
-      
-        // reward currently ruuning and user has share
+
+      const userRewardFields = userReward?.fields;
+
+      // reward currently ruuning and user has share
       if (timeElapsed > 0 && parseFloat(rewardDistributor.fields.share) > 0) {
         coinTypes.add(marketReward.fields.coin_type.fields.name);
-      } else if (userReward) {
+      } else if (userReward && userRewardFields) {
         // user has earned rewards in past and not claimed
-        if (parseFloat(userReward.earned_rewards.fields.value) !== 0) {
+        if (parseFloat(userRewardFields.earned_rewards.fields.value) !== 0) {
           coinTypes.add(marketReward.fields.coin_type.fields.name);
         } else if (
           // user has share and some rewards have been distributed after last update
           parseFloat(marketReward.fields.cummulative_rewards_per_share) >
-            parseFloat(userReward.cummulative_rewards_per_share.fields.value) &&
+            parseFloat(
+              userRewardFields.cummulative_rewards_per_share.fields.value,
+            ) &&
           parseFloat(rewardDistributor.fields.share) > 0
         ) {
           coinTypes.add(marketReward.fields.coin_type.fields.name);

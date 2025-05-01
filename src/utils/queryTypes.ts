@@ -271,7 +271,10 @@ export interface UserRewardDistributorQueryType {
   reward_distributor_id: string;
   market_id: string;
   share: string;
-  rewards: (UserRewardQueryType | null)[];
+  rewards: {
+    fields: UserRewardQueryType | null;
+    type: string;
+  }[];
   last_updated: string;
   is_deposit: boolean;
 }
