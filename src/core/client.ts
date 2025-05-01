@@ -39,6 +39,7 @@ import {
 } from "../utils/helper.js";
 import { Receipt } from "../utils/queryTypes.js";
 import { Constants } from "../constants/types.js";
+import { getUserPositionCapId } from "../models/position/functions.js";
 
 /**
  * AlphaLend Client
@@ -169,7 +170,17 @@ export class AlphalendClient {
         ],
       });
     } else {
-      const positionCap = this.createPosition(tx);
+      const positionCapId = await getUserPositionCapId(
+        this.client,
+        this.network,
+        params.address,
+      );
+      let positionCap: TransactionObjectArgument;
+      if (positionCapId) {
+        positionCap = tx.object(positionCapId);
+      } else {
+        positionCap = this.createPosition(tx);
+      }
       // Build add_collateral transaction
       tx.moveCall({
         target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::add_collateral`,
