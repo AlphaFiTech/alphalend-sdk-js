@@ -160,7 +160,6 @@ async function claimRewards() {
       "0xa511088cc13a632a5e8f9937028a77ae271832465e067360dd13f548fe934d1a",
     positionCapId:
       "0x8465d2416b01d3e76460912cd290e5dd9c4a36cfbe52f348cfe04e8ae769de4e",
-    priceUpdateCoinTypes: [],
     claimAll: false,
     claimAlpha: false,
   });
