@@ -14,7 +14,7 @@ export { getUserPositionCapId } from "./models/position/functions.js";
 export { AlphalendClient } from "./core/client.js";
 
 export function getSuiClient(network?: string) {
-  const mainnetUrl = "https://fullnode.mainnet.sui.io/";
+  const mainnetUrl = "https://alphalen-suimain-ef6f.mainnet.sui.rpcpool.com";
   const testnetUrl = "https://fullnode.testnet.sui.io/";
   const devnetUrl = "https://fullnode.devnet.sui.io/";
 
