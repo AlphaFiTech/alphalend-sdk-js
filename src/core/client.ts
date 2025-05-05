@@ -639,16 +639,29 @@ export class AlphalendClient {
     coinType: string,
   ): Promise<TransactionObjectArgument | undefined> {
     if (promise) {
-      const coin = tx.moveCall({
-        target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::fulfill_promise`,
-        typeArguments: [coinType],
-        arguments: [
-          tx.object(this.constants.LENDING_PROTOCOL_ID),
-          promise,
-          tx.object(this.constants.SUI_CLOCK_OBJECT_ID),
-        ],
-      });
-      return coin;
+      if (coinType === this.constants.SUI_COIN_TYPE) {
+        const coin = tx.moveCall({
+          target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::fulfill_promise_SUI`,
+          arguments: [
+            tx.object(this.constants.LENDING_PROTOCOL_ID),
+            promise,
+            tx.object(this.constants.SUI_SYSTEM_STATE_ID),
+            tx.object(this.constants.SUI_CLOCK_OBJECT_ID),
+          ],
+        });
+        return coin;
+      } else {
+        const coin = tx.moveCall({
+          target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::fulfill_promise`,
+          typeArguments: [coinType],
+          arguments: [
+            tx.object(this.constants.LENDING_PROTOCOL_ID),
+            promise,
+            tx.object(this.constants.SUI_CLOCK_OBJECT_ID),
+          ],
+        });
+        return coin;
+      }
     }
     return undefined;
   }
