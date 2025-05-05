@@ -21,6 +21,7 @@ import { execSync } from "child_process";
 import { SuiPriceServiceConnection } from "@pythnetwork/pyth-sui-js";
 import { SuiPythClient } from "@pythnetwork/pyth-sui-js";
 import { getSuiClient, updatePriceTransaction } from "../index.js";
+import { Blockchain } from "../models/blockchain.js";
 
 dotenv.config();
 
@@ -263,13 +264,13 @@ export async function executeTransactionBlock() {
       console.error(error);
     });
 }
-executeTransactionBlock();
+// executeTransactionBlock();
 
 async function setPriceCaller() {
-  const tx = new Transaction();
-  const { suiClient } = getExecStuff();
-  const constants = getConstants("testnet");
+  const blockchain = new Blockchain("mainnet", getSuiClient("mainnet"));
+  await blockchain.getAllMarkets();
 }
+// setPriceCaller();
 
 async function withdraw() {
   const { suiClient, keypair } = getExecStuff();
@@ -287,86 +288,5 @@ async function withdraw() {
   });
   if (tx) {
     dryRunTransactionBlock(tx);
-  }
-}
-
-async function upgradePackageDryRun() {
-  const { suiClient } = getExecStuff();
-  const txb = new Transaction();
-  const multiSigAddress =
-    "0xa1eb94d1700652aa85b417b46fa6775575b8b98d3352d864fb5146eb45d335fb";
-  // <------------  -------------->
-
-  // Path to Move contracts
-  const pathToContracts = path.join(
-    homedir(),
-    "work",
-    "alphalend",
-    "alphalend-contracts",
-    "alphafi_oracle",
-  );
-  const { modules, dependencies, digest } = JSON.parse(
-    execSync(
-      `sui move build --dump-bytecode-as-base64 --path ${pathToContracts}`,
-      { encoding: "utf-8" },
-    ),
-  );
-
-  const packageId =
-    "0x378b2a104e8bcd7ed0317f5e6a0ec4fd271d4d12e2fe6c99bcd1f12be725cf4f";
-
-  const upgradeCapId =
-    "0x003f74baef0bc40394b59dfc134516435ac0750a1b55dd3bfdb0ffc68559019d";
-
-  const cap = txb.object(upgradeCapId);
-
-  // // Create a ticket for the upgrade
-  const ticket = txb.moveCall({
-    target: `0x2::package::authorize_upgrade`,
-    arguments: [
-      cap,
-      txb.pure.u8(UpgradePolicy.COMPATIBLE),
-      txb.pure.vector("u8", digest),
-    ],
-  });
-
-  // // Define the upgrade transaction
-  const result = txb.upgrade({
-    modules,
-    dependencies,
-    package: packageId,
-    ticket,
-  });
-
-  // // Commit the upgrade
-  txb.moveCall({
-    target: `0x2::package::commit_upgrade`,
-    arguments: [cap, result],
-  });
-
-  // Fetch coins to set as gas payment
-  const res = await suiClient.getCoins({
-    owner: multiSigAddress,
-    coinType: "0x2::sui::SUI",
-  });
-
-  const coin = res.data.find((coin) => {
-    return Number(coin.balance) >= 1_000_000_000;
-  });
-
-  if (!coin) {
-    console.error("Multisig address has less than 1 Sui");
-    process.exit(1);
-  }
-  txb.setGasPayment([
-    {
-      objectId: coin.coinObjectId,
-      version: coin.version,
-      digest: coin.digest,
-    } as ObjectRef,
-  ]);
-
-  if (txb) {
-    dryRunTransactionBlock(txb);
   }
 }

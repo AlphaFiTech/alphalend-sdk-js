@@ -1,4 +1,4 @@
-import { coins } from "../coin/constants.js";
+import { coinsList } from "../coin/constants.js";
 import { SuiClient } from "@mysten/sui/client";
 
 /**
@@ -28,7 +28,7 @@ export async function getBalances(
   });
 
   // Filter coins based on requested token names
-  const selectedCoins = Object.values(coins).filter((coin) =>
+  const selectedCoins = Object.values(coinsList).filter((coin) =>
     tokenNames.includes(coin.name),
   );
 
@@ -72,7 +72,7 @@ export async function getAllBalances(
 
   // Map all balances to include token names
   const balances = allBalances.map((balance) => {
-    const coin = Object.values(coins).find(
+    const coin = Object.values(coinsList).find(
       (coin) => coin.type.toLowerCase() === balance.coinType.toLowerCase(),
     );
     return {

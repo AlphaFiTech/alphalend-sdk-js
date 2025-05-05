@@ -167,7 +167,7 @@ export interface ProtocolStats {
 /**
  * Represents a lending market in the protocol
  */
-export interface Market {
+export interface MarketData {
   /** Unique identifier for the market */
   marketId: string;
   /** Fully qualified coin type handled by this market */
@@ -217,62 +217,40 @@ export interface Market {
 /**
  * Represents a user's complete portfolio in the protocol
  */
-export interface Portfolio {
-  /** Address of the portfolio owner */
-  userAddress: string;
+export interface UserPortfolio {
+  /** Position ID */
+  positionId: string;
   /** Total value of assets minus liabilities (USD) */
-  netWorth: string;
-  /** Total value of supplied assets (USD) */
-  totalSuppliedUsd: string;
-  /** Total value of borrowed assets (USD) */
-  totalBorrowedUsd: string;
-  /** Maximum amount that can be borrowed (USD) */
-  safeBorrowLimit: string;
-  /** Amount of borrowed assets multiplied by the borrow weight (USD) */
-  borrowLimitUsed: string;
-  /** Limit for liquidation (USD) */
-  liquidationLimit: string;
-  /** Amount of rewards to claim (USD) */
-  rewardsToClaimUsd: string;
-  /** Rewards by token */
-  rewardsByToken: {
-    token: string;
-    amount: string;
-  }[];
+  netWorth: Decimal;
   /** Daily earnings (USD) */
-  dailyEarnings: string;
+  dailyEarnings: Decimal;
   /** Net annual percentage rate (APR) */
-  netApr: string;
+  netApr: Decimal;
+  /** Maximum amount that can be borrowed (USD) */
+  safeBorrowLimit: Decimal;
+  /** Amount of borrowed assets multiplied by the borrow weight (USD) */
+  borrowLimitUsed: Decimal;
+  /** Limit for liquidation (USD) */
+  liquidationThreshold: Decimal;
+  /** Total value of supplied assets (USD) */
+  totalSuppliedUsd: Decimal;
   /** Aggregated supply APR */
-  aggregatedSupplyApr: string;
+  aggregatedSupplyApr: Decimal;
+  /** Total value of borrowed assets (USD) */
+  totalBorrowedUsd: Decimal;
   /** Aggregated borrow APR */
-  aggregatedBorrowApr: string;
-  /** User balances */
-  userBalances: {
-    marketId: string;
-    suppliedAmount: Decimal;
-    borrowedAmount: Decimal;
+  aggregatedBorrowApr: Decimal;
+  /** Map of market IDs to supplied amounts */
+  suppliedAmounts: Map<number, Decimal>;
+  /** Map of market IDs to borrowed amounts */
+  borrowedAmounts: Map<number, Decimal>;
+  /** Amount of rewards to claim (USD) */
+  rewardsToClaimUsd: Decimal;
+  /** Rewards by token */
+  rewardsToClaim: {
+    coinType: string;
+    rewardAmount: Decimal;
   }[];
-  /** Health factor of the user's position (safe when > 1.0) */
-  healthFactor: string;
-  /** Whether the user's position is eligible for liquidation */
-  isLiquidatable: boolean;
-  /** Detailed information about user's positions in each market */
-  marketPositions: Record<
-    string,
-    {
-      marketId: string;
-      coinType: string;
-      suppliedAmount: string;
-      suppliedAmountUsd: string;
-      borrowedAmount: string;
-      borrowedAmountUsd: string;
-      supplyApr: number;
-      borrowApr: number;
-      ltv: number;
-      liquidationThreshold: number;
-    }
-  >;
 }
 
 /**
@@ -308,5 +286,3 @@ export interface Position {
   /** Whether this position is eligible for liquidation */
   isLiquidatable: boolean;
 }
-
-

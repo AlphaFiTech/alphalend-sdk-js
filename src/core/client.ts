@@ -24,13 +24,10 @@ import {
   RepayParams,
   ClaimRewardsParams,
   LiquidateParams,
-  Market,
-  Portfolio,
+  MarketData,
+  UserPortfolio,
   ProtocolStats,
 } from "./types.js";
-import { getProtocolStats } from "../models/protocol.js";
-import { getAllMarkets } from "../models/market.js";
-import { getUserPortfolio } from "../models/position/posiiton.js";
 import {
   getAlphaReceipt,
   getClaimRewardInput,
@@ -40,6 +37,7 @@ import {
 import { Receipt } from "../utils/queryTypes.js";
 import { Constants } from "../constants/types.js";
 import { getUserPositionCapId } from "../models/position/functions.js";
+import { LendingProtocol } from "../models/lendingProtocol.js";
 
 /**
  * AlphaLend Client
@@ -58,6 +56,7 @@ export class AlphalendClient {
   pythConnection: SuiPriceServiceConnection;
   network: string;
   constants: Constants;
+  lendingProtocol: LendingProtocol;
 
   constructor(network: string, client: SuiClient) {
     this.network = network;
@@ -73,6 +72,7 @@ export class AlphalendClient {
         ? "https://hermes.pyth.network"
         : "https://hermes-beta.pyth.network",
     );
+    this.lendingProtocol = new LendingProtocol(network, client);
   }
 
   /**
@@ -526,7 +526,8 @@ export class AlphalendClient {
    */
   async getProtocolStats(): Promise<ProtocolStats | undefined> {
     try {
-      const stats = await getProtocolStats(this.client, this.network);
+      const markets = await this.lendingProtocol.getAllMarkets();
+      const stats = await this.lendingProtocol.getProtocolStats(markets);
       return stats;
     } catch (error) {
       console.error("Error getting protocol stats:", error);
@@ -539,9 +540,9 @@ export class AlphalendClient {
    *
    * @returns Promise resolving to an array of Market objects
    */
-  async getAllMarkets(): Promise<Market[] | undefined> {
+  async getAllMarkets(): Promise<MarketData[] | undefined> {
     try {
-      const markets = await getAllMarkets(this.client, this.network);
+      const markets = await this.lendingProtocol.getAllMarketsData();
       return markets;
     } catch (error) {
       console.error("Error getting markets:", error);
@@ -555,13 +556,12 @@ export class AlphalendClient {
    * @param userAddress The user's address
    * @returns Promise resolving to Portfolio object
    */
-  async getUserPortfolio(userAddress: string): Promise<Portfolio | undefined> {
+  async getUserPortfolio(
+    positionCapId: string,
+  ): Promise<UserPortfolio | undefined> {
     try {
-      const portfolio = await getUserPortfolio(
-        this.client,
-        this.network,
-        userAddress,
-      );
+      const portfolio =
+        await this.lendingProtocol.getUserPortfolio(positionCapId);
       return portfolio;
     } catch (error) {
       console.error("Error getting portfolio:", error);

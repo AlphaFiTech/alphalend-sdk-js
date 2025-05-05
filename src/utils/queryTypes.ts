@@ -91,7 +91,7 @@ export interface RewardDistributorQueryType {
   total_xtokens: string;
 }
 
-interface RewardQueryType {
+export interface RewardQueryType {
   type: string;
   fields: {
     id: {
@@ -109,7 +109,7 @@ interface RewardQueryType {
   };
 }
 
-interface FlowLimiterQueryType {
+export interface FlowLimiterQueryType {
   flow_delta: NumberQueryType;
   last_update: string;
   max_rate: string;

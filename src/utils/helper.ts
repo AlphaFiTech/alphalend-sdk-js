@@ -7,8 +7,8 @@ import {
   RewardDistributorQueryType,
 } from "./queryTypes.js";
 import { pythPriceFeedIdMap } from "./priceFeedIds.js";
-import { getMarketFromChain } from "../models/market.js";
 import { getUserPosition } from "../models/position/functions.js";
+import { Blockchain } from "../models/blockchain.js";
 
 export async function getClaimRewardInput(
   suiClient: SuiClient,
@@ -98,7 +98,8 @@ async function getRewardDistributor(
   marketId: number,
   isDepositRewardDistributor: boolean,
 ): Promise<RewardDistributorQueryType | undefined> {
-  const market = await getMarketFromChain(suiClient, network, marketId);
+  const blockchainClient = new Blockchain(network, suiClient);
+  const market = await blockchainClient.getMarketQuery(marketId);
   if (!market) return undefined;
 
   return isDepositRewardDistributor
