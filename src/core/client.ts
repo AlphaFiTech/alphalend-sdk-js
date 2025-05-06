@@ -388,11 +388,14 @@ export class AlphalendClient {
       this.network,
       params.address,
     );
+
+    let alphaCoin: TransactionObjectArgument | undefined = undefined;
     for (const data of rewardInput) {
-      for (const coinType of data.coinTypes) {
+      for (let coinType of data.coinTypes) {
+        coinType = "0x" + coinType;
         let coin1: TransactionObjectArgument | undefined;
         let promise: TransactionObjectArgument | undefined;
-        if (params.claimAll && !params.claimAlpha) {
+        if (params.claimAll && coinType !== this.constants.ALPHA_COIN_TYPE) {
           [coin1, promise] = tx.moveCall({
             target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::collect_reward_and_deposit`,
             typeArguments: [coinType],
@@ -422,21 +425,17 @@ export class AlphalendClient {
             params.claimAlpha &&
             coinType === this.constants.ALPHA_COIN_TYPE
           ) {
-            if (coin2 && coin1) {
-              const [coin] = tx.splitCoins(coin1, [0]);
-              tx.mergeCoins(coin, [coin1, coin2]);
-              this.depositAlphaTransaction(tx, coin, params.address);
-            } else if (coin2) {
-              this.depositAlphaTransaction(tx, coin2, params.address);
-            } else if (coin1) {
-              this.depositAlphaTransaction(tx, coin1, params.address);
+            if (coin2) {
+              alphaCoin = this.mergeAlphaCoins(tx, alphaCoin, [coin2]);
+            }
+            if (coin1) {
+              alphaCoin = this.mergeAlphaCoins(tx, alphaCoin, [coin1]);
             }
           } else {
-            if (coin2 && coin1) {
-              tx.transferObjects([coin1, coin2], params.address);
-            } else if (coin2) {
+            if (coin2) {
               tx.transferObjects([coin2], params.address);
-            } else if (coin1) {
+            }
+            if (coin1) {
               tx.transferObjects([coin1], params.address);
             }
           }
@@ -445,12 +444,15 @@ export class AlphalendClient {
             params.claimAlpha &&
             coinType === this.constants.ALPHA_COIN_TYPE
           ) {
-            this.depositAlphaTransaction(tx, coin1, params.address);
+            alphaCoin = this.mergeAlphaCoins(tx, alphaCoin, [coin1]);
           } else {
             tx.transferObjects([coin1], params.address);
           }
         }
       }
+    }
+    if (alphaCoin) {
+      await this.depositAlphaTransaction(tx, alphaCoin, params.address);
     }
 
     const estimatedGasBudget = await getEstimatedGasBudget(
@@ -460,6 +462,20 @@ export class AlphalendClient {
     );
     if (estimatedGasBudget) tx.setGasBudget(estimatedGasBudget);
     return tx;
+  }
+
+  private mergeAlphaCoins(
+    tx: Transaction,
+    alphaCoin: TransactionObjectArgument | undefined,
+    coins: TransactionObjectArgument[],
+  ): TransactionObjectArgument {
+    if (alphaCoin) {
+      tx.mergeCoins(alphaCoin, coins);
+    } else {
+      alphaCoin = tx.splitCoins(coins[0], [0]);
+      tx.mergeCoins(alphaCoin, coins);
+    }
+    return alphaCoin;
   }
 
   /**
@@ -668,14 +684,14 @@ export class AlphalendClient {
 
   private async depositAlphaTransaction(
     tx: Transaction,
-    supplyCoin: any,
+    supplyCoin: TransactionObjectArgument,
     address: string,
   ) {
     const constants = getAlphafiConstants();
     const receipt: Receipt[] = await getAlphaReceipt(this.client, address);
 
-    if (receipt.length == 0) {
-      const [receipt] = tx.moveCall({
+    if (receipt.length === 0) {
+      const noneReceipt = tx.moveCall({
         target: `0x1::option::none`,
         typeArguments: [constants.ALPHA_POOL_RECEIPT],
         arguments: [],
@@ -685,7 +701,7 @@ export class AlphalendClient {
         typeArguments: [constants.ALPHA_COIN_TYPE],
         arguments: [
           tx.object(constants.VERSION),
-          receipt,
+          noneReceipt,
           tx.object(constants.ALPHA_POOL),
           tx.object(constants.ALPHA_DISTRIBUTOR),
           supplyCoin,
@@ -693,7 +709,7 @@ export class AlphalendClient {
         ],
       });
     } else {
-      const [someReceipt] = tx.moveCall({
+      const someReceipt = tx.moveCall({
         target: `0x1::option::some`,
         typeArguments: [constants.ALPHA_POOL_RECEIPT],
         arguments: [tx.object(receipt[0].objectId)],
