@@ -114,11 +114,7 @@ export class Position {
 
         totalBorrowedUsd = totalBorrowedUsd.add(loanUsd);
 
-        const utilizationRate = market.utilizationRate();
         const borrowApr = market.calculateBorrowApr();
-        const reserveFactor = new Decimal(
-          market.market.config.protocolFeeShareBps,
-        ).div(10000);
         const borrowRewards = await market.calculateBorrowRewardApr();
         const totalBorrowRewardApr = borrowRewards.reduce(
           (acc, reward) => acc.add(reward.rewardApr),
@@ -130,7 +126,7 @@ export class Position {
         );
 
         totalBorrowedByWeightUsd = totalBorrowedByWeightUsd.add(
-          loanUsd.mul(new Decimal(market.market.config.borrowWeight).div(100)),
+          loanUsd.mul(new Decimal(market.market.config.borrowWeight).div(1e18)),
         );
 
         totalWeightedAmount = totalWeightedAmount.sub(loanUsd);
@@ -179,7 +175,6 @@ export class Position {
               parseFloat(collateral.key),
               new Decimal(collateral.value)
                 .mul(market.market.xtokenRatio)
-                .div(10 ** 18)
                 .div(market.market.decimalDigit),
             ];
           }
@@ -192,7 +187,9 @@ export class Position {
           if (market) {
             return [
               parseFloat(loan.marketId),
-              new Decimal(loan.amount).div(market.market.decimalDigit),
+              new Decimal(loan.amount)
+                .div(market.market.decimalDigit)
+                .mul(1e18),
             ];
           }
           return [parseFloat(loan.marketId), new Decimal(0)];

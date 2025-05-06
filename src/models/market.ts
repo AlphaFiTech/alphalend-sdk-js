@@ -229,7 +229,9 @@ export class Market {
       if (rewardDuration === BigInt(0)) return;
 
       const rewardsGenerated =
-        (totalRewards * BigInt(timeElapsed)) / rewardDuration;
+        ((totalRewards - BigInt(reward.distributedRewards)) *
+          BigInt(timeElapsed)) /
+        (BigInt(reward.endTime) - BigInt(rewardDistributor.lastUpdated));
 
       reward.distributedRewards = (
         BigInt(reward.distributedRewards) + rewardsGenerated

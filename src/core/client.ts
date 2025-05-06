@@ -557,11 +557,11 @@ export class AlphalendClient {
    * @returns Promise resolving to Portfolio object
    */
   async getUserPortfolio(
-    positionCapId: string,
-  ): Promise<UserPortfolio | undefined> {
+    userAddress: string,
+  ): Promise<UserPortfolio[] | undefined> {
     try {
       const portfolio =
-        await this.lendingProtocol.getUserPortfolio(positionCapId);
+        await this.lendingProtocol.getUserPortfolio(userAddress);
       return portfolio;
     } catch (error) {
       console.error("Error getting portfolio:", error);

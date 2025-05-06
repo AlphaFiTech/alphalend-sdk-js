@@ -22,6 +22,7 @@ import { SuiPriceServiceConnection } from "@pythnetwork/pyth-sui-js";
 import { SuiPythClient } from "@pythnetwork/pyth-sui-js";
 import { getSuiClient, updatePriceTransaction } from "../index.js";
 import { Blockchain } from "../models/blockchain.js";
+import { Market } from "../models/market.js";
 
 dotenv.config();
 
@@ -242,10 +243,16 @@ export async function executeTransactionBlock() {
   //   "testnet",
   // );
   // await setPrice(tx, "0x2::sui::SUI", 10, 10, 1);
-  updatePriceTransaction(tx, {
-    priceInfoObject: "0x8270feb7375eee355e64fdb69c50abb6b5f9393a722883c1cf45f8e26048810a::wal::WAL",
-    coinType: "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin2::TESTCOIN2",
-  }, constants);
+  updatePriceTransaction(
+    tx,
+    {
+      priceInfoObject:
+        "0x8270feb7375eee355e64fdb69c50abb6b5f9393a722883c1cf45f8e26048810a::wal::WAL",
+      coinType:
+        "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin2::TESTCOIN2",
+    },
+    constants,
+  );
   await suiClient
     .signAndExecuteTransaction({
       signer: keypair,
@@ -266,11 +273,21 @@ export async function executeTransactionBlock() {
 }
 // executeTransactionBlock();
 
-async function setPriceCaller() {
-  const blockchain = new Blockchain("mainnet", getSuiClient("mainnet"));
-  await blockchain.getAllMarkets();
+async function getAllMarkets() {
+  const client = new AlphalendClient("mainnet", getSuiClient("mainnet"));
+  const res = await client.getAllMarkets();
+  console.log(res);
 }
-// setPriceCaller();
+// getAllMarkets();
+
+async function getUserPortfolio() {
+  const client = new AlphalendClient("mainnet", getSuiClient("mainnet"));
+  const res = await client.getUserPortfolio(
+    "0xe136f0b6faf27ee707725f38f2aeefc51c6c31cc508222bee5cbc4f5fcf222c3",
+  );
+  console.log(res);
+}
+getUserPortfolio();
 
 async function withdraw() {
   const { suiClient, keypair } = getExecStuff();

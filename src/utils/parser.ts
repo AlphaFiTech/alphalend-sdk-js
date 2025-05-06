@@ -64,8 +64,11 @@ export function parseReward(reward: RewardQueryType | null): RewardType | null {
     totalRewards: reward.fields.total_rewards,
     startTime: reward.fields.start_time,
     endTime: reward.fields.end_time,
-    distributedRewards: reward.fields.distributed_rewards,
-    cummulativeRewardsPerShare: reward.fields.cummulative_rewards_per_share,
+    distributedRewards: (
+      BigInt(reward.fields.distributed_rewards.fields.value) / BigInt(1e18)
+    ).toString(),
+    cummulativeRewardsPerShare:
+      reward.fields.cummulative_rewards_per_share.fields.value,
   };
 }
 
@@ -221,6 +224,11 @@ export function parseBorrow(borrow: {
   type: string;
 }): BorrowType {
   const fields = borrow.fields;
+  if (fields.coin_type.fields.name.includes("sui::SUI")) {
+    fields.coin_type.fields.name = "0x2::sui::SUI";
+  } else {
+    fields.coin_type.fields.name = "0x" + fields.coin_type.fields.name;
+  }
 
   return {
     amount: fields.amount,
@@ -286,11 +294,18 @@ export function parseUserReward(userReward: {
   if (!userReward.fields) return null;
 
   const fields = userReward.fields;
+  if (fields.coin_type.fields.name.includes("sui::SUI")) {
+    fields.coin_type.fields.name = "0x2::sui::SUI";
+  } else {
+    fields.coin_type.fields.name = "0x" + fields.coin_type.fields.name;
+  }
 
   return {
     rewardId: fields.reward_id,
     coinType: fields.coin_type.fields.name,
-    earnedRewards: fields.earned_rewards.fields.value,
+    earnedRewards: (
+      BigInt(fields.earned_rewards.fields.value) / BigInt(1e18)
+    ).toString(),
     cummulativeRewardsPerShare:
       fields.cummulative_rewards_per_share.fields.value,
     isAutoCompounded: fields.is_auto_compounded,

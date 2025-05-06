@@ -63,7 +63,9 @@ export async function getClaimRewardInput(
           coinTypes.add(marketReward.fields.coin_type.fields.name);
         } else if (
           // user has share and some rewards have been distributed after last update
-          parseFloat(marketReward.fields.cummulative_rewards_per_share) >
+          parseFloat(
+            marketReward.fields.cummulative_rewards_per_share.fields.value,
+          ) >
             parseFloat(
               userRewardFields.cummulative_rewards_per_share.fields.value,
             ) &&
@@ -74,7 +76,9 @@ export async function getClaimRewardInput(
       } else if (
         // new reward started and finished after last update and user has share
         parseFloat(rewardDistributor.fields.share) > 0 &&
-        parseFloat(marketReward.fields.cummulative_rewards_per_share) > 0
+        parseFloat(
+          marketReward.fields.cummulative_rewards_per_share.fields.value,
+        ) > 0
       ) {
         coinTypes.add(marketReward.fields.coin_type.fields.name);
       }
@@ -131,9 +135,34 @@ export const getPricesFromPyth = async (
   coinTypes: string[],
 ): Promise<PriceData[]> => {
   try {
+    const result: PriceData[] = [];
     const constants = getConstants("mainnet");
+    const alphafiConstants = getAlphafiConstants();
     if (coinTypes.length === 0) {
       return [];
+    }
+    if (coinTypes.includes(alphafiConstants.ALPHA_COIN_TYPE)) {
+      const req_url = `https://api.alphafi.xyz/alpha/fetchPrices?pairs=ALPHA/USD`;
+      const response = await fetch(req_url);
+      const data = (await response.json())[0] as { pair: any; price: string };
+      result.push({
+        coinType: alphafiConstants.ALPHA_COIN_TYPE,
+        price: {
+          price: data.price,
+          conf: "1",
+          expo: 9,
+          publish_time: Date.now(),
+        },
+        ema_price: {
+          price: data.price,
+          conf: "1",
+          expo: 9,
+          publish_time: Date.now(),
+        },
+      });
+      coinTypes = coinTypes.filter(
+        (coinType) => coinType !== alphafiConstants.ALPHA_COIN_TYPE,
+      );
     }
 
     const feedIds: string[] = [];
@@ -171,7 +200,6 @@ export const getPricesFromPyth = async (
       return [];
     }
 
-    const result: PriceData[] = [];
     for (const price of prices) {
       result.push({
         coinType: feedIdToCoinType[price.id],
