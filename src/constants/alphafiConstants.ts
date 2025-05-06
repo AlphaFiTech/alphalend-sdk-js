@@ -6,7 +6,7 @@ export const alphafiConstants = {
     "0x9bbd650b8442abb082c20f3bc95a9434a8d47b4bef98b0832dab57c1a8ba7123::alphapool::Receipt",
 
   ALPHA_COIN_TYPE:
-    "0xfe3afec26c59e874f3c1d60b8203cb3852d2bb2aa415df9548b8d688e6683f93",
+    "0xfe3afec26c59e874f3c1d60b8203cb3852d2bb2aa415df9548b8d688e6683f93::alpha::ALPHA",
 
   ALPHA_POOL:
     "0x6ee8f60226edf48772f81e5986994745dae249c2605a5b12de6602ef1b05b0c1",
