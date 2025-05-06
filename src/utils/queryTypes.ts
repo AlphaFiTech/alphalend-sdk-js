@@ -104,8 +104,18 @@ interface RewardQueryType {
     total_rewards: string;
     start_time: string;
     end_time: string;
-    distributed_rewards: string;
-    cummulative_rewards_per_share: string;
+    distributed_rewards: {
+      fields: {
+        value: string;
+      };
+      type: string;
+    };
+    cummulative_rewards_per_share: {
+      fields: {
+        value: string;
+      };
+      type: string;
+    };
   };
 }
 

@@ -63,7 +63,9 @@ export async function getClaimRewardInput(
           coinTypes.add(marketReward.fields.coin_type.fields.name);
         } else if (
           // user has share and some rewards have been distributed after last update
-          parseFloat(marketReward.fields.cummulative_rewards_per_share) >
+          parseFloat(
+            marketReward.fields.cummulative_rewards_per_share.fields.value,
+          ) >
             parseFloat(
               userRewardFields.cummulative_rewards_per_share.fields.value,
             ) &&
@@ -74,7 +76,9 @@ export async function getClaimRewardInput(
       } else if (
         // new reward started and finished after last update and user has share
         parseFloat(rewardDistributor.fields.share) > 0 &&
-        parseFloat(marketReward.fields.cummulative_rewards_per_share) > 0
+        parseFloat(
+          marketReward.fields.cummulative_rewards_per_share.fields.value,
+        ) > 0
       ) {
         coinTypes.add(marketReward.fields.coin_type.fields.name);
       }

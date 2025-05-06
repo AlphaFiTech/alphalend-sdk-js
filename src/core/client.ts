@@ -388,14 +388,14 @@ export class AlphalendClient {
       this.network,
       params.address,
     );
+
+    let alphaCoin: TransactionObjectArgument | undefined = undefined;
     for (const data of rewardInput) {
-      for (const coinType of data.coinTypes) {
+      for (let coinType of data.coinTypes) {
+        coinType = "0x" + coinType;
         let coin1: TransactionObjectArgument | undefined;
         let promise: TransactionObjectArgument | undefined;
-        if (
-          params.claimAll &&
-          "0x" + coinType !== this.constants.ALPHA_COIN_TYPE
-        ) {
+        if (params.claimAll && coinType !== this.constants.ALPHA_COIN_TYPE) {
           [coin1, promise] = tx.moveCall({
             target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::collect_reward_and_deposit`,
             typeArguments: [coinType],
@@ -423,37 +423,36 @@ export class AlphalendClient {
           const coin2 = await this.handlePromise(tx, promise, coinType);
           if (
             params.claimAlpha &&
-            "0x" + coinType === this.constants.ALPHA_COIN_TYPE
+            coinType === this.constants.ALPHA_COIN_TYPE
           ) {
-            if (coin2 && coin1) {
-              const [coin] = tx.splitCoins(coin1, [0]);
-              tx.mergeCoins(coin, [coin1, coin2]);
-              this.depositAlphaTransaction(tx, coin, params.address);
-            } else if (coin2) {
-              this.depositAlphaTransaction(tx, coin2, params.address);
-            } else if (coin1) {
-              this.depositAlphaTransaction(tx, coin1, params.address);
+            if (coin2) {
+              alphaCoin = this.mergeAlphaCoins(tx, alphaCoin, [coin2]);
+            }
+            if (coin1) {
+              alphaCoin = this.mergeAlphaCoins(tx, alphaCoin, [coin1]);
             }
           } else {
-            if (coin2 && coin1) {
-              tx.transferObjects([coin1, coin2], params.address);
-            } else if (coin2) {
+            if (coin2) {
               tx.transferObjects([coin2], params.address);
-            } else if (coin1) {
+            }
+            if (coin1) {
               tx.transferObjects([coin1], params.address);
             }
           }
         } else if (coin1) {
           if (
             params.claimAlpha &&
-            "0x" + coinType === this.constants.ALPHA_COIN_TYPE
+            coinType === this.constants.ALPHA_COIN_TYPE
           ) {
-            this.depositAlphaTransaction(tx, coin1, params.address);
+            alphaCoin = this.mergeAlphaCoins(tx, alphaCoin, [coin1]);
           } else {
             tx.transferObjects([coin1], params.address);
           }
         }
       }
+    }
+    if (alphaCoin) {
+      await this.depositAlphaTransaction(tx, alphaCoin, params.address);
     }
 
     const estimatedGasBudget = await getEstimatedGasBudget(
@@ -463,6 +462,20 @@ export class AlphalendClient {
     );
     if (estimatedGasBudget) tx.setGasBudget(estimatedGasBudget);
     return tx;
+  }
+
+  private mergeAlphaCoins(
+    tx: Transaction,
+    alphaCoin: TransactionObjectArgument | undefined,
+    coins: TransactionObjectArgument[],
+  ): TransactionObjectArgument {
+    if (alphaCoin) {
+      tx.mergeCoins(alphaCoin, coins);
+    } else {
+      alphaCoin = tx.splitCoins(coins[0], [0]);
+      tx.mergeCoins(alphaCoin, coins);
+    }
+    return alphaCoin;
   }
 
   /**
@@ -671,7 +684,7 @@ export class AlphalendClient {
 
   private async depositAlphaTransaction(
     tx: Transaction,
-    supplyCoin: any,
+    supplyCoin: TransactionObjectArgument,
     address: string,
   ) {
     const constants = getAlphafiConstants();

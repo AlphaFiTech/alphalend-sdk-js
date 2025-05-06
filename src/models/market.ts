@@ -66,7 +66,7 @@ const fetchAndRefreshMarket = async (
 };
 
 export const getAllMarkets = async (
-  suiClient: SuiClient, 
+  suiClient: SuiClient,
   network: string,
 ): Promise<Market[]> => {
   try {
@@ -543,16 +543,17 @@ const refreshRewardDistributors = (
     const rewardsGenerated =
       (totalRewards * BigInt(timeElapsed)) / rewardDuration;
 
-    reward.fields.distributed_rewards = (
-      BigInt(reward.fields.distributed_rewards) + rewardsGenerated
+    reward.fields.distributed_rewards.fields.value = (
+      BigInt(reward.fields.distributed_rewards.fields.value) + rewardsGenerated
     ).toString();
 
     const rewardsPerShare =
       (rewardsGenerated * BigInt(1e18)) /
       BigInt(rewardDistributor.total_xtokens);
 
-    reward.fields.cummulative_rewards_per_share = (
-      BigInt(reward.fields.cummulative_rewards_per_share) + rewardsPerShare
+    reward.fields.cummulative_rewards_per_share.fields.value = (
+      BigInt(reward.fields.cummulative_rewards_per_share.fields.value) +
+      rewardsPerShare
     ).toString();
   });
 
