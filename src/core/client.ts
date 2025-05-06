@@ -392,7 +392,10 @@ export class AlphalendClient {
       for (const coinType of data.coinTypes) {
         let coin1: TransactionObjectArgument | undefined;
         let promise: TransactionObjectArgument | undefined;
-        if (params.claimAll && !params.claimAlpha) {
+        if (
+          params.claimAll &&
+          "0x" + coinType !== this.constants.ALPHA_COIN_TYPE
+        ) {
           [coin1, promise] = tx.moveCall({
             target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::collect_reward_and_deposit`,
             typeArguments: [coinType],
@@ -420,7 +423,7 @@ export class AlphalendClient {
           const coin2 = await this.handlePromise(tx, promise, coinType);
           if (
             params.claimAlpha &&
-            coinType === this.constants.ALPHA_COIN_TYPE
+            "0x" + coinType === this.constants.ALPHA_COIN_TYPE
           ) {
             if (coin2 && coin1) {
               const [coin] = tx.splitCoins(coin1, [0]);
@@ -443,7 +446,7 @@ export class AlphalendClient {
         } else if (coin1) {
           if (
             params.claimAlpha &&
-            coinType === this.constants.ALPHA_COIN_TYPE
+            "0x" + coinType === this.constants.ALPHA_COIN_TYPE
           ) {
             this.depositAlphaTransaction(tx, coin1, params.address);
           } else {
@@ -674,8 +677,8 @@ export class AlphalendClient {
     const constants = getAlphafiConstants();
     const receipt: Receipt[] = await getAlphaReceipt(this.client, address);
 
-    if (receipt.length == 0) {
-      const [receipt] = tx.moveCall({
+    if (receipt.length === 0) {
+      const noneReceipt = tx.moveCall({
         target: `0x1::option::none`,
         typeArguments: [constants.ALPHA_POOL_RECEIPT],
         arguments: [],
@@ -685,7 +688,7 @@ export class AlphalendClient {
         typeArguments: [constants.ALPHA_COIN_TYPE],
         arguments: [
           tx.object(constants.VERSION),
-          receipt,
+          noneReceipt,
           tx.object(constants.ALPHA_POOL),
           tx.object(constants.ALPHA_DISTRIBUTOR),
           supplyCoin,
@@ -693,7 +696,7 @@ export class AlphalendClient {
         ],
       });
     } else {
-      const [someReceipt] = tx.moveCall({
+      const someReceipt = tx.moveCall({
         target: `0x1::option::some`,
         typeArguments: [constants.ALPHA_POOL_RECEIPT],
         arguments: [tx.object(receipt[0].objectId)],

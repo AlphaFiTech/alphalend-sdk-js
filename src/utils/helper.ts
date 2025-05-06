@@ -313,7 +313,7 @@ export async function getAlphaReceipt(
     paginatedObjects.data.forEach((obj) => {
       const o = obj.data as Receipt;
       if (o) {
-        if (constants.ALPHA_POOL_RECEIPT === o.content.fields.name) {
+        if (constants.ALPHA_POOL_RECEIPT === o.content.type) {
           nfts.push(o);
         }
       }
