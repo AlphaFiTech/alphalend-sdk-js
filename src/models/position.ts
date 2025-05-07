@@ -18,11 +18,9 @@ export class Position {
 
   async getUserPortfolio(markets: Market[]): Promise<UserPortfolio> {
     const marketMap = new Map<number, Market>();
-    const coinTypes: string[] = [];
     for (const market of markets) {
       market.refresh();
       marketMap.set(parseFloat(market.market.marketId), market);
-      coinTypes.push(market.market.coinType);
     }
     this.refresh(marketMap);
 
@@ -52,7 +50,9 @@ export class Position {
         ).div(decimalDivisor);
 
         const price = await getPricesFromPyth([market.market.coinType]);
-        const collateralUsd = collateralAmount.mul(price[0].price.price);
+        const collateralUsd = collateralAmount.mul(
+          price.get(market.market.coinType)?.price.price ?? 0,
+        );
 
         totalSuppliedUsd = totalSuppliedUsd.add(collateralUsd);
 
@@ -63,17 +63,7 @@ export class Position {
         safeBorrowLimitUsd = safeBorrowLimitUsd.add(
           collateralUsd.mul(marketLtv),
         );
-
-        const utilizationRate = market.utilizationRate();
-        const borrowApr = market.calculateBorrowApr();
-        const reserveFactor = new Decimal(
-          market.market.config.protocolFeeShareBps,
-        ).div(10000);
-        const supplyApr = market.calculateSupplyApr(
-          borrowApr.interestApr,
-          utilizationRate,
-          reserveFactor,
-        );
+        const supplyApr = market.calculateSupplyApr();
 
         // Get supply reward APRs and add them to the total
         const supplyRewards = await market.calculateSupplyRewardApr();
@@ -110,7 +100,9 @@ export class Position {
           decimalDivisor,
         );
         const price = await getPricesFromPyth([market.market.coinType]);
-        const loanUsd = compoundedLoanAmount.mul(price[0].price.price);
+        const loanUsd = compoundedLoanAmount.mul(
+          price.get(market.market.coinType)?.price.price ?? 0,
+        );
 
         totalBorrowedUsd = totalBorrowedUsd.add(loanUsd);
 
@@ -135,8 +127,10 @@ export class Position {
 
     const netWorth = totalSuppliedUsd.sub(totalBorrowedUsd);
 
-    const netApr = totalSuppliedUsd.gt(0)
-      ? totalWeightedSupplyApr.sub(totalWeightedBorrowApr).div(totalSuppliedUsd)
+    const netApr = totalWeightedAmount.gt(0)
+      ? totalWeightedSupplyApr
+          .sub(totalWeightedBorrowApr)
+          .div(totalWeightedAmount)
       : new Decimal(0);
 
     const aggregatedSupplyApr = totalSuppliedUsd.gt(0)
@@ -145,9 +139,10 @@ export class Position {
 
     const rewardsToClaim = this.calculateRewardsToClaim();
     const rewardCoinTypes = rewardsToClaim.map((reward) => reward.coinType);
+
     const prices = await getPricesFromPyth(rewardCoinTypes);
     const rewardsToClaimUsd = rewardsToClaim.reduce((acc, reward) => {
-      const price = prices.find((price) => price.coinType === reward.coinType);
+      const price = prices.get(reward.coinType);
       return acc.add(reward.rewardAmount.mul(price?.price.price ?? 0));
     }, new Decimal(0));
 
@@ -175,7 +170,8 @@ export class Position {
               parseFloat(collateral.key),
               new Decimal(collateral.value)
                 .mul(market.market.xtokenRatio)
-                .div(market.market.decimalDigit),
+                .div(market.market.decimalDigit)
+                .div(1e18),
             ];
           }
           return [parseFloat(collateral.key), new Decimal(0)];
@@ -187,9 +183,7 @@ export class Position {
           if (market) {
             return [
               parseFloat(loan.marketId),
-              new Decimal(loan.amount)
-                .div(market.market.decimalDigit)
-                .mul(1e18),
+              new Decimal(loan.amount).div(market.market.decimalDigit),
             ];
           }
           return [parseFloat(loan.marketId), new Decimal(0)];
@@ -299,6 +293,7 @@ export class Position {
             const newAmount =
               (BigInt(loan.amount) * BigInt(market.market.compoundedInterest)) /
               BigInt(loan.borrowCompoundedInterest);
+
             loan.amount = newAmount.toString();
             loan.borrowCompoundedInterest = market.market.compoundedInterest;
           }
@@ -322,7 +317,7 @@ export class Position {
         share: "0",
         rewards: [],
         lastUpdated: "0",
-        isDeposit: isDeposit,
+        isDeposit,
       };
       this.refreshUserRewardDistributor(
         userDistributor,
@@ -338,10 +333,14 @@ export class Position {
   private findUserRewardDistributor(
     distributor: RewardDistributorType,
   ): number {
-    return this.position.rewardDistributors.findIndex(
+    const index = this.position.rewardDistributors.findIndex(
       (rewardDistributor) =>
         rewardDistributor.rewardDistributorId === distributor.id,
     );
+    if (index === -1) {
+      return this.position.rewardDistributors.length;
+    }
+    return index;
   }
 
   private refreshUserRewardDistributor(
@@ -349,7 +348,7 @@ export class Position {
     distributor: RewardDistributorType,
     isNew: boolean,
     currentTime: number,
-  ) {
+  ): void {
     if (userDistributor.rewardDistributorId !== distributor.id) {
       throw new Error("Distributor ID does not match");
     }

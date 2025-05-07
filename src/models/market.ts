@@ -2,6 +2,7 @@ import { Decimal } from "decimal.js";
 import { MarketType, RewardDistributorType } from "../utils/parsedTypes.js";
 import { getPricesFromPyth } from "../utils/helper.js";
 import { MarketData } from "../core/types.js";
+import { decimalsMap } from "../utils/priceFeedIds.js";
 
 export class Market {
   market: MarketType;
@@ -28,14 +29,7 @@ export class Market {
 
     // Calculate borrow APR
     const borrowApr = this.calculateBorrowApr();
-    const reserveFactor = new Decimal(marketConfig.protocolFeeShareBps).div(
-      10000,
-    );
-    const supplyApr = this.calculateSupplyApr(
-      borrowApr.interestApr,
-      utilizationRate,
-      reserveFactor,
-    );
+    const supplyApr = this.calculateSupplyApr();
 
     // reward Aprs
     borrowApr.rewards = await this.calculateBorrowRewardApr();
@@ -48,7 +42,9 @@ export class Market {
         new Decimal(this.totalLiquidity().toString()).mul(
           new Decimal(marketConfig.borrowLimitPercentage).div(100),
         ),
-      ),
+      )
+        .sub(this.market.borrowedAmount)
+        .div(decimalDigit),
     );
     const allowedDepositAmount = Decimal.max(
       0,
@@ -66,18 +62,16 @@ export class Market {
       utilizationRate,
       supplyApr,
       borrowApr,
-      ltv: new Decimal(marketConfig.safeCollateralRatio).div(100),
+      ltv: new Decimal(marketConfig.safeCollateralRatio),
       availableLiquidity: new Decimal(this.market.balanceHolding).div(
         decimalDigit,
       ),
       borrowFee: new Decimal(marketConfig.borrowFeeBps).div(100),
       borrowWeight: new Decimal(marketConfig.borrowWeight).div(1e18),
-      liquidationThreshold: new Decimal(marketConfig.liquidationThreshold).div(
-        100,
-      ),
+      liquidationThreshold: new Decimal(marketConfig.liquidationThreshold),
       allowedDepositAmount,
       allowedBorrowAmount,
-      xtokenRatio: new Decimal(this.market.xtokenRatio),
+      xtokenRatio: new Decimal(this.market.xtokenRatio).div(1e18),
     };
   }
 
@@ -98,7 +92,10 @@ export class Market {
   utilizationRate(): Decimal {
     const totalSupply = new Decimal(this.totalLiquidity().toString());
     if (totalSupply.gt(0)) {
-      return new Decimal(this.market.borrowedAmount).div(totalSupply);
+      return Decimal.min(
+        new Decimal(this.market.borrowedAmount).div(totalSupply),
+        new Decimal(1),
+      );
     }
     return new Decimal(0);
   }
@@ -124,7 +121,7 @@ export class Market {
 
         // Calculate multiplier (1 + interest_rate_per_second)
         const multiplier = new Decimal(1).add(
-          borrowApr.interestApr.div(31536000),
+          borrowApr.interestApr.div(31536000 * 100),
         ); // 31536000 seconds in a year
 
         // Calculate compounded multiplier using exponentiation
@@ -142,13 +139,20 @@ export class Market {
         const compoundedMultiplier = result;
 
         // Calculate new borrowed amount using bigint to avoid overflow
-        let borrowed_u256 = BigInt(this.market.borrowedAmount);
-        let new_borrowed =
-          (borrowed_u256 * compoundedMultiplier) / BigInt(1e18);
+        let borrowedU256 = BigInt(this.market.borrowedAmount);
+        let newBorrowed = (borrowedU256 * compoundedMultiplier) / BigInt(1e18);
 
-        // Update borrowed amount
-        this.market.borrowedAmount = new_borrowed.toString();
-        // Update compounded interest
+        const spreadFee =
+          ((newBorrowed - borrowedU256) *
+            BigInt(this.market.config.spreadFeeBps)) /
+          BigInt(10000);
+
+        this.market.unclaimedSpreadFee = (
+          BigInt(this.market.unclaimedSpreadFee) + spreadFee
+        ).toString();
+
+        this.market.borrowedAmount = newBorrowed.toString();
+
         this.market.compoundedInterest = (
           (BigInt(this.market.compoundedInterest) * compoundedMultiplier) /
           BigInt(1e18)
@@ -164,28 +168,7 @@ export class Market {
       newXTokenRatio =
         (totalLiquidity * BigInt(1e18)) / BigInt(this.market.xtokenSupply);
     }
-
-    const changedRatio = newXTokenRatio - BigInt(this.market.xtokenRatio);
-    const spreadFeeRatio =
-      (changedRatio * BigInt(this.market.config.spreadFeeBps)) / BigInt(10000);
-    const addUnclaimedSpreadFee = totalLiquidity * spreadFeeRatio;
-    const protocolShare =
-      (addUnclaimedSpreadFee *
-        BigInt(this.market.config.protocolSpreadFeeShareBps)) /
-      BigInt(10000);
-
-    // Updates
-    this.market.unclaimedSpreadFeeProtocol = (
-      BigInt(this.market.unclaimedSpreadFeeProtocol) +
-      protocolShare / BigInt(1e18)
-    ).toString();
-
-    this.market.unclaimedSpreadFee = (
-      BigInt(this.market.unclaimedSpreadFee) +
-      (addUnclaimedSpreadFee - protocolShare) / BigInt(1e18)
-    ).toString();
-
-    this.market.xtokenRatio = (newXTokenRatio - spreadFeeRatio).toString();
+    this.market.xtokenRatio = newXTokenRatio.toString();
   }
 
   refreshRewardDistributors(rewardDistributor: RewardDistributorType) {
@@ -196,7 +179,7 @@ export class Market {
       return;
     }
     // If no xTokens, nothing to distribute
-    if (rewardDistributor.totalXtokens === "0" || !rewardDistributor.rewards) {
+    if (rewardDistributor.totalXtokens === "0") {
       return;
     }
     // Iterate through rewards
@@ -221,15 +204,8 @@ export class Market {
       const timeElapsed = endTime - startTime;
 
       // Calculate rewards generated during this period
-      const totalRewards = BigInt(reward.totalRewards);
-      const rewardDuration = BigInt(
-        parseInt(reward.endTime) - parseInt(reward.startTime),
-      );
-
-      if (rewardDuration === BigInt(0)) return;
-
       const rewardsGenerated =
-        ((totalRewards - BigInt(reward.distributedRewards)) *
+        ((BigInt(reward.totalRewards) - BigInt(reward.distributedRewards)) *
           BigInt(timeElapsed)) /
         (BigInt(reward.endTime) - BigInt(rewardDistributor.lastUpdated));
 
@@ -256,16 +232,19 @@ export class Market {
       rewardApr: Decimal;
     }[]
   > => {
-    const rewardAps: {
+    const rewardAprs: {
       coinType: string;
       rewardApr: Decimal;
     }[] = [];
     const MILLISECONDS_IN_YEAR = 365 * 24 * 60 * 60 * 1000; // 31536000000
 
     const distributor = this.market.depositRewardDistributor;
-    const totalLiquidity = new Decimal(this.totalLiquidity().toString());
+    const decimalDigit = new Decimal(this.market.decimalDigit);
+    const totalLiquidity = new Decimal(this.totalLiquidity().toString()).div(
+      decimalDigit,
+    );
     if (totalLiquidity.isZero()) {
-      return rewardAps;
+      return rewardAprs;
     }
 
     const coinTypes: string[] = [];
@@ -279,41 +258,69 @@ export class Market {
         coinTypes.push(coinType);
       }
     }
-    const marketPrice = await getPricesFromPyth([marketCoinType]);
-    const totalLiquidityValue = totalLiquidity.mul(marketPrice[0].price.price);
-    const prices = await getPricesFromPyth(coinTypes);
+    const prices = await getPricesFromPyth([...coinTypes, marketCoinType]);
+    const marketPrice = prices.get(marketCoinType);
+    if (!marketPrice) {
+      throw new Error("Market price not found for " + marketCoinType);
+    }
+    const totalLiquidityValue = totalLiquidity.mul(marketPrice.price.price);
 
     for (const reward of distributor.rewards) {
       if (!reward) continue;
 
-      if (reward.endTime <= reward.startTime) {
+      if (parseInt(reward.endTime) <= parseInt(reward.startTime)) {
         continue;
       }
 
-      const timeSpan = parseInt(reward.endTime) - parseInt(reward.startTime);
+      if (parseInt(reward.startTime) > parseInt(distributor.lastUpdated)) {
+        continue;
+      }
+
+      let timeSpan = 0;
+      if (parseInt(reward.endTime) > parseInt(distributor.lastUpdated)) {
+        timeSpan = parseInt(reward.endTime) - parseInt(distributor.lastUpdated);
+      }
       if (timeSpan === 0) {
         continue;
       }
 
       const rewardCoinType = reward.coinType;
-      const price = prices.find((p) => p.coinType === rewardCoinType);
+      const rewardDecimalDivisor = new Decimal(10).pow(
+        decimalsMap[rewardCoinType] || 0,
+      );
+      const price = prices.get(rewardCoinType);
       if (!price) continue;
 
-      const rewardAmount = new Decimal(reward.totalRewards);
-      const rewardValue = rewardAmount.mul(price.price.price);
+      const rewardAmount = new Decimal(reward.totalRewards)
+        .sub(new Decimal(reward.distributedRewards))
+        .div(rewardDecimalDivisor);
+      const timeRatio = new Decimal(MILLISECONDS_IN_YEAR).div(timeSpan);
 
-      const rewardRate = rewardValue.div(timeSpan);
-      const rewardApr = rewardRate
-        .mul(MILLISECONDS_IN_YEAR)
-        .div(totalLiquidityValue);
+      const rewardValue = rewardAmount.mul(price.price.price).mul(timeRatio);
 
-      rewardAps.push({
+      const rewardApr = rewardValue.div(totalLiquidityValue);
+
+      rewardAprs.push({
         coinType: rewardCoinType,
-        rewardApr: rewardApr,
+        rewardApr: rewardApr.mul(100),
       });
     }
 
-    return rewardAps;
+    // Add staking APR for stSUI if applicable
+    if (
+      marketCoinType ===
+      "0xd1b72982e40348d069bb1ff701e634c117bb5f741f44dff91e472d3b01461e55::stsui::STSUI"
+    ) {
+      const res = await fetch("https://ws.stsui.com/api/variables");
+      const data = await res.json();
+      const stakingApr = new Decimal(data.APR);
+      rewardAprs.push({
+        coinType: "staking_apr",
+        rewardApr: stakingApr,
+      });
+    }
+
+    return rewardAprs;
   };
 
   calculateBorrowRewardApr = async (): Promise<
@@ -329,7 +336,10 @@ export class Market {
     const MILLISECONDS_IN_YEAR = 365 * 24 * 60 * 60 * 1000; // 31536000000
 
     const distributor = this.market.borrowRewardDistributor;
-    const borrowedAmount = new Decimal(this.market.borrowedAmount);
+    const decimalDigit = new Decimal(this.market.decimalDigit);
+    const borrowedAmount = new Decimal(this.market.borrowedAmount).div(
+      decimalDigit,
+    );
     if (borrowedAmount.isZero()) {
       return rewardAprs;
     }
@@ -345,58 +355,72 @@ export class Market {
         coinTypes.push(coinType);
       }
     }
-    const marketPrice = await getPricesFromPyth([marketCoinType]);
-    const borrowedAmountValue = borrowedAmount.mul(marketPrice[0].price.price);
-    const prices = await getPricesFromPyth(coinTypes);
+    const prices = await getPricesFromPyth([...coinTypes, marketCoinType]);
+    const marketPrice = prices.get(marketCoinType);
+    if (!marketPrice) {
+      throw new Error("Market price not found for " + marketCoinType);
+    }
+    const borrowedAmountValue = borrowedAmount.mul(marketPrice.price.price);
 
     for (const reward of distributor.rewards) {
       if (!reward) continue;
 
-      if (reward.endTime <= reward.startTime) {
+      if (parseInt(reward.endTime) <= parseInt(reward.startTime)) {
+        continue;
+      }
+      if (parseInt(reward.startTime) > parseInt(distributor.lastUpdated)) {
         continue;
       }
 
-      const timeSpan = parseInt(reward.endTime) - parseInt(reward.startTime);
+      let timeSpan = 0;
+      if (parseInt(reward.endTime) > parseInt(distributor.lastUpdated)) {
+        timeSpan = parseInt(reward.endTime) - parseInt(distributor.lastUpdated);
+      }
       if (timeSpan === 0) {
         continue;
       }
 
       const rewardCoinType = reward.coinType;
-      const price = prices.find((p) => p.coinType === rewardCoinType);
+      const rewardDecimalDivisor = new Decimal(10).pow(
+        decimalsMap[rewardCoinType] || 0,
+      );
+      const price = prices.get(rewardCoinType);
       if (!price) continue;
 
-      const rewardAmount = new Decimal(reward.totalRewards);
-      const rewardValue = rewardAmount.mul(price.price.price);
+      const rewardAmount = new Decimal(reward.totalRewards)
+        .sub(new Decimal(reward.distributedRewards))
+        .div(rewardDecimalDivisor);
+      const timeRatio = new Decimal(MILLISECONDS_IN_YEAR).div(timeSpan);
 
-      const rewardRate = rewardValue.div(timeSpan);
-      const rewardApr = rewardRate
-        .mul(MILLISECONDS_IN_YEAR)
-        .div(borrowedAmountValue);
+      const rewardValue = rewardAmount.mul(price.price.price).mul(timeRatio);
+
+      const rewardApr = rewardValue.div(borrowedAmountValue);
 
       rewardAprs.push({
         coinType: rewardCoinType,
-        rewardApr: rewardApr,
+        rewardApr: rewardApr.mul(100),
       });
     }
 
     return rewardAprs;
   };
 
-  calculateSupplyApr = (
-    borrowApr: Decimal,
-    utilizationRate: Decimal,
-    reserveFactor: Decimal,
-  ): {
+  calculateSupplyApr = (): {
     interestApr: Decimal;
     rewards: {
       coinType: string;
       rewardApr: Decimal;
     }[];
   } => {
-    // Supply APR = Borrow APR * Utilization * (1 - Reserve Factor)
-    const interestApr = borrowApr
+    const borrowApr = this.calculateBorrowApr();
+    const utilizationRate = this.utilizationRate();
+    const interestApr = borrowApr.interestApr
       .mul(utilizationRate)
-      .mul(new Decimal(1).sub(reserveFactor));
+      .mul(
+        new Decimal(1).sub(
+          new Decimal(this.market.config.spreadFeeBps).div(10000),
+        ),
+      );
     return {
       interestApr,
       rewards: [], // Rewards would be added here if available
@@ -422,15 +446,15 @@ export class Market {
       };
     }
 
-    for (let i = 0; i < kinks.length; i++) {
+    for (let i = 1; i < kinks.length; i++) {
       if (utilizationRatePercentage.gte(kinks[i])) {
         continue;
       }
 
       // Calculate linear interpolation
-      let leftApr = i == 0 ? new Decimal(0) : new Decimal(rates[i - 1]);
+      let leftApr = new Decimal(rates[i - 1]);
       let rightApr = new Decimal(rates[i]);
-      let leftKink = i == 0 ? new Decimal(0) : new Decimal(kinks[i - 1]);
+      let leftKink = new Decimal(kinks[i - 1]);
       let rightKink = new Decimal(kinks[i]);
 
       // Calculate interpolated rate
@@ -443,13 +467,13 @@ export class Market {
 
       // Convert from bps to decimal
       return {
-        interestApr: interestApr.div(10000),
+        interestApr: interestApr.div(100),
         rewards: [], // Rewards would be added here if available
       };
     }
 
     return {
-      interestApr: new Decimal(rates[0]).div(10000),
+      interestApr: new Decimal(rates[rates.length - 1]).div(100),
       rewards: [], // Rewards would be added here if available
     };
   };

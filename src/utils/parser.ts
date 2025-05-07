@@ -169,7 +169,9 @@ export function parseMarket(marketRaw: MarketQueryType): MarketType {
     coinType: marketFields.coin_type.fields.name,
     compoundedInterest: marketFields.compounded_interest.fields.value,
     config: parseMarketConfig(marketFields.config),
-    decimalDigit: marketFields.decimal_digit.fields.value,
+    decimalDigit: (
+      BigInt(marketFields.decimal_digit.fields.value) / BigInt(1e18)
+    ).toString(),
     depositFlowLimiter: parseFlowLimiter(marketFields.deposit_flow_limiter),
     depositRewardDistributor: parseRewardDistributor(
       marketFields.deposit_reward_distributor,
@@ -191,6 +193,8 @@ export function parseMarket(marketRaw: MarketQueryType): MarketType {
     xtokenType: marketFields.xtoken_type.fields.name,
   };
 }
+
+// ------------------------------------------------------------------------
 
 /**
  * Parse a PositionCapQueryType from the raw query type

@@ -29,9 +29,7 @@ export class LendingProtocol {
       );
 
       for (const market of marketData) {
-        const tokenPrice = prices.find(
-          (price) => price.coinType === market.coinType,
-        )?.price.price;
+        const tokenPrice = prices.get(market.coinType)?.price.price;
 
         if (!tokenPrice) {
           console.error(`No price found for ${market.coinType}`);
@@ -69,7 +67,6 @@ export class LendingProtocol {
 
   async getAllMarketsData(): Promise<MarketData[]> {
     const markets = await this.getAllMarkets();
-    console.log("markets", markets[0].market.borrowRewardDistributor);
     return await Promise.all(markets.map((market) => market.getMarketData()));
   }
 
