@@ -623,32 +623,6 @@ export class AlphalendClient {
     }
   }
 
-  // private async getPriceIdsToUpdate(
-  //   priceFeedToInfoIdMap: Map<string, string>,
-  //   current_timestamp: string,
-  // ): Promise<string[]> {
-  //   const priceIdsToUpdate: string[] = [];
-  //   for (const [priceFeedId, infoObjectId] of priceFeedToInfoIdMap.entries()) {
-  //     const res = await this.client.getObject({
-  //       id: infoObjectId,
-  //       options: {
-  //         showContent: true,
-  //       },
-  //     });
-
-  //     if (res.data) {
-  //       const content = res.data.content as unknown as PythPriceInfo;
-  //       const attestation_time =
-  //         content.fields.price_info.fields.attestation_time;
-  //       if (parseFloat(current_timestamp) - parseFloat(attestation_time) > 20) {
-  //         priceIdsToUpdate.push(priceFeedId);
-  //       }
-  //     }
-  //   }
-
-  //   return priceIdsToUpdate;
-  // }
-
   private async handlePromise(
     tx: Transaction,
     promise: any,

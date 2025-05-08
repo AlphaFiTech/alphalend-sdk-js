@@ -84,9 +84,10 @@ export class Blockchain {
         showContent: true,
       },
     });
-    const markets = marketsResponse.map((m) =>
+    let markets = marketsResponse.map((m) =>
       parseMarket(m.data as MarketQueryType),
     );
+    markets = markets.filter((m) => m.config.active);
     return markets;
   }
 

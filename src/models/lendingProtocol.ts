@@ -70,6 +70,11 @@ export class LendingProtocol {
     return await Promise.all(markets.map((market) => market.getMarketData()));
   }
 
+  async getMarketData(marketId: number): Promise<MarketData> {
+    const market = await this.getMarket(marketId);
+    return await market.getMarketData();
+  }
+
   // Position methods
   async getPositions(userAddress: string): Promise<Position[]> {
     const positions = await this.blockchain.getPositionsForUser(userAddress);
@@ -77,14 +82,12 @@ export class LendingProtocol {
   }
 
   async getUserPortfolio(userAddress: string): Promise<UserPortfolio[]> {
-    const [positionQueries, markets] = await Promise.all([
-      this.blockchain.getPositionsForUser(userAddress),
+    const [positions, markets] = await Promise.all([
+      this.getPositions(userAddress),
       this.getAllMarkets(),
     ]);
     const res = await Promise.all(
-      positionQueries.map((positionQuery) =>
-        new Position(positionQuery).getUserPortfolio(markets),
-      ),
+      positions.map((position) => position.getUserPortfolio(markets)),
     );
 
     return res;

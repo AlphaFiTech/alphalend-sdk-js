@@ -23,6 +23,20 @@ export class Position {
       marketMap.set(parseFloat(market.market.marketId), market);
     }
     this.refresh(marketMap);
+    const priceCoinTypes = new Set<string>();
+    for (const collateral of this.position.collaterals) {
+      const market = marketMap.get(parseFloat(collateral.key));
+      if (market) {
+        priceCoinTypes.add(market.market.coinType);
+      }
+    }
+    for (const loan of this.position.loans) {
+      const market = marketMap.get(parseFloat(loan.marketId));
+      if (market) {
+        priceCoinTypes.add(market.market.coinType);
+      }
+    }
+    const prices = await getPricesFromPyth([...priceCoinTypes]);
 
     // Calculate total supplied and borrowed values
     // Calculate weighted average liquidation threshold
@@ -34,9 +48,9 @@ export class Position {
     let totalWeightedAmount = new Decimal(0);
     let totalSuppliedUsd = new Decimal(0);
     let totalBorrowedUsd = new Decimal(0);
+    let safeBorrowLimitUsd = new Decimal(0);
 
     // Calculate supplied values from collaterals
-    let safeBorrowLimitUsd = new Decimal(0);
     for (const collateral of this.position.collaterals) {
       const market = marketMap.get(parseFloat(collateral.key));
       const xTokenAmount = BigInt(collateral.value);
@@ -49,10 +63,8 @@ export class Position {
           ).toString(),
         ).div(decimalDivisor);
 
-        const price = await getPricesFromPyth([market.market.coinType]);
-        const collateralUsd = collateralAmount.mul(
-          price.get(market.market.coinType)?.price.price ?? 0,
-        );
+        const price = prices.get(market.market.coinType);
+        const collateralUsd = collateralAmount.mul(price?.price.price ?? 0);
 
         totalSuppliedUsd = totalSuppliedUsd.add(collateralUsd);
 
@@ -99,10 +111,8 @@ export class Position {
         const compoundedLoanAmount = new Decimal(loan.amount).div(
           decimalDivisor,
         );
-        const price = await getPricesFromPyth([market.market.coinType]);
-        const loanUsd = compoundedLoanAmount.mul(
-          price.get(market.market.coinType)?.price.price ?? 0,
-        );
+        const price = prices.get(market.market.coinType);
+        const loanUsd = compoundedLoanAmount.mul(price?.price.price ?? 0);
 
         totalBorrowedUsd = totalBorrowedUsd.add(loanUsd);
 
@@ -140,9 +150,9 @@ export class Position {
     const rewardsToClaim = this.calculateRewardsToClaim();
     const rewardCoinTypes = rewardsToClaim.map((reward) => reward.coinType);
 
-    const prices = await getPricesFromPyth(rewardCoinTypes);
+    const rewardPrices = await getPricesFromPyth(rewardCoinTypes);
     const rewardsToClaimUsd = rewardsToClaim.reduce((acc, reward) => {
-      const price = prices.get(reward.coinType);
+      const price = rewardPrices.get(reward.coinType);
       return acc.add(reward.rewardAmount.mul(price?.price.price ?? 0));
     }, new Decimal(0));
 

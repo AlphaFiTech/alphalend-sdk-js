@@ -247,18 +247,17 @@ export class Market {
       return rewardAprs;
     }
 
-    const coinTypes: string[] = [];
+    const coinTypes: Set<string> = new Set();
     const marketCoinType = this.market.coinType;
 
     for (const reward of distributor.rewards) {
       if (!reward) continue;
 
       const coinType = reward.coinType;
-      if (!coinTypes.includes(coinType)) {
-        coinTypes.push(coinType);
-      }
+      coinTypes.add(coinType);
     }
-    const prices = await getPricesFromPyth([...coinTypes, marketCoinType]);
+    coinTypes.add(marketCoinType);
+    const prices = await getPricesFromPyth([...coinTypes]);
     const marketPrice = prices.get(marketCoinType);
     if (!marketPrice) {
       throw new Error("Market price not found for " + marketCoinType);
@@ -344,18 +343,17 @@ export class Market {
       return rewardAprs;
     }
 
-    const coinTypes: string[] = [];
+    const coinTypes: Set<string> = new Set();
     const marketCoinType = this.market.coinType;
 
     for (const reward of distributor.rewards) {
       if (!reward) continue;
 
       const coinType = reward.coinType;
-      if (!coinTypes.includes(coinType)) {
-        coinTypes.push(coinType);
-      }
+      coinTypes.add(coinType);
     }
-    const prices = await getPricesFromPyth([...coinTypes, marketCoinType]);
+    coinTypes.add(marketCoinType);
+    const prices = await getPricesFromPyth([...coinTypes]);
     const marketPrice = prices.get(marketCoinType);
     if (!marketPrice) {
       throw new Error("Market price not found for " + marketCoinType);
