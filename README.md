@@ -1,3 +1,5 @@
+[![Documentation](https://img.shields.io/badge/docs-latest-blue)](https://alphalend.github.io/alphalend-sdk-js/)
+
 # AlphaLend JavaScript SDK
 
 AlphaLend SDK for JavaScript/TypeScript applications built on the Sui blockchain. This SDK provides a comprehensive interface to interact with the AlphaLend lending protocol.
