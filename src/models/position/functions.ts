@@ -1,3 +1,11 @@
+/**
+ * Position Functions Module
+ * 
+ * This module provides utility functions for working with user positions in the AlphaLend protocol:
+ * - Fetching position capability IDs and position IDs
+ * - Retrieving user position data
+ * - Managing position objects and their relationships
+ */
 import { SuiClient } from "@mysten/sui/client";
 import { getConstants } from "../../constants/index.js";
 import {
@@ -5,7 +13,14 @@ import {
   PositionQueryType,
 } from "../../utils/queryTypes.js";
 
-// Function to fetch all owned objects and find the PositionCap
+/**
+ * Fetches a user's position capability ID
+ * 
+ * @param suiClient - SuiClient instance
+ * @param network - Network name ("mainnet", "testnet", or "devnet")
+ * @param userAddress - Address of the user
+ * @returns Promise resolving to the position capability ID or undefined if not found
+ */
 export const getUserPositionCapId = async (
   suiClient: SuiClient,
   network: string,
@@ -33,7 +48,14 @@ export const getUserPositionCapId = async (
   }
 };
 
-// Function to fetch all owned objects and find the PositionCap and return the positionId
+/**
+ * Fetches a user's position ID from their position capability
+ * 
+ * @param suiClient - SuiClient instance
+ * @param network - Network name ("mainnet", "testnet", or "devnet")
+ * @param userAddress - Address of the user
+ * @returns Promise resolving to the position ID or undefined if not found
+ */
 export const getUserPositionId = async (
   suiClient: SuiClient,
   network: string,
@@ -66,6 +88,14 @@ export const getUserPositionId = async (
   }
 };
 
+/**
+ * Retrieves the complete position object for a user
+ * 
+ * @param suiClient - SuiClient instance
+ * @param network - Network name ("mainnet", "testnet", or "devnet")
+ * @param userAddress - Address of the user
+ * @returns Promise resolving to the position object or undefined if not found
+ */
 export const getUserPosition = async (
   suiClient: SuiClient,
   network: string,

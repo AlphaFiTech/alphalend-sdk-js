@@ -1,10 +1,10 @@
 /**
  * Oracle Module
  *
- * This module provides TypeScript interfaces to interact with the AlphaFi oracle module:
+ * This module provides interfaces to interact with price oracles in the AlphaLend protocol:
  * - Updates price information from Pyth oracles
- * - Retrieves price data for assets
- * - Manages oracle configuration (admin functions)
+ * - Manages price feed updates for the protocol
+ * - Handles the connection between external price feeds and the lending protocol
  */
 import { Transaction } from "@mysten/sui/transactions";
 import {
@@ -13,11 +13,25 @@ import {
 } from "@pythnetwork/pyth-sui-js";
 import { Constants } from "../constants/types.js";
 
+/**
+ * Arguments required for updating prices in a transaction
+ */
 export interface UpdatePriceTransactionArgs {
+  /** The Pyth price info object ID */
   priceInfoObject: string;
+  /** The fully qualified coin type */
   coinType: string;
 }
 
+/**
+ * Fetches price feed data from Pyth and adds update instructions to the transaction
+ * 
+ * @param tx - The transaction to add price updates to
+ * @param priceIDs - Array of Pyth price feed IDs
+ * @param pythClient - SuiPythClient instance
+ * @param pythConnection - SuiPriceServiceConnection instance
+ * @returns Promise resolving to an array of price info object IDs
+ */
 export async function getPriceInfoObjectIdsWithUpdate(
   tx: Transaction,
   priceIDs: string[],
@@ -36,6 +50,13 @@ export async function getPriceInfoObjectIdsWithUpdate(
   return priceInfoObjectIds;
 }
 
+/**
+ * Retrieves price info object IDs from Pyth without updating them
+ * 
+ * @param priceIDs - Array of Pyth price feed IDs
+ * @param pythClient - SuiPythClient instance
+ * @returns Promise resolving to an array of price info object IDs or undefined
+ */
 export async function getPriceInfoObjectIdsWithoutUpdate(
   priceIDs: string[],
   pythClient: SuiPythClient,
@@ -48,6 +69,13 @@ export async function getPriceInfoObjectIdsWithoutUpdate(
   return priceInfoObjectIds;
 }
 
+/**
+ * Adds oracle price update instructions to a transaction
+ * 
+ * @param tx - The transaction to add price updates to
+ * @param args - Update price transaction arguments
+ * @param constants - Protocol constants
+ */
 export function updatePriceTransaction(
   tx: Transaction,
   args: UpdatePriceTransactionArgs,

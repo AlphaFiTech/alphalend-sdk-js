@@ -14,7 +14,7 @@ import { Coin, CoinName } from "./types.js";
  * const suiCoin = coins.SUI;
  * // Returns: { name: 'SUI', type: '0x2::sui::SUI', icon: '...', expo: 9 }
  *
- * @note The coin types are unique identifiers on the Sui blockchain
+ * @remarks The coin types are unique identifiers on the Sui blockchain
  * and should not be modified without proper verification
  */
 export const coinsList: { [key in CoinName]: Coin } = {

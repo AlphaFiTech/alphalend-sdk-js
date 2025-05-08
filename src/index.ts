@@ -7,14 +7,14 @@ export * from "./utils/oracle.js";
 export * from "./utils/priceFeedIds.js";
 export * from "./coin/index.js";
 export * from "./core/types.js";
-export { updatePythIdentifierForCoin } from "./admin/oracle.js";
-export { getUserPositionCapId } from "./models/position/functions.js";
 
 // Re-export key types for easier access
 export { AlphalendClient } from "./core/client.js";
+export { getUserPositionCapId } from "./models/position/functions.js";
+export { updatePythIdentifierForCoin } from "./admin/oracle.js";
 
 export function getSuiClient(network?: string) {
-  const mainnetUrl = "https://fullnode.mainnet.sui.io/";
+  const mainnetUrl = "https://alphalen-suimain-ef6f.mainnet.sui.rpcpool.com";
   const testnetUrl = "https://fullnode.testnet.sui.io/";
   const devnetUrl = "https://fullnode.devnet.sui.io/";
 
