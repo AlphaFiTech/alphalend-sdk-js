@@ -6,7 +6,7 @@ export * from "./constants.js";
 /**
  * Fetches all coins owned by a wallet address with pagination support
  *
- * @param owner - The Sui address of the wallet owner
+ * @param userAddress - The Sui address of the wallet owner
  * @param suiClient - Instance of SuiClient to interact with the Sui blockchain
  * @returns Promise resolving to an array of Coin objects containing coin information
  *
@@ -17,7 +17,7 @@ export * from "./constants.js";
  * );
  * // Returns: Array of Coin objects with coin type and balance information
  *
- * @note This function uses pagination to handle large numbers of coins
+ * @remarks This function uses pagination to handle large numbers of coins
  * and logs coin information to the console for debugging purposes
  */
 export async function getWalletCoins(

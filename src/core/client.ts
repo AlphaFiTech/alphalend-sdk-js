@@ -24,13 +24,10 @@ import {
   RepayParams,
   ClaimRewardsParams,
   LiquidateParams,
-  Market,
-  Portfolio,
+  MarketData,
+  UserPortfolio,
   ProtocolStats,
 } from "./types.js";
-import { getProtocolStats } from "../models/protocol.js";
-import { getAllMarkets } from "../models/market.js";
-import { getUserPortfolio } from "../models/position/posiiton.js";
 import {
   getAlphaReceipt,
   getClaimRewardInput,
@@ -40,16 +37,17 @@ import {
 import { Receipt } from "../utils/queryTypes.js";
 import { Constants } from "../constants/types.js";
 import { getUserPositionCapId } from "../models/position/functions.js";
+import { LendingProtocol } from "../models/lendingProtocol.js";
 
 /**
  * AlphaLend Client
  *
  * The main entry point for interacting with the AlphaLend protocol:
- * - Provides methods for all protocol actions (supply, borrow, withdraw, repay)
- * - Handles connection to the Sui blockchain
- * - Manages transaction building, signing and submission
- * - Exposes query methods for protocol state and user positions
- * - Initializes and coordinates other protocol components
+ * - Provides methods for all protocol actions (supply, borrow, withdraw, repay, claimRewards, liquidate)
+ * - Handles connection to the Sui blockchain and Pyth oracle
+ * - Manages transaction building for protocol interactions
+ * - Exposes query methods for protocol state, markets, and user positions
+ * - Initializes and coordinates price feed updates
  */
 
 export class AlphalendClient {
@@ -58,7 +56,14 @@ export class AlphalendClient {
   pythConnection: SuiPriceServiceConnection;
   network: string;
   constants: Constants;
+  lendingProtocol: LendingProtocol;
 
+  /**
+   * Creates a new AlphaLend client instance
+   *
+   * @param network Network to connect to ("mainnet", "testnet", or "devnet")
+   * @param client SuiClient instance for blockchain interaction
+   */
   constructor(network: string, client: SuiClient) {
     this.network = network;
     this.client = client;
@@ -73,12 +78,20 @@ export class AlphalendClient {
         ? "https://hermes.pyth.network"
         : "https://hermes-beta.pyth.network",
     );
+    this.lendingProtocol = new LendingProtocol(network, client);
   }
 
   /**
    * Updates price information for assets from Pyth oracle
    *
-   * @param coinTypes Array of coin types or symbols
+   * This method:
+   * 1. Gathers price feed IDs for the specified coins
+   * 2. Fetches the latest price data from Pyth oracle
+   * 3. Adds price update instructions to the transaction
+   * 4. Updates the protocol with new price information
+   *
+   * @param tx - Transaction object to add price update calls to
+   * @param coinTypes - Array of fully qualified coin types (e.g., "0x2::sui::SUI")
    * @returns Transaction object with price update calls
    */
   async updatePrices(tx: Transaction, coinTypes: string[]) {
@@ -130,7 +143,12 @@ export class AlphalendClient {
   /**
    * Supplies token collateral to the AlphaLend protocol
    *
-   * @param params Supply parameters - marketId, amount, supplyCoinType, positionCapId, address, priceUpdateCoinTypes
+   * @param params Supply parameters
+   * @param params.marketId Market ID where collateral is being added
+   * @param params.amount Amount to supply as collateral in base units (Decimal)
+   * @param params.coinType Fully qualified coin type to supply (e.g., "0x2::sui::SUI")
+   * @param params.positionCapId Optional: Object ID of the position capability object
+   * @param params.address Address of the user supplying collateral
    * @returns Transaction object ready for signing and execution
    */
   async supply(params: SupplyParams): Promise<Transaction | undefined> {
@@ -208,7 +226,13 @@ export class AlphalendClient {
   /**
    * Withdraws token collateral from the AlphaLend protocol
    *
-   * @param params Withdraw parameters - marketId, amount, withdrawCoinType, positionCapId, priceUpdateCoinTypes
+   * @param params Withdraw parameters
+   * @param params.marketId Market ID from which to withdraw
+   * @param params.amount Amount to withdraw in base units (Decimal, use MAX_U64 to withdraw all)
+   * @param params.coinType Fully qualified coin type to withdraw (e.g., "0x2::sui::SUI")
+   * @param params.positionCapId Object ID of the position capability object
+   * @param params.address Address of the user withdrawing collateral
+   * @param params.priceUpdateCoinTypes Array of coin types to update prices for
    * @returns Transaction object ready for signing and execution
    */
   async withdraw(params: WithdrawParams): Promise<Transaction> {
@@ -263,7 +287,13 @@ export class AlphalendClient {
   /**
    * Borrows tokens from the AlphaLend protocol
    *
-   * @param params Borrow parameters - marketId, amount, borrowCoinType, positionCapId, priceUpdateCoinTypes
+   * @param params Borrow parameters
+   * @param params.marketId Market ID to borrow from
+   * @param params.amount Amount to borrow in base units (Decimal)
+   * @param params.coinType Fully qualified coin type to borrow (e.g., "0x2::sui::SUI")
+   * @param params.positionCapId Object ID of the position capability object
+   * @param params.address Address of the user borrowing tokens
+   * @param params.priceUpdateCoinTypes Array of coin types to update prices for
    * @returns Transaction object ready for signing and execution
    */
   async borrow(params: BorrowParams): Promise<Transaction> {
@@ -325,7 +355,12 @@ export class AlphalendClient {
   /**
    * Repays borrowed tokens to the AlphaLend protocol
    *
-   * @param params Repay parameters - marketId, amount, repayCoinType, positionCapId, address, priceUpdateCoinTypes
+   * @param params Repay parameters
+   * @param params.marketId Market ID where debt exists
+   * @param params.amount Amount to repay in base units (Decimal)
+   * @param params.coinType Fully qualified coin type to repay (e.g., "0x2::sui::SUI")
+   * @param params.positionCapId Object ID of the position capability object
+   * @param params.address Address of the user repaying the debt
    * @returns Transaction object ready for signing and execution
    */
   async repay(params: RepayParams): Promise<Transaction | undefined> {
@@ -377,7 +412,11 @@ export class AlphalendClient {
   /**
    * Claims rewards from the AlphaLend protocol
    *
-   * @param params ClaimRewards parameters - marketId, coinType, positionCapId, priceUpdateCoinTypes
+   * @param params ClaimRewards parameters
+   * @param params.positionCapId Object ID of the position capability object
+   * @param params.address Address of the user claiming rewards
+   * @param params.claimAlpha Whether to claim and deposit Alpha token rewards
+   * @param params.claimAll Whether to claim and deposit all other reward tokens
    * @returns Transaction object ready for signing and execution
    */
   async claimRewards(params: ClaimRewardsParams): Promise<Transaction> {
@@ -464,6 +503,14 @@ export class AlphalendClient {
     return tx;
   }
 
+  /**
+   * Merges multiple Alpha token coins into a single coin
+   *
+   * @param tx Transaction to add merge operation to
+   * @param alphaCoin Existing Alpha coin to merge into (or undefined)
+   * @param coins Array of Alpha coins to merge
+   * @returns Transaction argument representing the merged coin
+   */
   private mergeAlphaCoins(
     tx: Transaction,
     alphaCoin: TransactionObjectArgument | undefined,
@@ -542,7 +589,8 @@ export class AlphalendClient {
    */
   async getProtocolStats(): Promise<ProtocolStats | undefined> {
     try {
-      const stats = await getProtocolStats(this.client, this.network);
+      const markets = await this.lendingProtocol.getAllMarkets();
+      const stats = await this.lendingProtocol.getProtocolStats(markets);
       return stats;
     } catch (error) {
       console.error("Error getting protocol stats:", error);
@@ -555,9 +603,9 @@ export class AlphalendClient {
    *
    * @returns Promise resolving to an array of Market objects
    */
-  async getAllMarkets(): Promise<Market[] | undefined> {
+  async getAllMarkets(): Promise<MarketData[] | undefined> {
     try {
-      const markets = await getAllMarkets(this.client, this.network);
+      const markets = await this.lendingProtocol.getAllMarketsData();
       return markets;
     } catch (error) {
       console.error("Error getting markets:", error);
@@ -568,16 +616,15 @@ export class AlphalendClient {
   /**
    * Gets user portfolio data
    *
-   * @param userAddress The user's address
-   * @returns Promise resolving to Portfolio object
+   * @param userAddress The user's address for which to fetch portfolio data
+   * @returns Promise resolving to an array of UserPortfolio objects or undefined if not found
    */
-  async getUserPortfolio(userAddress: string): Promise<Portfolio | undefined> {
+  async getUserPortfolio(
+    userAddress: string,
+  ): Promise<UserPortfolio[] | undefined> {
     try {
-      const portfolio = await getUserPortfolio(
-        this.client,
-        this.network,
-        userAddress,
-      );
+      const portfolio =
+        await this.lendingProtocol.getUserPortfolio(userAddress);
       return portfolio;
     } catch (error) {
       console.error("Error getting portfolio:", error);
@@ -585,6 +632,14 @@ export class AlphalendClient {
     }
   }
 
+  /**
+   * Gets a coin object suitable for a transaction
+   * 
+   * @param tx Transaction to which the coin will be added
+   * @param type Fully qualified coin type to get
+   * @param address Address of the user that owns the coin
+   * @returns Transaction argument representing the coin or undefined if not found
+   */
   async getCoinObject(
     tx: Transaction,
     type: string,
@@ -622,32 +677,6 @@ export class AlphalendClient {
       return coin;
     }
   }
-
-  // private async getPriceIdsToUpdate(
-  //   priceFeedToInfoIdMap: Map<string, string>,
-  //   current_timestamp: string,
-  // ): Promise<string[]> {
-  //   const priceIdsToUpdate: string[] = [];
-  //   for (const [priceFeedId, infoObjectId] of priceFeedToInfoIdMap.entries()) {
-  //     const res = await this.client.getObject({
-  //       id: infoObjectId,
-  //       options: {
-  //         showContent: true,
-  //       },
-  //     });
-
-  //     if (res.data) {
-  //       const content = res.data.content as unknown as PythPriceInfo;
-  //       const attestation_time =
-  //         content.fields.price_info.fields.attestation_time;
-  //       if (parseFloat(current_timestamp) - parseFloat(attestation_time) > 20) {
-  //         priceIdsToUpdate.push(priceFeedId);
-  //       }
-  //     }
-  //   }
-
-  //   return priceIdsToUpdate;
-  // }
 
   private async handlePromise(
     tx: Transaction,

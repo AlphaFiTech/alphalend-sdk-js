@@ -54,7 +54,7 @@ export interface WithdrawParams {
   coinType: string;
   /** Object ID of the position capability object */
   positionCapId: string;
-  /** Address of the user supplying collateral */
+  /** Address of the user withdrawing collateral */
   address: string;
   /** Coin types of the coins whose price needs to be updated
    * (Will have to pass all market coin types that user has supplied or borrowed in and current market coin type in which user is withdrawing) */
@@ -74,7 +74,7 @@ export interface BorrowParams {
   coinType: string;
   /** Object ID of the position capability object */
   positionCapId: string;
-  /** Address of the user supplying collateral */
+  /** Address of the user borrowing tokens */
   address: string;
   /** Coin types of the coins whose price needs to be updated
    * (Will have to pass all market coin types that user has supplied or borrowed in and current market coin type in which user is borrowing) */
@@ -166,113 +166,101 @@ export interface ProtocolStats {
 
 /**
  * Represents a lending market in the protocol
+ * Contains all market-specific data including rates, limits, and configuration
  */
-export interface Market {
+export interface MarketData {
   /** Unique identifier for the market */
   marketId: string;
-  /** Fully qualified coin type handled by this market */
+  /** Fully qualified coin type handled by this market (e.g., "0x2::sui::SUI") */
   coinType: string;
-  /** Decimal digit of the coin */
+  /** Number of decimal places used by the coin (e.g., 9 for SUI) */
   decimalDigit: number;
-  /** Total token supply in the market */
+  /** Total token supply in the market (in base units) */
   totalSupply: Decimal;
-  /** Total tokens borrowed from the market */
+  /** Total tokens borrowed from the market (in base units) */
   totalBorrow: Decimal;
-  /** Current utilization rate (0.0 to 1.0) */
+  /** Current utilization rate as a decimal (0.0 to 1.0) */
   utilizationRate: Decimal;
-  /** Annual percentage rate for suppliers */
+  /** Annual percentage rate for suppliers including base interest and additional rewards */
   supplyApr: {
+    /** Base interest rate for suppliers (as a decimal) */
     interestApr: Decimal;
+    /** Additional incentive rewards for suppliers */
     rewards: {
+      /** The coin type of the reward token */
       coinType: string;
+      /** Annual percentage rate of the reward (as a decimal) */
       rewardApr: Decimal;
     }[];
   };
-  /** Annual percentage rate for borrowers */
+  /** Annual percentage rate for borrowers including base interest and additional rewards */
   borrowApr: {
+    /** Base interest rate for borrowers (as a decimal) */
     interestApr: Decimal;
+    /** Additional incentive rewards for borrowers */
     rewards: {
+      /** The coin type of the reward token */
       coinType: string;
+      /** Annual percentage rate of the reward (as a decimal) */
       rewardApr: Decimal;
     }[];
   };
-  /** Loan-to-value ratio (0.0 to 1.0) */
+  /** Loan-to-value ratio as a decimal (0.0 to 1.0) */
   ltv: Decimal;
-  /** Available liquidity in the market */
+  /** Available liquidity in the market (in base units) */
   availableLiquidity: Decimal;
-  /** Borrow fee */
+  /** Fee charged for borrowing (as a decimal percentage) */
   borrowFee: Decimal;
-  /** Liquidation threshold (0.0 to 1.0) */
+  /** Liquidation threshold as a decimal (0.0 to 1.0) */
   liquidationThreshold: Decimal;
-  /** Maximum amount that can be borrowed from the market */
+  /** Maximum amount that can be borrowed from the market (in base units) */
   allowedBorrowAmount: Decimal;
-  /** Maximum amount that can be deposited into the market */
+  /** Maximum amount that can be deposited into the market (in base units) */
   allowedDepositAmount: Decimal;
-  /** Borrow weight */
+  /** Weighting factor applied to borrowed amounts for risk calculations */
   borrowWeight: Decimal;
-  /** XToken ratio */
+  /** Exchange rate between base token and xToken (protocol's interest-bearing token) */
   xtokenRatio: Decimal;
 }
 
 /**
  * Represents a user's complete portfolio in the protocol
+ * Includes all positions, balances, rewards, and related metrics
  */
-export interface Portfolio {
-  /** Address of the portfolio owner */
-  userAddress: string;
-  /** Total value of assets minus liabilities (USD) */
-  netWorth: string;
-  /** Total value of supplied assets (USD) */
-  totalSuppliedUsd: string;
-  /** Total value of borrowed assets (USD) */
-  totalBorrowedUsd: string;
-  /** Maximum amount that can be borrowed (USD) */
-  safeBorrowLimit: string;
-  /** Amount of borrowed assets multiplied by the borrow weight (USD) */
-  borrowLimitUsed: string;
-  /** Limit for liquidation (USD) */
-  liquidationLimit: string;
-  /** Amount of rewards to claim (USD) */
-  rewardsToClaimUsd: string;
-  /** Rewards by token */
-  rewardsByToken: {
-    token: string;
-    amount: string;
+export interface UserPortfolio {
+  /** Unique identifier for the user's position */
+  positionId: string;
+  /** Total value of assets minus liabilities (in USD) */
+  netWorth: Decimal;
+  /** Daily earnings from lending and rewards (in USD) */
+  dailyEarnings: Decimal;
+  /** Net annual percentage rate across all positions (weighted average) */
+  netApr: Decimal;
+  /** Maximum amount that can be borrowed without risk of liquidation (in USD) */
+  safeBorrowLimit: Decimal;
+  /** Percentage of the borrow limit that is currently used (0.0 to 1.0) */
+  borrowLimitUsed: Decimal;
+  /** Threshold at which the position becomes eligible for liquidation (in USD) */
+  liquidationThreshold: Decimal;
+  /** Total value of all supplied assets (in USD) */
+  totalSuppliedUsd: Decimal;
+  /** Weighted average supply APR across all markets */
+  aggregatedSupplyApr: Decimal;
+  /** Total value of all borrowed assets (in USD) */
+  totalBorrowedUsd: Decimal;
+  /** Weighted average borrow APR across all markets */
+  aggregatedBorrowApr: Decimal;
+  /** Map of market IDs to supplied amounts (in token's base units) */
+  suppliedAmounts: Map<number, Decimal>;
+  /** Map of market IDs to borrowed amounts (in token's base units) */
+  borrowedAmounts: Map<number, Decimal>;
+  /** Total USD value of all unclaimed rewards */
+  rewardsToClaimUsd: Decimal;
+  /** Detailed breakdown of rewards by token type */
+  rewardsToClaim: {
+    coinType: string;
+    rewardAmount: Decimal;
   }[];
-  /** Daily earnings (USD) */
-  dailyEarnings: string;
-  /** Net annual percentage rate (APR) */
-  netApr: string;
-  /** Aggregated supply APR */
-  aggregatedSupplyApr: string;
-  /** Aggregated borrow APR */
-  aggregatedBorrowApr: string;
-  /** User balances */
-  userBalances: {
-    marketId: string;
-    suppliedAmount: Decimal;
-    borrowedAmount: Decimal;
-  }[];
-  /** Health factor of the user's position (safe when > 1.0) */
-  healthFactor: string;
-  /** Whether the user's position is eligible for liquidation */
-  isLiquidatable: boolean;
-  /** Detailed information about user's positions in each market */
-  marketPositions: Record<
-    string,
-    {
-      marketId: string;
-      coinType: string;
-      suppliedAmount: string;
-      suppliedAmountUsd: string;
-      borrowedAmount: string;
-      borrowedAmountUsd: string;
-      supplyApr: number;
-      borrowApr: number;
-      ltv: number;
-      liquidationThreshold: number;
-    }
-  >;
 }
 
 /**
@@ -308,5 +296,3 @@ export interface Position {
   /** Whether this position is eligible for liquidation */
   isLiquidatable: boolean;
 }
-
-

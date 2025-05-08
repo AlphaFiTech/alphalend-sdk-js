@@ -7,8 +7,9 @@ import {
   RewardDistributorQueryType,
 } from "./queryTypes.js";
 import { pythPriceFeedIdMap } from "./priceFeedIds.js";
-import { getMarketFromChain } from "../models/market.js";
 import { getUserPosition } from "../models/position/functions.js";
+import { Blockchain } from "../models/blockchain.js";
+import { Decimal } from "decimal.js";
 
 export async function getClaimRewardInput(
   suiClient: SuiClient,
@@ -102,7 +103,8 @@ async function getRewardDistributor(
   marketId: number,
   isDepositRewardDistributor: boolean,
 ): Promise<RewardDistributorQueryType | undefined> {
-  const market = await getMarketFromChain(suiClient, network, marketId);
+  const blockchainClient = new Blockchain(network, suiClient);
+  const market = await blockchainClient.getMarketQuery(marketId);
   if (!market) return undefined;
 
   return isDepositRewardDistributor
@@ -132,11 +134,36 @@ export async function getEstimatedGasBudget(
 
 export const getPricesFromPyth = async (
   coinTypes: string[],
-): Promise<PriceData[]> => {
+): Promise<Map<string, PriceData>> => {
   try {
+    const result: Map<string, PriceData> = new Map();
     const constants = getConstants("mainnet");
+    const alphafiConstants = getAlphafiConstants();
     if (coinTypes.length === 0) {
-      return [];
+      return result;
+    }
+    if (coinTypes.includes(alphafiConstants.ALPHA_COIN_TYPE)) {
+      const req_url = `https://api.alphafi.xyz/alpha/fetchPrices?pairs=ALPHA/USD`;
+      const response = await fetch(req_url);
+      const data = (await response.json())[0] as { pair: any; price: string };
+      result.set(alphafiConstants.ALPHA_COIN_TYPE, {
+        coinType: alphafiConstants.ALPHA_COIN_TYPE,
+        price: {
+          price: data.price,
+          conf: "1",
+          expo: 9,
+          publish_time: Date.now(),
+        },
+        ema_price: {
+          price: data.price,
+          conf: "1",
+          expo: 9,
+          publish_time: Date.now(),
+        },
+      });
+      coinTypes = coinTypes.filter(
+        (coinType) => coinType !== alphafiConstants.ALPHA_COIN_TYPE,
+      );
     }
 
     const feedIds: string[] = [];
@@ -153,7 +180,7 @@ export const getPricesFromPyth = async (
 
     if (feedIds.length === 0) {
       console.error("No feed IDs found for the requested coin IDs");
-      return [];
+      return result;
     }
 
     // Construct URL with query parameters
@@ -166,20 +193,33 @@ export const getPricesFromPyth = async (
       console.error(
         `Failed to fetch from Pyth Network: HTTP ${response.status}`,
       );
-      return [];
+      return result;
     }
     const prices = await response.json();
     if (!Array.isArray(prices)) {
       console.error("Invalid response format from Pyth Network");
-      return [];
+      return result;
     }
 
-    const result: PriceData[] = [];
     for (const price of prices) {
-      result.push({
+      result.set(feedIdToCoinType[price.id], {
         coinType: feedIdToCoinType[price.id],
-        price: price.price,
-        ema_price: price.ema_price,
+        price: {
+          price: new Decimal(price.price.price)
+            .mul(Math.pow(10, price.price.expo))
+            .toString(),
+          conf: price.price.conf,
+          expo: price.price.expo,
+          publish_time: price.price.publish_time,
+        },
+        ema_price: {
+          price: new Decimal(price.ema_price.price)
+            .mul(Math.pow(10, price.ema_price.expo))
+            .toString(),
+          conf: price.ema_price.conf,
+          expo: price.ema_price.expo,
+          publish_time: price.ema_price.publish_time,
+        },
       });
     }
 
