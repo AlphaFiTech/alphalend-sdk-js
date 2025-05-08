@@ -5,24 +5,24 @@ import {
   UpgradePolicy,
 } from "@mysten/sui/transactions";
 import { fromB64 } from "@mysten/sui/utils";
-import { getConstants } from "../constants/index.js";
+import { getConstants } from "../src/constants/index.js";
 import {
   addCoinToOracle,
   removeCoinFromOracle,
   updatePythIdentifierForCoin,
-} from "./oracle.js";
-import { AlphalendClient } from "../core/client.js";
+} from "../src/admin/oracle.js";
+import { AlphalendClient } from "../src/core/client.js";
 import * as dotenv from "dotenv";
 import { Decimal } from "decimal.js";
-import { setPrices } from "../utils/helper.js";
+import { setPrices } from "../src/utils/helper.js";
 import path from "path";
 import { homedir } from "os";
 import { execSync } from "child_process";
 import { SuiPriceServiceConnection } from "@pythnetwork/pyth-sui-js";
 import { SuiPythClient } from "@pythnetwork/pyth-sui-js";
-import { getSuiClient, updatePriceTransaction } from "../index.js";
-import { Blockchain } from "../models/blockchain.js";
-import { Market } from "../models/market.js";
+import { getSuiClient, updatePriceTransaction } from "../src/index.js";
+import { Blockchain } from "../src/models/blockchain.js";
+import { Market } from "../src/models/market.js";
 
 dotenv.config();
 
