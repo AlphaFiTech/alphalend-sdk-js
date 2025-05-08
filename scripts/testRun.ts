@@ -20,11 +20,28 @@ import { homedir } from "os";
 import { execSync } from "child_process";
 import { SuiPriceServiceConnection } from "@pythnetwork/pyth-sui-js";
 import { SuiPythClient } from "@pythnetwork/pyth-sui-js";
-import { getSuiClient, updatePriceTransaction } from "../src/index.js";
 import { Blockchain } from "../src/models/blockchain.js";
 import { Market } from "../src/models/market.js";
+import { SuiClient } from "@mysten/sui/client";
 
 dotenv.config();
+
+export function getSuiClient(network?: string) {
+  const mainnetUrl = "https://alphalen-suimain-ef6f.mainnet.sui.rpcpool.com";
+  const testnetUrl = "https://fullnode.testnet.sui.io/";
+  const devnetUrl = "https://fullnode.devnet.sui.io/";
+
+  let rpcUrl = devnetUrl;
+  if (network === "mainnet") {
+    rpcUrl = mainnetUrl;
+  } else if (network === "testnet") {
+    rpcUrl = testnetUrl;
+  }
+
+  return new SuiClient({
+    url: rpcUrl,
+  });
+}
 
 const constants = getConstants("testnet");
 
@@ -243,16 +260,6 @@ export async function executeTransactionBlock() {
   //   "testnet",
   // );
   // await setPrice(tx, "0x2::sui::SUI", 10, 10, 1);
-  updatePriceTransaction(
-    tx,
-    {
-      priceInfoObject:
-        "0x8270feb7375eee355e64fdb69c50abb6b5f9393a722883c1cf45f8e26048810a::wal::WAL",
-      coinType:
-        "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin2::TESTCOIN2",
-    },
-    constants,
-  );
   await suiClient
     .signAndExecuteTransaction({
       signer: keypair,
