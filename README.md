@@ -1,4 +1,4 @@
-[![Documentation](https://img.shields.io/badge/docs-latest-blue)](https://alphalend.github.io/alphalend-sdk-js/)
+[![Documentation](https://img.shields.io/badge/docs-latest-blue)](https://alphafitech.github.io/alphalend-sdk-js/)
 
 # AlphaLend JavaScript SDK
 
