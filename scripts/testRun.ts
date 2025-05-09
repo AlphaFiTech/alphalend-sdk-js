@@ -1,33 +1,22 @@
 import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
 import {
-  ObjectRef,
   Transaction,
-  UpgradePolicy,
 } from "@mysten/sui/transactions";
 import { fromB64 } from "@mysten/sui/utils";
 import { getConstants } from "../src/constants/index.js";
 import {
   addCoinToOracle,
-  removeCoinFromOracle,
-  updatePythIdentifierForCoin,
 } from "../src/admin/oracle.js";
 import { AlphalendClient } from "../src/core/client.js";
 import * as dotenv from "dotenv";
 import { Decimal } from "decimal.js";
 import { setPrices } from "../src/utils/helper.js";
-import path from "path";
-import { homedir } from "os";
-import { execSync } from "child_process";
-import { SuiPriceServiceConnection } from "@pythnetwork/pyth-sui-js";
-import { SuiPythClient } from "@pythnetwork/pyth-sui-js";
-import { Blockchain } from "../src/models/blockchain.js";
-import { Market } from "../src/models/market.js";
 import { SuiClient } from "@mysten/sui/client";
 
 dotenv.config();
 
 export function getSuiClient(network?: string) {
-  const mainnetUrl = "https://alphalen-suimain-ef6f.mainnet.sui.rpcpool.com";
+  const mainnetUrl = "https://fullnode.mainnet.sui.io/";
   const testnetUrl = "https://fullnode.testnet.sui.io/";
   const devnetUrl = "https://fullnode.devnet.sui.io/";
 
@@ -285,7 +274,7 @@ async function getAllMarkets() {
   const res = await client.getAllMarkets();
   console.log(res);
 }
-// getAllMarkets();
+getAllMarkets();
 
 async function getUserPortfolio() {
   const client = new AlphalendClient("mainnet", getSuiClient("mainnet"));
@@ -294,7 +283,7 @@ async function getUserPortfolio() {
   );
   console.log(res);
 }
-getUserPortfolio();
+// getUserPortfolio();
 
 async function withdraw() {
   const { suiClient, keypair } = getExecStuff();

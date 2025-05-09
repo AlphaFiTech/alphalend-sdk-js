@@ -75,7 +75,7 @@ export class Position {
         safeBorrowLimitUsd = safeBorrowLimitUsd.add(
           collateralUsd.mul(marketLtv),
         );
-        const supplyApr = market.calculateSupplyApr();
+        const supplyApr = await market.calculateSupplyApr();
 
         // Get supply reward APRs and add them to the total
         const supplyRewards = await market.calculateSupplyRewardApr();
@@ -85,7 +85,10 @@ export class Position {
         );
 
         totalWeightedSupplyApr = totalWeightedSupplyApr.add(
-          supplyApr.interestApr.add(totalSupplyRewardApr).mul(collateralUsd),
+          supplyApr.interestApr
+            .add(supplyApr.stakingApr)
+            .add(totalSupplyRewardApr)
+            .mul(collateralUsd),
         );
 
         totalWeightedLiquidationThreshold =

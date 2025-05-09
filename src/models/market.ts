@@ -29,7 +29,7 @@ export class Market {
 
     // Calculate borrow APR
     const borrowApr = this.calculateBorrowApr();
-    const supplyApr = this.calculateSupplyApr();
+    const supplyApr = await this.calculateSupplyApr();
 
     // reward Aprs
     borrowApr.rewards = await this.calculateBorrowRewardApr();
@@ -305,20 +305,6 @@ export class Market {
       });
     }
 
-    // Add staking APR for stSUI if applicable
-    if (
-      marketCoinType ===
-      "0xd1b72982e40348d069bb1ff701e634c117bb5f741f44dff91e472d3b01461e55::stsui::STSUI"
-    ) {
-      const res = await fetch("https://ws.stsui.com/api/variables");
-      const data = await res.json();
-      const stakingApr = new Decimal(data.APR);
-      rewardAprs.push({
-        coinType: "staking_apr",
-        rewardApr: stakingApr,
-      });
-    }
-
     return rewardAprs;
   };
 
@@ -403,13 +389,14 @@ export class Market {
     return rewardAprs;
   };
 
-  calculateSupplyApr = (): {
+  calculateSupplyApr = async (): Promise<{
     interestApr: Decimal;
+    stakingApr: Decimal;
     rewards: {
       coinType: string;
       rewardApr: Decimal;
     }[];
-  } => {
+  }> => {
     const borrowApr = this.calculateBorrowApr();
     const utilizationRate = this.utilizationRate();
     const interestApr = borrowApr.interestApr
@@ -419,8 +406,21 @@ export class Market {
           new Decimal(this.market.config.spreadFeeBps).div(10000),
         ),
       );
+
+    // Add staking APR for stSUI if applicable
+    let stakingApr = new Decimal(0);
+    if (
+      this.market.coinType ===
+      "0xd1b72982e40348d069bb1ff701e634c117bb5f741f44dff91e472d3b01461e55::stsui::STSUI"
+    ) {
+      const res = await fetch("https://ws.stsui.com/api/variables");
+      const data = await res.json();
+      stakingApr = new Decimal(data.APR);
+    }
+
     return {
       interestApr,
+      stakingApr,
       rewards: [], // Rewards would be added here if available
     };
   };
