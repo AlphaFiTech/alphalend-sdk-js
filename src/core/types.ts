@@ -185,6 +185,8 @@ export interface MarketData {
   supplyApr: {
     /** Base interest rate for suppliers (as a decimal) */
     interestApr: Decimal;
+    /** Staking APR for market coin type (e.g. stSUI) */
+    stakingApr: Decimal;
     /** Additional incentive rewards for suppliers */
     rewards: {
       /** The coin type of the reward token */
