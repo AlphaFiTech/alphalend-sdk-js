@@ -18,7 +18,7 @@ AlphaLend SDK for JavaScript/TypeScript applications built on the Sui blockchain
 ## Installation
 
 ```bash
-npm install alphalend-sdk
+npm install @alphafi/alphalend-sdk
 ```
 
 ## Getting Started
