@@ -54,7 +54,7 @@ await alphalendClient.updatePrices(tx, [
 ]);
 
 // Set gas budget and execute the transaction
-const wallet = await import('@mysten/wallet-kit');
+const wallet = await import("@mysten/wallet-kit");
 tx.setGasBudget(100_000_000);
 await wallet.signAndExecuteTransaction(tx);
 ```
@@ -63,14 +63,13 @@ await wallet.signAndExecuteTransaction(tx);
 
 ```typescript
 import { Transaction } from "@mysten/sui/transactions";
-import { Decimal } from "decimal.js";
 
 // Supply tokens as collateral
 const supplyParams = {
   marketId: "1", // Market ID to supply to
-  amount: new Decimal("1000000000"), // Amount in lowest denomination
+  amount: 1000000000n, // Amount in lowest denomination (in mists)
   coinType: "0x2::sui::SUI", // Coin type to supply
-  positionCapId: "0xYOUR_POSITION_CAP_ID", // Optional: your position capability 
+  positionCapId: "0xYOUR_POSITION_CAP_ID", // Optional: your position capability
   address: "0xYOUR_ADDRESS", // Address of the user supplying collateral
 };
 
@@ -78,8 +77,7 @@ const supplyParams = {
 const supplyTx = await alphalendClient.supply(supplyParams);
 
 // Set gas budget and execute the transaction
-const wallet = await import('@mysten/wallet-kit');
-supplyTx.setGasBudget(100_000_000);
+const wallet = await import("@mysten/wallet-kit");
 await wallet.signAndExecuteTransaction(supplyTx);
 ```
 
@@ -87,26 +85,25 @@ await wallet.signAndExecuteTransaction(supplyTx);
 
 ```typescript
 import { Transaction } from "@mysten/sui/transactions";
-import { Decimal } from "decimal.js";
 
 // Borrow against your collateral
 const borrowParams = {
   marketId: "2", // Market ID to borrow from
-  amount: new Decimal("500000000"), // Amount to borrow
-  coinType: "0x5d4b302506645c37ff133b98c4b50a5ae14841659738d6d733d59d0d217a93bf::coin::USDC", // Coin type to borrow
+  amount: 500000000n, // Amount to borrow (in mists)
+  coinType:
+    "0x5d4b302506645c37ff133b98c4b50a5ae14841659738d6d733d59d0d217a93bf::coin::USDC", // Coin type to borrow
   positionCapId: "0xYOUR_POSITION_CAP_ID", // Your position capability
   address: "0xYOUR_ADDRESS", // Address of the user
   priceUpdateCoinTypes: [
-    "0x5d4b302506645c37ff133b98c4b50a5ae14841659738d6d733d59d0d217a93bf::coin::USDC", 
-    "0x2::sui::SUI"
+    "0x5d4b302506645c37ff133b98c4b50a5ae14841659738d6d733d59d0d217a93bf::coin::USDC",
+    "0x2::sui::SUI",
   ], // Coin types to update prices for
 };
 
 // Create borrow transaction
 const borrowTx = await alphalendClient.borrow(borrowParams);
 
-// Set gas budget and execute the transaction
-borrowTx.setGasBudget(100_000_000);
+// Execute the transaction
 await wallet.signAndExecuteTransaction(borrowTx);
 ```
 
@@ -114,13 +111,13 @@ await wallet.signAndExecuteTransaction(borrowTx);
 
 ```typescript
 import { Transaction } from "@mysten/sui/transactions";
-import { Decimal } from "decimal.js";
 
 // Repay borrowed assets
 const repayParams = {
   marketId: "2", // Market ID where debt exists
-  amount: new Decimal("500000000"), // Amount to repay
-  coinType: "0x5d4b302506645c37ff133b98c4b50a5ae14841659738d6d733d59d0d217a93bf::coin::USDC", // Coin type to repay
+  amount: 500000000n, // Amount to repay (in mists)
+  coinType:
+    "0x5d4b302506645c37ff133b98c4b50a5ae14841659738d6d733d59d0d217a93bf::coin::USDC", // Coin type to repay
   positionCapId: "0xYOUR_POSITION_CAP_ID", // Your position capability
   address: "0xYOUR_ADDRESS", // Address of the user repaying the debt
 };
@@ -128,8 +125,7 @@ const repayParams = {
 // Create repay transaction
 const repayTx = await alphalendClient.repay(repayParams);
 
-// Set gas budget and execute the transaction
-repayTx.setGasBudget(100_000_000);
+// Execute the transaction
 await wallet.signAndExecuteTransaction(repayTx);
 ```
 
@@ -137,12 +133,12 @@ await wallet.signAndExecuteTransaction(repayTx);
 
 ```typescript
 import { Transaction } from "@mysten/sui/transactions";
-import { Decimal, MAX_U64 } from "alphalend-sdk";
+import { MAX_U64 } from "alphalend-sdk";
 
 // Withdraw collateral (partial amount)
 const withdrawParams = {
   marketId: "1", // Market ID to withdraw from
-  amount: new Decimal("500000000"), // Amount to withdraw
+  amount: 500000000n, // Amount to withdraw (in mists)
   coinType: "0x2::sui::SUI", // Coin type to withdraw
   positionCapId: "0xYOUR_POSITION_CAP_ID", // Your position capability
   address: "0xYOUR_ADDRESS", // Address of the user
@@ -162,8 +158,7 @@ const withdrawAllParams = {
 // Create withdraw transaction
 const withdrawTx = await alphalendClient.withdraw(withdrawParams);
 
-// Set gas budget and execute the transaction
-withdrawTx.setGasBudget(100_000_000);
+// Execute the transaction
 await wallet.signAndExecuteTransaction(withdrawTx);
 ```
 
@@ -183,8 +178,7 @@ const claimRewardsParams = {
 // Create claim rewards transaction
 const claimRewardsTx = await alphalendClient.claimRewards(claimRewardsParams);
 
-// Set gas budget and execute the transaction
-claimRewardsTx.setGasBudget(100_000_000);
+// Execute the transaction
 await wallet.signAndExecuteTransaction(claimRewardsTx);
 ```
 
@@ -197,7 +191,7 @@ import { Transaction } from "@mysten/sui/transactions";
 const tx = new Transaction();
 
 // Get a coin to use for repayment
-const repayAmount = new Decimal("500000000"); 
+const repayAmount = 500000000n;
 const repayCoin = await someFunction.getCoinForRepayment(tx, repayAmount);
 
 // Liquidate an unhealthy position
@@ -207,22 +201,23 @@ const liquidateParams = {
   borrowMarketId: "2", // Market ID where debt is repaid
   withdrawMarketId: "1", // Market ID where collateral is seized
   repayCoin: repayCoin, // Transaction argument for repay coin
-  borrowCoinType: "0x5d4b302506645c37ff133b98c4b50a5ae14841659738d6d733d59d0d217a93bf::coin::USDC", // Coin type of debt
+  borrowCoinType:
+    "0x5d4b302506645c37ff133b98c4b50a5ae14841659738d6d733d59d0d217a93bf::coin::USDC", // Coin type of debt
   withdrawCoinType: "0x2::sui::SUI", // Coin type of collateral to seize
   priceUpdateCoinTypes: [
     "0x5d4b302506645c37ff133b98c4b50a5ae14841659738d6d733d59d0d217a93bf::coin::USDC",
-    "0x2::sui::SUI"
+    "0x2::sui::SUI",
   ], // Coin types to update prices for
 };
 
 // Liquidate the position
-const [repaidCoin, seizedCoin] = await alphalendClient.liquidate(liquidateParams);
+const [repaidCoin, seizedCoin] =
+  await alphalendClient.liquidate(liquidateParams);
 
 // Transfer the seized collateral to the liquidator
 tx.transferObjects([seizedCoin], "0xLIQUIDATOR_ADDRESS");
 
-// Set gas budget and execute the transaction
-tx.setGasBudget(100_000_000);
+// Execute the transaction
 await wallet.signAndExecuteTransaction(tx);
 ```
 
@@ -231,42 +226,48 @@ await wallet.signAndExecuteTransaction(tx);
 The SDK includes TypeScript definitions for all operations, making it easy to use in TypeScript projects:
 
 - `SupplyParams`: Parameters for supplying collateral
+
   - `marketId`: Market ID where collateral is being added
-  - `amount`: Amount to supply as collateral in base units (Decimal)
+  - `amount`: Amount to supply as collateral in base units (bigint, in mists)
   - `coinType`: Fully qualified coin type to supply (e.g., "0x2::sui::SUI")
   - `positionCapId?`: Object ID of the position capability object (optional)
   - `address`: Address of the user supplying collateral
 
 - `WithdrawParams`: Parameters for withdrawing collateral
+
   - `marketId`: Market ID from which to withdraw
-  - `amount`: Amount to withdraw in base units (use MAX_U64 constant to withdraw all)
+  - `amount`: Amount to withdraw in base units (bigint, in mists, use MAX_U64 constant to withdraw all)
   - `coinType`: Fully qualified coin type to withdraw (e.g., "0x2::sui::SUI")
   - `positionCapId`: Object ID of the position capability object
   - `address`: Address of the user withdrawing collateral
   - `priceUpdateCoinTypes`: Array of coin types to update prices for
 
 - `BorrowParams`: Parameters for borrowing assets
+
   - `marketId`: Market ID to borrow from
-  - `amount`: Amount to borrow in base units (Decimal)
+  - `amount`: Amount to borrow in base units (bigint, in mists)
   - `coinType`: Fully qualified coin type to borrow (e.g., "0x2::sui::SUI")
   - `positionCapId`: Object ID of the position capability object
   - `address`: Address of the user borrowing tokens
   - `priceUpdateCoinTypes`: Array of coin types to update prices for
 
 - `RepayParams`: Parameters for repaying borrowed assets
+
   - `marketId`: Market ID where the debt exists
-  - `amount`: Amount to repay in base units (Decimal)
+  - `amount`: Amount to repay in base units (bigint, in mists)
   - `coinType`: Fully qualified coin type to repay (e.g., "0x2::sui::SUI")
   - `positionCapId`: Object ID of the position capability object
   - `address`: Address of the user repaying the debt
 
 - `ClaimRewardsParams`: Parameters for claiming rewards
+
   - `positionCapId`: Object ID of the position capability object
   - `address`: Address of the user claiming rewards
   - `claimAlpha`: Whether to claim and deposit Alpha token rewards (boolean)
   - `claimAll`: Whether to claim and deposit all other reward tokens (boolean)
 
 - `LiquidateParams`: Parameters for liquidating unhealthy positions
+
   - `tx?`: Optional existing transaction to build upon
   - `liquidatePositionId`: Object ID of the position to liquidate
   - `borrowMarketId`: Market ID where debt is repaid

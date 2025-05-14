@@ -145,7 +145,7 @@ export class AlphalendClient {
    *
    * @param params Supply parameters
    * @param params.marketId Market ID where collateral is being added
-   * @param params.amount Amount to supply as collateral in base units (Decimal)
+   * @param params.amount Amount to supply as collateral in base units (bigint, in mists)
    * @param params.coinType Fully qualified coin type to supply (e.g., "0x2::sui::SUI")
    * @param params.positionCapId Optional: Object ID of the position capability object
    * @param params.address Address of the user supplying collateral
@@ -168,10 +168,10 @@ export class AlphalendClient {
         return undefined;
       }
 
-      supplyCoinA = tx.splitCoins(coin, [params.amount.floor().toString()]);
+      supplyCoinA = tx.splitCoins(coin, [params.amount]);
       tx.transferObjects([coin], params.address);
     } else {
-      supplyCoinA = tx.splitCoins(tx.gas, [params.amount.floor().toString()]);
+      supplyCoinA = tx.splitCoins(tx.gas, [params.amount]);
     }
 
     if (params.positionCapId) {
@@ -228,7 +228,7 @@ export class AlphalendClient {
    *
    * @param params Withdraw parameters
    * @param params.marketId Market ID from which to withdraw
-   * @param params.amount Amount to withdraw in base units (Decimal, use MAX_U64 to withdraw all)
+   * @param params.amount Amount to withdraw in base units (bigint, in mists, use MAX_U64 to withdraw all)
    * @param params.coinType Fully qualified coin type to withdraw (e.g., "0x2::sui::SUI")
    * @param params.positionCapId Object ID of the position capability object
    * @param params.address Address of the user withdrawing collateral
@@ -252,7 +252,7 @@ export class AlphalendClient {
         tx.object(this.constants.LENDING_PROTOCOL_ID), // Protocol object
         tx.object(params.positionCapId), // Position capability
         tx.pure.u64(params.marketId), // Market ID
-        tx.pure.u64(params.amount.floor().toString()), // Amount to withdraw
+        tx.pure.u64(params.amount), // Amount to withdraw
         tx.object(this.constants.SUI_CLOCK_OBJECT_ID), // Clock object
       ],
     });
@@ -289,7 +289,7 @@ export class AlphalendClient {
    *
    * @param params Borrow parameters
    * @param params.marketId Market ID to borrow from
-   * @param params.amount Amount to borrow in base units (Decimal)
+   * @param params.amount Amount to borrow in base units (bigint, in mists)
    * @param params.coinType Fully qualified coin type to borrow (e.g., "0x2::sui::SUI")
    * @param params.positionCapId Object ID of the position capability object
    * @param params.address Address of the user borrowing tokens
@@ -313,7 +313,7 @@ export class AlphalendClient {
         tx.object(this.constants.LENDING_PROTOCOL_ID), // Protocol object
         tx.object(params.positionCapId), // Position capability
         tx.pure.u64(params.marketId), // Market ID
-        tx.pure.u64(params.amount.floor().toString()), // Amount to borrow
+        tx.pure.u64(params.amount), // Amount to borrow
         tx.object(this.constants.SUI_CLOCK_OBJECT_ID), // Clock object
       ],
     });
@@ -357,7 +357,7 @@ export class AlphalendClient {
    *
    * @param params Repay parameters
    * @param params.marketId Market ID where debt exists
-   * @param params.amount Amount to repay in base units (Decimal)
+   * @param params.amount Amount to repay in base units (bigint, in mists)
    * @param params.coinType Fully qualified coin type to repay (e.g., "0x2::sui::SUI")
    * @param params.positionCapId Object ID of the position capability object
    * @param params.address Address of the user repaying the debt
@@ -380,10 +380,10 @@ export class AlphalendClient {
         console.error("Coin object not found");
         return undefined;
       }
-      repayCoinA = tx.splitCoins(coin, [params.amount.floor().toString()]);
+      repayCoinA = tx.splitCoins(coin, [params.amount]);
       tx.transferObjects([coin], params.address);
     } else {
-      repayCoinA = tx.splitCoins(tx.gas, [params.amount.floor().toString()]);
+      repayCoinA = tx.splitCoins(tx.gas, [params.amount]);
     }
 
     // Build repay transaction
@@ -634,7 +634,7 @@ export class AlphalendClient {
 
   /**
    * Gets a coin object suitable for a transaction
-   * 
+   *
    * @param tx Transaction to which the coin will be added
    * @param type Fully qualified coin type to get
    * @param address Address of the user that owns the coin

@@ -18,7 +18,7 @@ import { Decimal } from "decimal.js";
  * Used to indicate withdrawing all collateral when passed as the amount parameter
  * in withdraw operations.
  */
-export const MAX_U64 = Decimal("18446744073709551615");
+export const MAX_U64: bigint = 18446744073709551615n;
 
 /**
  * Parameter interfaces for protocol operations
@@ -31,8 +31,8 @@ export const MAX_U64 = Decimal("18446744073709551615");
 export interface SupplyParams {
   /** Market ID where collateral is being added */
   marketId: string;
-  /** Amount to supply as collateral in base units */
-  amount: Decimal;
+  /** Amount to supply as collateral in base units (in mists) */
+  amount: bigint;
   /** Supply coin type (e.g., "0x2::sui::SUI") */
   coinType: string;
   /** Object ID of the position capability object */
@@ -48,8 +48,8 @@ export interface SupplyParams {
 export interface WithdrawParams {
   /** Market ID from which to withdraw */
   marketId: string;
-  /** Amount to withdraw (use MAX_U64 constant to withdraw all) */
-  amount: Decimal;
+  /** Amount to withdraw (in mists, use MAX_U64 constant to withdraw all) */
+  amount: bigint;
   /** Withdraw coin type (e.g., "0x2::sui::SUI") */
   coinType: string;
   /** Object ID of the position capability object */
@@ -68,8 +68,8 @@ export interface WithdrawParams {
 export interface BorrowParams {
   /** Market ID to borrow from */
   marketId: string;
-  /** Amount to borrow in base units */
-  amount: Decimal;
+  /** Amount to borrow in base units (in mists) */
+  amount: bigint;
   /** Borrow coin type (e.g., "0x2::sui::SUI") */
   coinType: string;
   /** Object ID of the position capability object */
@@ -88,8 +88,8 @@ export interface BorrowParams {
 export interface RepayParams {
   /** Market ID where the debt exists */
   marketId: string;
-  /** Amount to repay in base units */
-  amount: Decimal;
+  /** Amount to repay in base units (in mists) */
+  amount: bigint;
   /** Repay coin type (e.g., "0x2::sui::SUI") */
   coinType: string;
   /** Object ID of the position capability object */
@@ -263,38 +263,4 @@ export interface UserPortfolio {
     coinType: string;
     rewardAmount: Decimal;
   }[];
-}
-
-/**
- * Represents an outstanding loan
- */
-export interface Loan {
-  /** Fully qualified coin type of the borrowed asset */
-  coinType: string;
-  /** Market ID where the loan exists */
-  marketId: string;
-  /** Amount borrowed in base units */
-  amount: Decimal;
-  /** USD value of the borrowed amount */
-  amountUsd: number;
-}
-
-/**
- * Represents a user position in the protocol
- */
-export interface Position {
-  /** Position identifier */
-  id: string;
-  /** Map of market IDs to collateral amounts */
-  collaterals: { [marketId: string]: Decimal };
-  /** List of outstanding loans */
-  loans: Loan[];
-  /** Total USD value of all collateral */
-  totalCollateralUsd: number;
-  /** Total USD value of all loans */
-  totalLoanUsd: number;
-  /** Health factor (safe when > 1.0) */
-  healthFactor: number;
-  /** Whether this position is eligible for liquidation */
-  isLiquidatable: boolean;
 }
