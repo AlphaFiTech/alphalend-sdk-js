@@ -1,6 +1,6 @@
 {
   "name": "@alphafi/alphalend-sdk",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "description": "",
   "type": "module",
   "main": "dist/cjs/index.js",
@@ -47,8 +47,8 @@
     "typescript-eslint": "^8.14.0"
   },
   "peerDependencies": {
-    "@mysten/dapp-kit": "^0.14.49",
+    "@mysten/dapp-kit": "^0.16.3",
     "@mysten/sui": "^1.21.1",
-    "@mysten/wallet-standard": "^0.13.25"
+    "@mysten/wallet-standard": "^0.15.0"
   }
 }
