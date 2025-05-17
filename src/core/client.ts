@@ -38,6 +38,7 @@ import { Receipt } from "../utils/queryTypes.js";
 import { Constants } from "../constants/types.js";
 import { getUserPositionCapId } from "../models/position/functions.js";
 import { LendingProtocol } from "../models/lendingProtocol.js";
+import { Market } from "../models/market.js";
 
 /**
  * AlphaLend Client
@@ -614,6 +615,37 @@ export class AlphalendClient {
   }
 
   /**
+   * Gets all markets data from the protocol with cached markets chain data
+   *
+   * @returns Promise resolving to an array of MarketData objects
+   */
+  async getAllMarketsWithCachedMarkets(
+    markets: Market[],
+  ): Promise<MarketData[] | undefined> {
+    try {
+      return await Promise.all(markets.map((market) => market.getMarketData()));
+    } catch (error) {
+      console.error("Error getting markets:", error);
+      return undefined;
+    }
+  }
+
+  /**
+   * Gets all markets chain data to cache
+   *
+   * @returns Promise resolving to an array of Market objects
+   */
+  async getMarketsChain(): Promise<Market[] | undefined> {
+    try {
+      const markets = await this.lendingProtocol.getAllMarkets();
+      return markets;
+    } catch (error) {
+      console.error("Error getting markets:", error);
+      return undefined;
+    }
+  }
+
+  /**
    * Gets user portfolio data
    *
    * @param userAddress The user's address for which to fetch portfolio data
@@ -625,6 +657,29 @@ export class AlphalendClient {
     try {
       const portfolio =
         await this.lendingProtocol.getUserPortfolio(userAddress);
+      return portfolio;
+    } catch (error) {
+      console.error("Error getting portfolio:", error);
+      return undefined;
+    }
+  }
+
+  /**
+   * Gets user portfolio data with cached markets data
+   *
+   * @param userAddress The user's address for which to fetch portfolio data
+   * @param markets The cached markets data to use for the portfolio
+   * @returns Promise resolving to an array of UserPortfolio objects or undefined if not found
+   */
+  async getUserPortfolioWithCachedMarkets(
+    userAddress: string,
+    markets: Market[],
+  ): Promise<UserPortfolio[] | undefined> {
+    try {
+      const portfolio = await this.lendingProtocol.getUserPortfolioWithMarkets(
+        userAddress,
+        markets,
+      );
       return portfolio;
     } catch (error) {
       console.error("Error getting portfolio:", error);

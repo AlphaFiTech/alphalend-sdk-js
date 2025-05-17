@@ -323,6 +323,26 @@ console.log(markets);
 // ]
 ```
 
+### Get Markets Chain Data (Caching)
+
+```typescript
+// Get market chain data for caching and reuse
+const marketsChain = await alphalendClient.getMarketsChain();
+
+// Later use the cached markets with other functions
+```
+
+### Get All Markets with Cached Markets
+
+```typescript
+// Use cached markets to get market data more efficiently
+const marketsChain = await alphalendClient.getMarketsChain();
+const markets = await alphalendClient.getAllMarketsWithCachedMarkets(marketsChain);
+
+console.log(markets);
+// Same output format as getAllMarkets but more efficient when called multiple times
+```
+
 ### Get Protocol Stats
 
 ```typescript
@@ -374,4 +394,15 @@ console.log(userPortfolio);
 //     ]
 //   }
 // ]
+```
+
+### Get User Portfolio with Cached Markets
+
+```typescript
+// Get user portfolio using cached markets for better performance
+const marketsChain = await alphalendClient.getMarketsChain();
+const userPortfolio = await alphalendClient.getUserPortfolioWithCachedMarkets("0xUSER_ADDRESS", marketsChain);
+
+// Same output format as getUserPortfolio but more efficient when retrieving multiple portfolios
+// or when used in combination with other market data queries
 ```
