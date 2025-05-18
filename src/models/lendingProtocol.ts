@@ -92,4 +92,16 @@ export class LendingProtocol {
 
     return res;
   }
+
+  async getUserPortfolioWithMarkets(
+    userAddress: string,
+    markets: Market[],
+  ): Promise<UserPortfolio[]> {
+    const positions = await this.getPositions(userAddress);
+    const res = await Promise.all(
+      positions.map((position) => position.getUserPortfolio(markets)),
+    );
+
+    return res;
+  }
 }
