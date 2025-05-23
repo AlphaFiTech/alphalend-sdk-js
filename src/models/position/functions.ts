@@ -1,6 +1,6 @@
 /**
  * Position Functions Module
- * 
+ *
  * This module provides utility functions for working with user positions in the AlphaLend protocol:
  * - Fetching position capability IDs and position IDs
  * - Retrieving user position data
@@ -15,7 +15,7 @@ import {
 
 /**
  * Fetches a user's position capability ID
- * 
+ *
  * @param suiClient - SuiClient instance
  * @param network - Network name ("mainnet", "testnet", or "devnet")
  * @param userAddress - Address of the user
@@ -50,7 +50,7 @@ export const getUserPositionCapId = async (
 
 /**
  * Fetches a user's position ID from their position capability
- * 
+ *
  * @param suiClient - SuiClient instance
  * @param network - Network name ("mainnet", "testnet", or "devnet")
  * @param userAddress - Address of the user
@@ -79,8 +79,8 @@ export const getUserPositionId = async (
     }
 
     // Find the first PositionCap object and extract the positionCap ID
-    const positionCapObject = response
-      .data[0].data as unknown as PositionCapQueryType;
+    const positionCapObject = response.data[0]
+      .data as unknown as PositionCapQueryType;
 
     return positionCapObject.content.fields.position_id;
   } catch (error) {
@@ -89,8 +89,50 @@ export const getUserPositionId = async (
 };
 
 /**
+ * Fetches a user's position IDs from their position capabilities
+ *
+ * @param suiClient - SuiClient instance
+ * @param network - Network name ("mainnet", "testnet", or "devnet")
+ * @param userAddress - Address of the user
+ * @returns Promise resolving to the position IDs, empty array if not found, undefined if error
+ */
+export const getUserPositionIds = async (
+  suiClient: SuiClient,
+  network: string,
+  userAddress: string,
+): Promise<string[] | undefined> => {
+  try {
+    const constants = getConstants(network);
+    // Fetch owned objects for the user
+    const response = await suiClient.getOwnedObjects({
+      owner: userAddress,
+      options: {
+        showContent: true, // Include object content to access fields
+      },
+      filter: {
+        StructType: constants.POSITION_CAP_TYPE,
+      },
+    });
+
+    if (!response || !response.data || response.data.length === 0) {
+      return [];
+    }
+
+    // Find all the PositionCap objects and extract the positionCap IDs
+    const positionCapObjects = response.data.map(
+      (obj) => obj.data as unknown as PositionCapQueryType,
+    );
+
+    const ids = positionCapObjects.map((obj) => obj.content.fields.position_id);
+    return ids;
+  } catch (error) {
+    console.error("Error fetching user position IDs:", error);
+  }
+};
+
+/**
  * Retrieves the complete position object for a user
- * 
+ *
  * @param suiClient - SuiClient instance
  * @param network - Network name ("mainnet", "testnet", or "devnet")
  * @param userAddress - Address of the user
