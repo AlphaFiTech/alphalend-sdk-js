@@ -18,6 +18,8 @@
 
     // linting
     "strict": true,
+    "isolatedModules": true,
+    "isolatedModules": true,
 
     // sources
     "sourceMap": true,

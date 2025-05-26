@@ -20,7 +20,9 @@
     "build:docker": "npm run build",
     "lint": "eslint 'src/**/*.ts' --fix",
     "format": "prettier --write 'src/**/*.ts'",
-    "test": "jest --config jest.config.cjs.js",
+    "test:cjs": "jest --config jest.config.cjs.js",
+    "test:esm": "NODE_OPTIONS=\"--experimental-vm-modules\" jest --config jest.config.esm.js",
+    "test": "npm run test:esm && npm run test:cjs",
     "docs": "typedoc"
   },
   "keywords": [],
@@ -44,7 +46,8 @@
     "ts-node": "^10.9.2",
     "typedoc": "^0.28.0",
     "typescript": "^5.8.2",
-    "typescript-eslint": "^8.14.0"
+    "typescript-eslint": "^8.14.0",
+    "ts-jest": "^29.2.1"
   },
   "peerDependencies": {
     "@mysten/dapp-kit": "^0.16.3",
