@@ -2,7 +2,7 @@ import {
   AlphalendClient,
   getUserPositionCapId,
   updatePythIdentifierForCoin,
-} from "..";
+} from "../src";
 
 describe("index exports", () => {
   it("should export AlphalendClient", () => {
