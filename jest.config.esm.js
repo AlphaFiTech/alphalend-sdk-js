@@ -12,4 +12,7 @@ export default {
       },
     ],
   },
+  moduleNameMapper: {
+    "^(\\.{1,2}/.*)\\.js$": "$1", // Handle .js imports in TypeScript
+  },
 };

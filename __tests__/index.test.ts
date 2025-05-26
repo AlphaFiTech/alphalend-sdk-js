@@ -1,4 +1,8 @@
-import { AlphalendClient, getUserPositionCapId, updatePythIdentifierForCoin } from "..";
+import {
+  AlphalendClient,
+  getUserPositionCapId,
+  updatePythIdentifierForCoin,
+} from "..";
 
 describe("index exports", () => {
   it("should export AlphalendClient", () => {
