@@ -349,12 +349,12 @@ export function parsePosition(positionRaw: PositionQueryType): PositionType {
   const fields = positionRaw.content.fields.value.fields;
 
   // Parse collaterals
-  const collaterals = fields.collaterals.fields.contents.map((content: any) => {
-    return {
+  const collaterals = fields.collaterals.fields.contents.map(
+    (content: { fields: { key: string; value: string } }) => ({
       key: content.fields.key,
       value: content.fields.value,
-    };
-  });
+    }),
+  );
 
   return {
     positionDynamicFieldId: positionRaw.objectId,

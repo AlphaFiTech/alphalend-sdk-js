@@ -139,8 +139,8 @@ export class Market {
         const compoundedMultiplier = result;
 
         // Calculate new borrowed amount using bigint to avoid overflow
-        let borrowedU256 = BigInt(this.market.borrowedAmount);
-        let newBorrowed = (borrowedU256 * compoundedMultiplier) / BigInt(1e18);
+        const borrowedU256 = BigInt(this.market.borrowedAmount);
+        const newBorrowed = (borrowedU256 * compoundedMultiplier) / BigInt(1e18);
 
         const spreadFee =
           ((newBorrowed - borrowedU256) *
@@ -450,13 +450,13 @@ export class Market {
       }
 
       // Calculate linear interpolation
-      let leftApr = new Decimal(rates[i - 1]);
-      let rightApr = new Decimal(rates[i]);
-      let leftKink = new Decimal(kinks[i - 1]);
-      let rightKink = new Decimal(kinks[i]);
+      const leftApr = new Decimal(rates[i - 1]);
+      const rightApr = new Decimal(rates[i]);
+      const leftKink = new Decimal(kinks[i - 1]);
+      const rightKink = new Decimal(kinks[i]);
 
       // Calculate interpolated rate
-      let interestApr = leftApr.add(
+      const interestApr = leftApr.add(
         rightApr
           .sub(leftApr)
           .mul(utilizationRatePercentage.sub(leftKink))

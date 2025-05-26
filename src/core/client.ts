@@ -8,6 +8,7 @@ import {
   Transaction,
   TransactionObjectArgument,
   TransactionResult,
+  TransactionArgument,
 } from "@mysten/sui/transactions";
 import {
   getPriceInfoObjectIdsWithUpdate,
@@ -735,7 +736,7 @@ export class AlphalendClient {
 
   private async handlePromise(
     tx: Transaction,
-    promise: any,
+    promise: TransactionArgument,
     coinType: string,
   ): Promise<TransactionObjectArgument | undefined> {
     if (promise) {

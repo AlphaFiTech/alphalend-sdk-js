@@ -18,12 +18,12 @@ export async function getClaimRewardInput(
 ): Promise<{ marketId: number; coinTypes: string[] }[]> {
   const position = await getUserPosition(suiClient, network, userAddress);
   const positionFields = position!.content.fields.value.fields;
-  let rewardInput: {
+  const rewardInput: {
     marketId: number;
     coinTypes: string[];
   }[] = [];
 
-  let marketActionMap: Map<number, string[]> = new Map();
+  const marketActionMap: Map<number, string[]> = new Map();
 
   for (const rewardDistributor of positionFields.reward_distributors) {
     const marketId = Number(rewardDistributor.fields.market_id);
@@ -145,7 +145,7 @@ export const getPricesFromPyth = async (
     if (coinTypes.includes(alphafiConstants.ALPHA_COIN_TYPE)) {
       const req_url = `https://api.alphafi.xyz/alpha/fetchPrices?pairs=ALPHA/USD`;
       const response = await fetch(req_url);
-      const data = (await response.json())[0] as { pair: any; price: string };
+      const data = (await response.json())[0] as { pair: string; price: string };
       result.set(alphafiConstants.ALPHA_COIN_TYPE, {
         coinType: alphafiConstants.ALPHA_COIN_TYPE,
         price: {
