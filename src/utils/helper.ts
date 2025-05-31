@@ -145,7 +145,10 @@ export const getPricesFromPyth = async (
     if (coinTypes.includes(alphafiConstants.ALPHA_COIN_TYPE)) {
       const req_url = `https://api.alphafi.xyz/alpha/fetchPrices?pairs=ALPHA/USD`;
       const response = await fetch(req_url);
-      const data = (await response.json())[0] as { pair: string; price: string };
+      const data = (await response.json())[0] as {
+        pair: string;
+        price: string;
+      };
       result.set(alphafiConstants.ALPHA_COIN_TYPE, {
         coinType: alphafiConstants.ALPHA_COIN_TYPE,
         price: {
@@ -179,7 +182,6 @@ export const getPricesFromPyth = async (
     });
 
     if (feedIds.length === 0) {
-      console.error("No feed IDs found for the requested coin IDs");
       return result;
     }
 

@@ -184,7 +184,7 @@ async function borrow() {
     coinType:
       "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin2::TESTCOIN2",
     marketId: "2",
-    amount: new Decimal(100000000000),
+    amount: 100000000000n,
     priceUpdateCoinTypes: [],
   });
   if (tx) {
@@ -270,16 +270,16 @@ async function getAllMarkets() {
   const res = await client.getAllMarkets();
   console.log(res);
 }
-// getAllMarkets();
+getAllMarkets();
 
 async function getUserPortfolio() {
   const client = new AlphalendClient("mainnet", getSuiClient("mainnet"));
-  const res = await client.getUserPortfolioFromPosition(
-    "0x77ccbdde575857f9f0c09f6c4226503a59c6d758ca3462cdcc1701a83c76d3ec",
+  const res = await client.getUserPortfolio(
+    "0xe136f0b6faf27ee707725f38f2aeefc51c6c31cc508222bee5cbc4f5fcf222c3",
   );
   console.log(res);
 }
-getUserPortfolio();
+// getUserPortfolio();
 
 async function withdraw() {
   const { suiClient, keypair } = getExecStuff();
@@ -292,7 +292,7 @@ async function withdraw() {
       "0x8465d2416b01d3e76460912cd290e5dd9c4a36cfbe52f348cfe04e8ae769de4e",
     coinType: "0x2::sui::SUI",
     marketId: "6",
-    amount: new Decimal(1000000000),
+    amount: 1000000000n,
     priceUpdateCoinTypes: [],
   });
   if (tx) {

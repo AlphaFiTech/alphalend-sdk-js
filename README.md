@@ -295,6 +295,7 @@ console.log(markets);
 // [
 //   {
 //     marketId: "1",
+//     price: new Decimal("1.546187202"),
 //     coinType: "0x2::sui::SUI",
 //     decimalDigit: 9,
 //     totalSupply: new Decimal("1000000000"),
@@ -337,7 +338,8 @@ const marketsChain = await alphalendClient.getMarketsChain();
 ```typescript
 // Use cached markets to get market data more efficiently
 const marketsChain = await alphalendClient.getMarketsChain();
-const markets = await alphalendClient.getAllMarketsWithCachedMarkets(marketsChain);
+const markets =
+  await alphalendClient.getAllMarketsWithCachedMarkets(marketsChain);
 
 console.log(markets);
 // Same output format as getAllMarkets but more efficient when called multiple times
@@ -401,7 +403,10 @@ console.log(userPortfolio);
 ```typescript
 // Get user portfolio using cached markets for better performance
 const marketsChain = await alphalendClient.getMarketsChain();
-const userPortfolio = await alphalendClient.getUserPortfolioWithCachedMarkets("0xUSER_ADDRESS", marketsChain);
+const userPortfolio = await alphalendClient.getUserPortfolioWithCachedMarkets(
+  "0xUSER_ADDRESS",
+  marketsChain,
+);
 
 // Same output format as getUserPortfolio but more efficient when retrieving multiple portfolios
 // or when used in combination with other market data queries
@@ -411,7 +416,8 @@ const userPortfolio = await alphalendClient.getUserPortfolioWithCachedMarkets("0
 
 ```typescript
 // Get user portfolio information for a specific position ID
-const userPortfolio = await alphalendClient.getUserPortfolioFromPosition("0xPOSITION_ID");
+const userPortfolio =
+  await alphalendClient.getUserPortfolioFromPosition("0xPOSITION_ID");
 
 console.log(userPortfolio);
 // Example output:

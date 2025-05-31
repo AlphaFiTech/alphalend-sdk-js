@@ -3,6 +3,7 @@ import { MarketType, RewardDistributorType } from "../utils/parsedTypes.js";
 import { getPricesFromPyth } from "../utils/helper.js";
 import { MarketData } from "../core/types.js";
 import { decimalsMap } from "../utils/priceFeedIds.js";
+import { PriceData } from "../utils/queryTypes.js";
 
 export class Market {
   market: MarketType;
@@ -31,9 +32,10 @@ export class Market {
     const borrowApr = this.calculateBorrowApr();
     const supplyApr = await this.calculateSupplyApr();
 
+    const prices = await this.fetchPrices();
     // reward Aprs
-    borrowApr.rewards = await this.calculateBorrowRewardApr();
-    supplyApr.rewards = await this.calculateSupplyRewardApr();
+    borrowApr.rewards = await this.calculateBorrowRewardApr(prices);
+    supplyApr.rewards = await this.calculateSupplyRewardApr(prices);
 
     const allowedBorrowAmount = Decimal.max(
       0,
@@ -55,6 +57,7 @@ export class Market {
 
     return {
       marketId: this.market.marketId,
+      price: new Decimal(prices.get(this.market.coinType)?.price.price ?? 0),
       coinType: this.market.coinType,
       decimalDigit: decimalDigit.log(10).toNumber(),
       totalSupply,
@@ -73,6 +76,34 @@ export class Market {
       allowedBorrowAmount,
       xtokenRatio: new Decimal(this.market.xtokenRatio).div(1e18),
     };
+  }
+
+  fetchPriceCoinTypes(): Set<string> {
+    const coinTypes: Set<string> = new Set();
+    const depositRewardDistributor = this.market.depositRewardDistributor;
+    for (const reward of depositRewardDistributor.rewards) {
+      if (!reward) continue;
+
+      const coinType = reward.coinType;
+      coinTypes.add(coinType);
+    }
+
+    const borrowRewardDistributor = this.market.borrowRewardDistributor;
+    for (const reward of borrowRewardDistributor.rewards) {
+      if (!reward) continue;
+
+      const coinType = reward.coinType;
+      coinTypes.add(coinType);
+    }
+    coinTypes.add(this.market.coinType);
+
+    return coinTypes;
+  }
+
+  async fetchPrices(): Promise<Map<string, PriceData>> {
+    const coinTypes = this.fetchPriceCoinTypes();
+    const prices = await getPricesFromPyth([...coinTypes]);
+    return prices;
   }
 
   totalLiquidity(): bigint {
@@ -140,7 +171,8 @@ export class Market {
 
         // Calculate new borrowed amount using bigint to avoid overflow
         const borrowedU256 = BigInt(this.market.borrowedAmount);
-        const newBorrowed = (borrowedU256 * compoundedMultiplier) / BigInt(1e18);
+        const newBorrowed =
+          (borrowedU256 * compoundedMultiplier) / BigInt(1e18);
 
         const spreadFee =
           ((newBorrowed - borrowedU256) *
@@ -226,7 +258,9 @@ export class Market {
     rewardDistributor.lastUpdated = currentTime.toString();
   }
 
-  calculateSupplyRewardApr = async (): Promise<
+  calculateSupplyRewardApr = async (
+    prices: Map<string, PriceData>,
+  ): Promise<
     {
       coinType: string;
       rewardApr: Decimal;
@@ -247,20 +281,9 @@ export class Market {
       return rewardAprs;
     }
 
-    const coinTypes: Set<string> = new Set();
-    const marketCoinType = this.market.coinType;
-
-    for (const reward of distributor.rewards) {
-      if (!reward) continue;
-
-      const coinType = reward.coinType;
-      coinTypes.add(coinType);
-    }
-    coinTypes.add(marketCoinType);
-    const prices = await getPricesFromPyth([...coinTypes]);
-    const marketPrice = prices.get(marketCoinType);
+    const marketPrice = prices.get(this.market.coinType);
     if (!marketPrice) {
-      throw new Error("Market price not found for " + marketCoinType);
+      throw new Error("Market price not found for " + this.market.coinType);
     }
     const totalLiquidityValue = totalLiquidity.mul(marketPrice.price.price);
 
@@ -308,7 +331,9 @@ export class Market {
     return rewardAprs;
   };
 
-  calculateBorrowRewardApr = async (): Promise<
+  calculateBorrowRewardApr = async (
+    prices: Map<string, PriceData>,
+  ): Promise<
     {
       coinType: string;
       rewardApr: Decimal;
@@ -329,20 +354,9 @@ export class Market {
       return rewardAprs;
     }
 
-    const coinTypes: Set<string> = new Set();
-    const marketCoinType = this.market.coinType;
-
-    for (const reward of distributor.rewards) {
-      if (!reward) continue;
-
-      const coinType = reward.coinType;
-      coinTypes.add(coinType);
-    }
-    coinTypes.add(marketCoinType);
-    const prices = await getPricesFromPyth([...coinTypes]);
-    const marketPrice = prices.get(marketCoinType);
+    const marketPrice = prices.get(this.market.coinType);
     if (!marketPrice) {
-      throw new Error("Market price not found for " + marketCoinType);
+      throw new Error("Market price not found for " + this.market.coinType);
     }
     const borrowedAmountValue = borrowedAmount.mul(marketPrice.price.price);
 

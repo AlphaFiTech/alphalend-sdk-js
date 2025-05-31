@@ -171,6 +171,8 @@ export interface ProtocolStats {
 export interface MarketData {
   /** Unique identifier for the market */
   marketId: string;
+  /** Price of the market coin in USD */
+  price: Decimal;
   /** Fully qualified coin type handled by this market (e.g., "0x2::sui::SUI") */
   coinType: string;
   /** Number of decimal places used by the coin (e.g., 9 for SUI) */
