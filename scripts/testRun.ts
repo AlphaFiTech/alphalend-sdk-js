@@ -1,12 +1,8 @@
 import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
-import {
-  Transaction,
-} from "@mysten/sui/transactions";
+import { Transaction } from "@mysten/sui/transactions";
 import { fromB64 } from "@mysten/sui/utils";
 import { getConstants } from "../src/constants/index.js";
-import {
-  addCoinToOracle,
-} from "../src/admin/oracle.js";
+import { addCoinToOracle } from "../src/admin/oracle.js";
 import { AlphalendClient } from "../src/core/client.js";
 import * as dotenv from "dotenv";
 import { Decimal } from "decimal.js";
@@ -274,16 +270,16 @@ async function getAllMarkets() {
   const res = await client.getAllMarkets();
   console.log(res);
 }
-getAllMarkets();
+// getAllMarkets();
 
 async function getUserPortfolio() {
   const client = new AlphalendClient("mainnet", getSuiClient("mainnet"));
-  const res = await client.getUserPortfolio(
-    "0xe136f0b6faf27ee707725f38f2aeefc51c6c31cc508222bee5cbc4f5fcf222c3",
+  const res = await client.getUserPortfolioFromPosition(
+    "0x77ccbdde575857f9f0c09f6c4226503a59c6d758ca3462cdcc1701a83c76d3ec",
   );
   console.log(res);
 }
-// getUserPortfolio();
+getUserPortfolio();
 
 async function withdraw() {
   const { suiClient, keypair } = getExecStuff();

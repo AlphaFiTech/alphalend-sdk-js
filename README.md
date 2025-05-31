@@ -406,3 +406,40 @@ const userPortfolio = await alphalendClient.getUserPortfolioWithCachedMarkets("0
 // Same output format as getUserPortfolio but more efficient when retrieving multiple portfolios
 // or when used in combination with other market data queries
 ```
+
+### Get User Portfolio from Position
+
+```typescript
+// Get user portfolio information for a specific position ID
+const userPortfolio = await alphalendClient.getUserPortfolioFromPosition("0xPOSITION_ID");
+
+console.log(userPortfolio);
+// Example output:
+// {
+//   positionId: "0x...",
+//   netWorth: new Decimal("1500.00"),
+//   dailyEarnings: new Decimal("0.82"),
+//   netApr: new Decimal("0.02"),
+//   safeBorrowLimit: new Decimal("700.00"),
+//   borrowLimitUsed: new Decimal("0.35"),
+//   liquidationThreshold: new Decimal("800.00"),
+//   totalSuppliedUsd: new Decimal("1000.00"),
+//   aggregatedSupplyApr: new Decimal("0.04"),
+//   totalBorrowedUsd: new Decimal("300.00"),
+//   aggregatedBorrowApr: new Decimal("0.08"),
+//   suppliedAmounts: new Map([
+//     [1, new Decimal("100000000000")], // Key is marketId, value is amount
+//     [3, new Decimal("50000000")]
+//   ]),
+//   borrowedAmounts: new Map([
+//     [2, new Decimal("300000000")]
+//   ]),
+//   rewardsToClaimUsd: new Decimal("5.72"),
+//   rewardsToClaim: [
+//     {
+//       coinType: "0x..::alpha::ALPHA",
+//       rewardAmount: new Decimal("10.5")
+//     }
+//   ]
+// }
+```
