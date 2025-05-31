@@ -689,6 +689,25 @@ export class AlphalendClient {
   }
 
   /**
+   * Gets user portfolio data for a specific position
+   *
+   * @param positionId The position ID to get portfolio data for
+   * @returns Promise resolving to a UserPortfolio object or undefined if not found
+   */
+  async getUserPortfolioFromPosition(
+    positionId: string,
+  ): Promise<UserPortfolio | undefined> {
+    try {
+      const position = await this.lendingProtocol.getPosition(positionId);
+      const markets = await this.lendingProtocol.getAllMarkets();
+      return position.getUserPortfolio(markets);
+    } catch (error) {
+      console.error("Error getting position:", error);
+      return undefined;
+    }
+  }
+
+  /**
    * Gets a coin object suitable for a transaction
    *
    * @param tx Transaction to which the coin will be added

@@ -27,13 +27,17 @@ export class Position {
     for (const collateral of this.position.collaterals) {
       const market = marketMap.get(parseFloat(collateral.key));
       if (market) {
-        priceCoinTypes.add(market.market.coinType);
+        market.fetchPriceCoinTypes().forEach((coinType) => {
+          priceCoinTypes.add(coinType);
+        });
       }
     }
     for (const loan of this.position.loans) {
       const market = marketMap.get(parseFloat(loan.marketId));
       if (market) {
-        priceCoinTypes.add(market.market.coinType);
+        market.fetchPriceCoinTypes().forEach((coinType) => {
+          priceCoinTypes.add(coinType);
+        });
       }
     }
     const prices = await getPricesFromPyth([...priceCoinTypes]);
@@ -78,7 +82,7 @@ export class Position {
         const supplyApr = await market.calculateSupplyApr();
 
         // Get supply reward APRs and add them to the total
-        const supplyRewards = await market.calculateSupplyRewardApr();
+        const supplyRewards = await market.calculateSupplyRewardApr(prices);
         const totalSupplyRewardApr = supplyRewards.reduce(
           (acc, reward) => acc.add(reward.rewardApr),
           new Decimal(0),
@@ -120,7 +124,7 @@ export class Position {
         totalBorrowedUsd = totalBorrowedUsd.add(loanUsd);
 
         const borrowApr = market.calculateBorrowApr();
-        const borrowRewards = await market.calculateBorrowRewardApr();
+        const borrowRewards = await market.calculateBorrowRewardApr(prices);
         const totalBorrowRewardApr = borrowRewards.reduce(
           (acc, reward) => acc.add(reward.rewardApr),
           new Decimal(0),

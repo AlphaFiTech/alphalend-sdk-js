@@ -1,12 +1,8 @@
 import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
-import {
-  Transaction,
-} from "@mysten/sui/transactions";
+import { Transaction } from "@mysten/sui/transactions";
 import { fromB64 } from "@mysten/sui/utils";
 import { getConstants } from "../src/constants/index.js";
-import {
-  addCoinToOracle,
-} from "../src/admin/oracle.js";
+import { addCoinToOracle } from "../src/admin/oracle.js";
 import { AlphalendClient } from "../src/core/client.js";
 import * as dotenv from "dotenv";
 import { Decimal } from "decimal.js";
@@ -188,7 +184,7 @@ async function borrow() {
     coinType:
       "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin2::TESTCOIN2",
     marketId: "2",
-    amount: new Decimal(100000000000),
+    amount: 100000000000n,
     priceUpdateCoinTypes: [],
   });
   if (tx) {
@@ -296,7 +292,7 @@ async function withdraw() {
       "0x8465d2416b01d3e76460912cd290e5dd9c4a36cfbe52f348cfe04e8ae769de4e",
     coinType: "0x2::sui::SUI",
     marketId: "6",
-    amount: new Decimal(1000000000),
+    amount: 1000000000n,
     priceUpdateCoinTypes: [],
   });
   if (tx) {
