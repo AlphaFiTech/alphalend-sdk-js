@@ -666,6 +666,26 @@ export class AlphalendClient {
   }
 
   /**
+   * Gets portfolio data from position id with cached markets data
+   *
+   * @param positionId The position id for which to fetch portfolio data
+   * @param markets The cached markets data to use for the portfolio
+   * @returns Promise resolving to a UserPortfolio object or undefined if not found
+   */
+  async getUserPortfolioFromPositionIdWithCachedMarkets(
+    positionId: string,
+    markets: Market[],
+  ): Promise<UserPortfolio | undefined> {
+    try {
+      const portfolio = await this.lendingProtocol.getUserPortfolioFromPositionIdWithMarkets(positionId, markets);
+      return portfolio;
+    } catch (error) {
+      console.error("Error getting portfolio:", error);
+      return undefined;
+    }
+  }
+
+  /**
    * Gets user portfolio data with cached markets data
    *
    * @param userAddress The user's address for which to fetch portfolio data
