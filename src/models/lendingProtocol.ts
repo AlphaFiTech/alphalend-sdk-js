@@ -110,12 +110,4 @@ export class LendingProtocol {
 
     return res;
   }
-
-  async getUserPortfolioFromPositionIdWithMarkets(
-    positionId: string,
-    markets: Market[],
-  ): Promise<UserPortfolio | undefined> {
-    const position = new Position(await this.blockchain.getPosition(positionId));
-    return position.getUserPortfolio(markets);
-  }
 }
