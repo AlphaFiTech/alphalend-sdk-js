@@ -1,6 +1,6 @@
 export const alphafiConstants = {
   ALPHA_LATEST_PACKAGE_ID:
-    "0xc56bd7d2e446385c8a4b59dc6b1379bbf37d52d47bfb39627e1f697e7341ad83",
+    "0xb6d6d6fab9f2b440b0fe499bfa87e16722203eba423cb6e38b84ae38b4ceda1f",
 
   ALPHA_POOL_RECEIPT:
     "0x9bbd650b8442abb082c20f3bc95a9434a8d47b4bef98b0832dab57c1a8ba7123::alphapool::Receipt",
