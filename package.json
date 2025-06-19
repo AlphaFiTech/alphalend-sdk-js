@@ -20,8 +20,8 @@
     "build:docker": "npm run build",
     "lint": "eslint 'src/**/*.ts' --fix",
     "format": "prettier --write 'src/**/*.ts'",
-    "test:cjs": "jest --config jest.config.cjs.js",
-    "test:esm": "NODE_OPTIONS=\"--experimental-vm-modules\" jest --config jest.config.esm.js",
+    "test:cjs": "jest --config jest.config.cjs.js --silent --verbose=false",
+    "test:esm": "NODE_OPTIONS=\"--experimental-vm-modules --no-warnings\" jest --config jest.config.esm.js --silent --verbose=false",
     "test": "npm run test:esm && npm run test:cjs",
     "docs": "typedoc"
   },
