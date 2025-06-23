@@ -142,6 +142,30 @@ export class AlphalendClient {
     }
   }
 
+  async updateAllPrices(tx: Transaction, coinTypes: string[]) {
+    const updatePriceFeedIds: string[] = Array.from(new Set(coinTypes.map((coinType) => pythPriceFeedIdMap[coinType])));
+
+    const updatePricePromises = updatePriceFeedIds.map((id) => getPriceInfoObjectIdsWithUpdate(
+      tx,
+      [id],
+      this.pythClient,
+      this.pythConnection,
+    ));
+    await Promise.all(updatePricePromises);
+
+    for (const coinType of coinTypes) {
+      const priceInfoObjectId = priceInfoObjectIdMap[coinType];
+      updatePriceTransaction(
+        tx,
+        {
+          priceInfoObject: priceInfoObjectId,
+          coinType: coinType,
+        },
+        this.constants,
+      );
+    }
+  }
+
   /**
    * Supplies token collateral to the AlphaLend protocol
    *
@@ -539,7 +563,11 @@ export class AlphalendClient {
 
     // First update prices to ensure latest oracle values
     if (this.network === "mainnet") {
-      await this.updatePrices(tx, params.priceUpdateCoinTypes);
+      if (params.updateAllPrices) {
+        await this.updateAllPrices(tx, params.priceUpdateCoinTypes);
+      } else {
+        await this.updatePrices(tx, params.priceUpdateCoinTypes);
+      }
     } else {
       await setPrices(tx);
     }
