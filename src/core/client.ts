@@ -145,13 +145,12 @@ export class AlphalendClient {
   async updateAllPrices(tx: Transaction, coinTypes: string[]) {
     const updatePriceFeedIds: string[] = Array.from(new Set(coinTypes.map((coinType) => pythPriceFeedIdMap[coinType])));
 
-    const updatePricePromises = updatePriceFeedIds.map((id) => getPriceInfoObjectIdsWithUpdate(
+    await getPriceInfoObjectIdsWithUpdate(
       tx,
-      [id],
+      updatePriceFeedIds,
       this.pythClient,
       this.pythConnection,
-    ));
-    await Promise.all(updatePricePromises);
+    );
 
     for (const coinType of coinTypes) {
       const priceInfoObjectId = priceInfoObjectIdMap[coinType];
