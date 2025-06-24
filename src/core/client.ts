@@ -120,6 +120,17 @@ export class AlphalendClient {
         ],
       );
     }
+    if (
+      coinTypes.includes(
+        "0x4c981f3ff786cdb9e514da897ab8a953647dae2ace9679e8358eec1e3e8871ac::dmc::DMC",
+      )
+    ) {
+      updatePriceFeedIds.push(
+        pythPriceFeedIdMap[
+          "0x4c981f3ff786cdb9e514da897ab8a953647dae2ace9679e8358eec1e3e8871ac::dmc::DMC"
+        ],
+      );
+    }
     if (updatePriceFeedIds.length > 0) {
       await getPriceInfoObjectIdsWithUpdate(
         tx,

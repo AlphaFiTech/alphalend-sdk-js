@@ -8,6 +8,11 @@ import * as dotenv from "dotenv";
 import { Decimal } from "decimal.js";
 import { setPrices } from "../src/utils/helper.js";
 import { SuiClient } from "@mysten/sui/client";
+import {
+  SuiPriceServiceConnection,
+  SuiPythClient,
+} from "@pythnetwork/pyth-sui-js";
+import { pythPriceFeedIdMap } from "../src/utils/priceFeedIds.js";
 
 dotenv.config();
 
@@ -270,7 +275,7 @@ async function getAllMarkets() {
   const res = await client.getAllMarkets();
   console.log(res);
 }
-getAllMarkets();
+// getAllMarkets();
 
 async function getUserPortfolio() {
   const client = new AlphalendClient("mainnet", getSuiClient("mainnet"));
@@ -299,3 +304,56 @@ async function withdraw() {
     dryRunTransactionBlock(tx);
   }
 }
+
+async function run(coinType: string) {
+  const { suiClient, keypair } = getExecStuff();
+  const tx = new Transaction();
+  const constants = getConstants("mainnet");
+  const pythClient = new SuiPythClient(
+    suiClient,
+    constants.PYTH_STATE_ID,
+    constants.WORMHOLE_STATE_ID,
+  );
+  const pythConnection = new SuiPriceServiceConnection(
+    "https://hermes.pyth.network",
+  );
+
+  // console.log(pythPriceFeedIdMap[coinType]);
+  // const priceInfoObjectIds = await pythClient.getPriceFeedObjectId(
+  //   pythPriceFeedIdMap[coinType],
+  // );
+
+  // const priceFeedUpdateData = await pythConnection.getPriceFeedsUpdateData([
+  //   pythPriceFeedIdMap[coinType],
+  // ]);
+
+  // const priceInfoObjectIds = await pythClient.createPriceFeed(
+  //   tx,
+  //   priceFeedUpdateData,
+  // );
+  const alc = new AlphalendClient("mainnet", suiClient);
+  await alc.updatePrices(tx, [coinType]);
+  tx.setGasBudget(1e9);
+  dryRunTransactionBlock(tx);
+
+  await suiClient
+    .signAndExecuteTransaction({
+      signer: keypair,
+      transaction: tx,
+      requestType: "WaitForLocalExecution",
+      options: {
+        showEffects: true,
+        showBalanceChanges: true,
+        showObjectChanges: true,
+      },
+    })
+    .then((res) => {
+      console.log(JSON.stringify(res, null, 2));
+    })
+    .catch((error) => {
+      console.error(error);
+    });
+}
+run(
+  "0x4c981f3ff786cdb9e514da897ab8a953647dae2ace9679e8358eec1e3e8871ac::dmc::DMC",
+);
