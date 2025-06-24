@@ -134,6 +134,8 @@ export interface LiquidateParams {
   /** Coin types of the coins whose price needs to be updated
    * (Will have to pass all market coin types that user has supplied or borrowed in and current market coin type in which is being liquidated) */
   priceUpdateCoinTypes: string[];
+  /** Whether to update all prices */
+  updateAllPrices?: boolean;
 }
 
 /**

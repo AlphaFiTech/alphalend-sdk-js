@@ -153,6 +153,29 @@ export class AlphalendClient {
     }
   }
 
+  async updateAllPrices(tx: Transaction, coinTypes: string[]) {
+    const updatePriceFeedIds: string[] = Array.from(new Set(coinTypes.map((coinType) => pythPriceFeedIdMap[coinType])));
+
+    await getPriceInfoObjectIdsWithUpdate(
+      tx,
+      updatePriceFeedIds,
+      this.pythClient,
+      this.pythConnection,
+    );
+
+    for (const coinType of coinTypes) {
+      const priceInfoObjectId = priceInfoObjectIdMap[coinType];
+      updatePriceTransaction(
+        tx,
+        {
+          priceInfoObject: priceInfoObjectId,
+          coinType: coinType,
+        },
+        this.constants,
+      );
+    }
+  }
+
   /**
    * Supplies token collateral to the AlphaLend protocol
    *
@@ -550,7 +573,11 @@ export class AlphalendClient {
 
     // First update prices to ensure latest oracle values
     if (this.network === "mainnet") {
-      await this.updatePrices(tx, params.priceUpdateCoinTypes);
+      if (params.updateAllPrices) {
+        await this.updateAllPrices(tx, params.priceUpdateCoinTypes);
+      } else {
+        await this.updatePrices(tx, params.priceUpdateCoinTypes);
+      }
     } else {
       await setPrices(tx);
     }
@@ -670,6 +697,26 @@ export class AlphalendClient {
       const portfolio =
         await this.lendingProtocol.getUserPortfolio(userAddress);
       return portfolio;
+    } catch (error) {
+      console.error("Error getting portfolio:", error);
+      return undefined;
+    }
+  }
+
+  /**
+   * Gets portfolio data from position id with cached markets data
+   *
+   * @param positionId The position id for which to fetch portfolio data
+   * @param markets The cached markets data to use for the portfolio
+   * @returns Promise resolving to a UserPortfolio object or undefined if not found
+   */
+  async getUserPortfolioFromPositionWithCachedMarkets(
+    positionId: string,
+    markets: Market[],
+  ): Promise<UserPortfolio | undefined> {
+    try {
+      const position = await this.lendingProtocol.getPosition(positionId);
+      return position.getUserPortfolio(markets);
     } catch (error) {
       console.error("Error getting portfolio:", error);
       return undefined;
