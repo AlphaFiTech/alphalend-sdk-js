@@ -817,7 +817,7 @@ export class AlphalendClient {
     coinType: string,
   ): Promise<TransactionObjectArgument | undefined> {
     if (promise) {
-      if (coinType === this.constants.SUI_COIN_TYPE) {
+      if (coinType === this.constants.SUI_COIN_TYPE || coinType === this.constants.SUI_COIN_TYPE_LONG) {
         const coin = tx.moveCall({
           target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::fulfill_promise_SUI`,
           arguments: [
