@@ -64,4 +64,6 @@ export interface Constants {
   STSUI_COIN_TYPE: string;
 
   ALPHA_COIN_TYPE: string;
+
+  SUI_COIN_TYPE_LONG: string;
 }
