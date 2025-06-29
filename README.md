@@ -171,8 +171,11 @@ import { Transaction } from "@mysten/sui/transactions";
 const claimRewardsParams = {
   positionCapId: "0xYOUR_POSITION_CAP_ID", // Your position capability
   address: "0xYOUR_ADDRESS", // Address of the user claiming rewards
-  claimAlpha: true, // Whether to claim and deposit Alpha token rewards
-  claimAll: true, // Whether to claim and deposit all other reward tokens
+  claimAndDepositAlpha: true, // Whether to claim and deposit Alpha token rewards
+  claimAndDepositAll: true, // Whether to claim and deposit all other reward tokens
+  // DEPRECATED: Use claimAndDepositAlpha and claimAndDepositAll instead
+  // claimAlpha: true, // ⚠️ DEPRECATED - use claimAndDepositAlpha instead
+  // claimAll: true,  // ⚠️ DEPRECATED - use claimAndDepositAll instead
 };
 
 // Create claim rewards transaction
@@ -263,8 +266,10 @@ The SDK includes TypeScript definitions for all operations, making it easy to us
 
   - `positionCapId`: Object ID of the position capability object
   - `address`: Address of the user claiming rewards
-  - `claimAlpha`: Whether to claim and deposit Alpha token rewards (boolean)
-  - `claimAll`: Whether to claim and deposit all other reward tokens (boolean)
+  - `claimAndDepositAlpha`: Whether to claim and deposit Alpha token rewards (boolean)
+  - `claimAndDepositAll`: Whether to claim and deposit all other reward tokens (boolean)
+  - `claimAlpha`: ⚠️ **DEPRECATED** - Use `claimAndDepositAlpha` instead (boolean)
+  - `claimAll`: ⚠️ **DEPRECATED** - Use `claimAndDepositAll` instead (boolean)
 
 - `LiquidateParams`: Parameters for liquidating unhealthy positions
 
