@@ -108,14 +108,14 @@ export interface ClaimRewardsParams {
   /** Address of the user supplying collateral */
   address: string;
   /**
+   * Whether to claim and deposit alpha rewards
    * @deprecated Use `claimAndDepositAlpha` instead.
    */
-  /** Whether to claim and deposit alpha rewards (deprecated. Use claimAndDepositAlpha instead) */
   claimAlpha?: boolean;
   /**
+   * Whether to claim and deposit all rewards (except alpha)
    * @deprecated Use `claimAndDepositAll` instead.
    */
-  /** Whether to claim and deposit all rewards (except alpha) (deprecated. Use claimAndDepositAll instead) */
   claimAll?: boolean;
   /** Whether to deposit alpha rewards */
   claimAndDepositAlpha?: boolean;
