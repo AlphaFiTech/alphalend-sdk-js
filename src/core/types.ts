@@ -107,10 +107,20 @@ export interface ClaimRewardsParams {
   positionCapId: string;
   /** Address of the user supplying collateral */
   address: string;
-  /** Whether to claim alpha rewards */
-  claimAlpha: boolean;
-  /** Whether to claim all rewards (except alpha) */
-  claimAll: boolean;
+  /**
+   * Whether to claim and deposit alpha rewards
+   * @deprecated Use `claimAndDepositAlpha` instead.
+   */
+  claimAlpha?: boolean;
+  /**
+   * Whether to claim and deposit all rewards (except alpha)
+   * @deprecated Use `claimAndDepositAll` instead.
+   */
+  claimAll?: boolean;
+  /** Whether to deposit alpha rewards */
+  claimAndDepositAlpha?: boolean;
+  /** Whether to deposit all rewards (except alpha) */
+  claimAndDepositAll?: boolean;
 }
 
 /**

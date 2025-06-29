@@ -154,7 +154,9 @@ export class AlphalendClient {
   }
 
   async updateAllPrices(tx: Transaction, coinTypes: string[]) {
-    const updatePriceFeedIds: string[] = Array.from(new Set(coinTypes.map((coinType) => pythPriceFeedIdMap[coinType])));
+    const updatePriceFeedIds: string[] = Array.from(
+      new Set(coinTypes.map((coinType) => pythPriceFeedIdMap[coinType])),
+    );
 
     await getPriceInfoObjectIdsWithUpdate(
       tx,
@@ -451,12 +453,19 @@ export class AlphalendClient {
    * @param params ClaimRewards parameters
    * @param params.positionCapId Object ID of the position capability object
    * @param params.address Address of the user claiming rewards
-   * @param params.claimAlpha Whether to claim and deposit Alpha token rewards
-   * @param params.claimAll Whether to claim and deposit all other reward tokens
+   * @deprecated Use claimAndDepositAlpha instead
+   * @param params.claimAlpha Whether to claim and deposit Alpha token rewards 
+   * @deprecated Use claimAndDepositAll instead
+   * @param params.claimAll Whether to claim and deposit all other reward tokens 
+   * @param params.claimAndDepositAlpha Whether to claim and deposit Alpha token rewards
+   * @param params.claimAndDepositAll Whether to claim and deposit all other reward tokens
    * @returns Transaction object ready for signing and execution
    */
   async claimRewards(params: ClaimRewardsParams): Promise<Transaction> {
     const tx = new Transaction();
+    params.claimAndDepositAlpha =
+      params.claimAndDepositAlpha || params.claimAlpha;
+    params.claimAndDepositAll = params.claimAndDepositAll || params.claimAll;
 
     const rewardInput = await getClaimRewardInput(
       this.client,
@@ -470,7 +479,10 @@ export class AlphalendClient {
         coinType = "0x" + coinType;
         let coin1: TransactionObjectArgument | undefined;
         let promise: TransactionObjectArgument | undefined;
-        if (params.claimAll && coinType !== this.constants.ALPHA_COIN_TYPE) {
+        if (
+          params.claimAndDepositAll &&
+          coinType !== this.constants.ALPHA_COIN_TYPE
+        ) {
           [coin1, promise] = tx.moveCall({
             target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::collect_reward_and_deposit`,
             typeArguments: [coinType],
@@ -497,7 +509,7 @@ export class AlphalendClient {
         if (promise) {
           const coin2 = await this.handlePromise(tx, promise, coinType);
           if (
-            params.claimAlpha &&
+            params.claimAndDepositAlpha &&
             coinType === this.constants.ALPHA_COIN_TYPE
           ) {
             if (coin2) {
@@ -516,7 +528,7 @@ export class AlphalendClient {
           }
         } else if (coin1) {
           if (
-            params.claimAlpha &&
+            params.claimAndDepositAlpha &&
             coinType === this.constants.ALPHA_COIN_TYPE
           ) {
             alphaCoin = this.mergeAlphaCoins(tx, alphaCoin, [coin1]);
@@ -817,7 +829,10 @@ export class AlphalendClient {
     coinType: string,
   ): Promise<TransactionObjectArgument | undefined> {
     if (promise) {
-      if (coinType === this.constants.SUI_COIN_TYPE || coinType === this.constants.SUI_COIN_TYPE_LONG) {
+      if (
+        coinType === this.constants.SUI_COIN_TYPE ||
+        coinType === this.constants.SUI_COIN_TYPE_LONG
+      ) {
         const coin = tx.moveCall({
           target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::fulfill_promise_SUI`,
           arguments: [
