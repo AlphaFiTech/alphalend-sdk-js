@@ -66,9 +66,10 @@ export class Market {
       supplyApr,
       borrowApr,
       ltv: new Decimal(marketConfig.safeCollateralRatio),
-      availableLiquidity: new Decimal(this.market.balanceHolding).div(
-        decimalDigit,
-      ),
+      availableLiquidity: new Decimal(this.market.balanceHolding)
+        .sub(this.market.unclaimedSpreadFee)
+        .sub(this.market.unclaimedSpreadFeeProtocol)
+        .div(decimalDigit),
       borrowFee: new Decimal(marketConfig.borrowFeeBps).div(100),
       borrowWeight: new Decimal(marketConfig.borrowWeight).div(1e18),
       liquidationThreshold: new Decimal(marketConfig.liquidationThreshold),
