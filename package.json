@@ -29,6 +29,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@alphafi/stsui-sdk": "^0.0.22",
     "@pythnetwork/pyth-sui-js": "^2.1.0",
     "bech32": "^2.0.0",
     "decimal.js": "^10.5.0",

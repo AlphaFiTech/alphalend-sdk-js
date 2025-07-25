@@ -4,6 +4,7 @@ import { getPricesFromPyth } from "../utils/helper.js";
 import { MarketData } from "../core/types.js";
 import { decimalsMap } from "../utils/priceFeedIds.js";
 import { PriceData } from "../utils/queryTypes.js";
+import { fetchStSuiAPR } from "@alphafi/stsui-sdk";
 
 export class Market {
   market: MarketType;
@@ -428,9 +429,8 @@ export class Market {
       this.market.coinType ===
       "0xd1b72982e40348d069bb1ff701e634c117bb5f741f44dff91e472d3b01461e55::stsui::STSUI"
     ) {
-      const res = await fetch("https://ws.stsui.com/api/variables");
-      const data = await res.json();
-      stakingApr = new Decimal(data.APR);
+      const res = await fetchStSuiAPR(7);
+      stakingApr = new Decimal(res);
     }
 
     return {
