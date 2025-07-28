@@ -131,6 +131,17 @@ export class AlphalendClient {
         ],
       );
     }
+    if (
+      coinTypes.includes(
+        "0x7262fb2f7a3a14c888c438a3cd9b912469a58cf60f367352c46584262e8299aa::ika::IKA",
+      )
+    ) {
+      updatePriceFeedIds.push(
+        pythPriceFeedIdMap[
+          "0x7262fb2f7a3a14c888c438a3cd9b912469a58cf60f367352c46584262e8299aa::ika::IKA"
+        ],
+      );
+    }
     if (updatePriceFeedIds.length > 0) {
       await getPriceInfoObjectIdsWithUpdate(
         tx,
@@ -454,9 +465,9 @@ export class AlphalendClient {
    * @param params.positionCapId Object ID of the position capability object
    * @param params.address Address of the user claiming rewards
    * @deprecated Use claimAndDepositAlpha instead
-   * @param params.claimAlpha Whether to claim and deposit Alpha token rewards 
+   * @param params.claimAlpha Whether to claim and deposit Alpha token rewards
    * @deprecated Use claimAndDepositAll instead
-   * @param params.claimAll Whether to claim and deposit all other reward tokens 
+   * @param params.claimAll Whether to claim and deposit all other reward tokens
    * @param params.claimAndDepositAlpha Whether to claim and deposit Alpha token rewards
    * @param params.claimAndDepositAll Whether to claim and deposit all other reward tokens
    * @returns Transaction object ready for signing and execution
