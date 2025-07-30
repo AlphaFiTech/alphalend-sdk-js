@@ -675,7 +675,15 @@ export class AlphalendClient {
       return undefined;
     }
   }
-
+  async getMarketDataFromId(marketId: number): Promise<MarketData|undefined>{
+    try {
+      const market = await this.lendingProtocol.getMarketData(marketId);
+      return market;
+    } catch (error) {
+      console.error("Error getting market:", error);
+      return undefined;
+    }
+  }
   /**
    * Gets all markets data from the protocol with cached markets chain data
    *
