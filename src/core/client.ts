@@ -675,6 +675,11 @@ export class AlphalendClient {
       return undefined;
     }
   }
+  /**
+   * Gets market data of a particular market id from the protocol
+   *
+   * @returns Promise resolving to a MarketData object
+   */
   async getMarketDataFromId(marketId: number): Promise<MarketData|undefined>{
     try {
       const market = await this.lendingProtocol.getMarketData(marketId);
