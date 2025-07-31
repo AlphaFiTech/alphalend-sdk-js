@@ -329,6 +329,13 @@ console.log(markets);
 // ]
 ```
 
+### Get market data for a particular market
+
+```typescript
+// Get market data for a particular market
+const marketData = await alphalendClient.getMarketDataFromId(1);
+```
+
 ### Get Markets Chain Data (Caching)
 
 ```typescript
