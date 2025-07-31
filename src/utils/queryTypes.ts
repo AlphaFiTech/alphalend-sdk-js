@@ -298,22 +298,6 @@ export interface UserRewardQueryType {
   auto_compound_market_id: string;
 }
 
-export interface PriceData {
-  coinType: string;
-  price: {
-    price: string;
-    conf: string;
-    expo: number;
-    publish_time: number;
-  };
-  ema_price: {
-    price: string;
-    conf: string;
-    expo: number;
-    publish_time: number;
-  };
-}
-
 export interface Receipt {
   objectId: string;
   version: string;

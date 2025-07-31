@@ -1,10 +1,9 @@
 import { Decimal } from "decimal.js";
 import { MarketType, RewardDistributorType } from "../utils/parsedTypes.js";
-import { getPricesFromPyth } from "../utils/helper.js";
 import { MarketData } from "../core/types.js";
 import { decimalsMap } from "../utils/priceFeedIds.js";
-import { PriceData } from "../utils/queryTypes.js";
 import { fetchStSuiAPR } from "@alphafi/stsui-sdk";
+import { getPricesMap } from "../utils/helper.js";
 
 export class Market {
   market: MarketType;
@@ -33,7 +32,7 @@ export class Market {
     const borrowApr = this.calculateBorrowApr();
     const supplyApr = await this.calculateSupplyApr();
 
-    const prices = await this.fetchPrices();
+    const prices = await getPricesMap();
     // reward Aprs
     borrowApr.rewards = await this.calculateBorrowRewardApr(prices);
     supplyApr.rewards = await this.calculateSupplyRewardApr(prices);
@@ -58,7 +57,7 @@ export class Market {
 
     return {
       marketId: this.market.marketId,
-      price: new Decimal(prices.get(this.market.coinType)?.price.price ?? 0),
+      price: new Decimal(prices.get(this.market.coinType) ?? 0),
       coinType: this.market.coinType,
       decimalDigit: decimalDigit.log(10).toNumber(),
       totalSupply,
@@ -78,34 +77,6 @@ export class Market {
       allowedBorrowAmount,
       xtokenRatio: new Decimal(this.market.xtokenRatio).div(1e18),
     };
-  }
-
-  fetchPriceCoinTypes(): Set<string> {
-    const coinTypes: Set<string> = new Set();
-    const depositRewardDistributor = this.market.depositRewardDistributor;
-    for (const reward of depositRewardDistributor.rewards) {
-      if (!reward) continue;
-
-      const coinType = reward.coinType;
-      coinTypes.add(coinType);
-    }
-
-    const borrowRewardDistributor = this.market.borrowRewardDistributor;
-    for (const reward of borrowRewardDistributor.rewards) {
-      if (!reward) continue;
-
-      const coinType = reward.coinType;
-      coinTypes.add(coinType);
-    }
-    coinTypes.add(this.market.coinType);
-
-    return coinTypes;
-  }
-
-  async fetchPrices(): Promise<Map<string, PriceData>> {
-    const coinTypes = this.fetchPriceCoinTypes();
-    const prices = await getPricesFromPyth([...coinTypes]);
-    return prices;
   }
 
   totalLiquidity(): bigint {
@@ -261,7 +232,7 @@ export class Market {
   }
 
   calculateSupplyRewardApr = async (
-    prices: Map<string, PriceData>,
+    prices: Map<string, Decimal>,
   ): Promise<
     {
       coinType: string;
@@ -287,7 +258,7 @@ export class Market {
     if (!marketPrice) {
       throw new Error("Market price not found for " + this.market.coinType);
     }
-    const totalLiquidityValue = totalLiquidity.mul(marketPrice.price.price);
+    const totalLiquidityValue = totalLiquidity.mul(marketPrice);
 
     for (const reward of distributor.rewards) {
       if (!reward) continue;
@@ -320,7 +291,7 @@ export class Market {
         .div(rewardDecimalDivisor);
       const timeRatio = new Decimal(MILLISECONDS_IN_YEAR).div(timeSpan);
 
-      const rewardValue = rewardAmount.mul(price.price.price).mul(timeRatio);
+      const rewardValue = rewardAmount.mul(price).mul(timeRatio);
 
       const rewardApr = rewardValue.div(totalLiquidityValue);
 
@@ -334,7 +305,7 @@ export class Market {
   };
 
   calculateBorrowRewardApr = async (
-    prices: Map<string, PriceData>,
+    prices: Map<string, Decimal>,
   ): Promise<
     {
       coinType: string;
@@ -360,7 +331,7 @@ export class Market {
     if (!marketPrice) {
       throw new Error("Market price not found for " + this.market.coinType);
     }
-    const borrowedAmountValue = borrowedAmount.mul(marketPrice.price.price);
+    const borrowedAmountValue = borrowedAmount.mul(marketPrice);
 
     for (const reward of distributor.rewards) {
       if (!reward) continue;
@@ -392,7 +363,7 @@ export class Market {
         .div(rewardDecimalDivisor);
       const timeRatio = new Decimal(MILLISECONDS_IN_YEAR).div(timeSpan);
 
-      const rewardValue = rewardAmount.mul(price.price.price).mul(timeRatio);
+      const rewardValue = rewardAmount.mul(price).mul(timeRatio);
 
       const rewardApr = rewardValue.div(borrowedAmountValue);
 

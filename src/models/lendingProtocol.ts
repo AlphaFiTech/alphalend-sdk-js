@@ -3,7 +3,7 @@ import { Blockchain } from "./blockchain.js";
 import { Position } from "./position.js";
 import { Market } from "./market.js";
 import { MarketData, ProtocolStats, UserPortfolio } from "../core/types.js";
-import { getPricesFromPyth } from "../utils/helper.js";
+import { getPricesMap } from "../utils/helper.js";
 
 export class LendingProtocol {
   private blockchain: Blockchain;
@@ -24,12 +24,10 @@ export class LendingProtocol {
       let totalSuppliedUsd = 0;
       let totalBorrowedUsd = 0;
 
-      const prices = await getPricesFromPyth(
-        marketData.map((market: MarketData) => market.coinType),
-      );
+      const prices = await getPricesMap();
 
       for (const market of marketData) {
-        const tokenPrice = prices.get(market.coinType)?.price.price;
+        const tokenPrice = prices.get(market.coinType);
 
         if (!tokenPrice) {
           console.error(`No price found for ${market.coinType}`);
