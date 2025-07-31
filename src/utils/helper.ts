@@ -2,11 +2,9 @@ import { Transaction } from "@mysten/sui/transactions";
 import { PaginatedObjectsResponse, SuiClient } from "@mysten/sui/client";
 import { getAlphafiConstants, getConstants } from "../constants/index.js";
 import {
-  PriceData,
   Receipt,
   RewardDistributorQueryType,
 } from "./queryTypes.js";
-import { pythPriceFeedIdMap } from "./priceFeedIds.js";
 import { getUserPosition } from "../models/position/functions.js";
 import { Blockchain } from "../models/blockchain.js";
 import { Decimal } from "decimal.js";
@@ -132,105 +130,39 @@ export async function getEstimatedGasBudget(
   }
 }
 
-export const getPricesFromPyth = async (
-  coinTypes: string[],
-): Promise<Map<string, PriceData>> => {
-  try {
-    const result: Map<string, PriceData> = new Map();
-    const constants = getConstants("mainnet");
-    const alphafiConstants = getAlphafiConstants();
-    if (coinTypes.length === 0) {
-      return result;
-    }
-    if (coinTypes.includes(alphafiConstants.ALPHA_COIN_TYPE)) {
-      const req_url = `https://api.alphafi.xyz/alpha/fetchPrices?pairs=ALPHA/USD`;
-      const response = await fetch(req_url);
-      const data = (await response.json())[0] as {
-        pair: string;
-        price: string;
-      };
-      result.set(alphafiConstants.ALPHA_COIN_TYPE, {
-        coinType: alphafiConstants.ALPHA_COIN_TYPE,
-        price: {
-          price: data.price,
-          conf: "1",
-          expo: 9,
-          publish_time: Date.now(),
-        },
-        ema_price: {
-          price: data.price,
-          conf: "1",
-          expo: 9,
-          publish_time: Date.now(),
-        },
-      });
-      coinTypes = coinTypes.filter(
-        (coinType) => coinType !== alphafiConstants.ALPHA_COIN_TYPE,
-      );
-    }
-
-    const feedIds: string[] = [];
-    const feedIdToCoinType: Record<string, string> = {};
-    // Collect feed IDs for given coin IDs
-    coinTypes.forEach((coinType) => {
-      const id = pythPriceFeedIdMap[coinType];
-      if (!id) {
-        console.error(`Coin ID not supported: ${coinType}`);
+export async function getPricesMap(): Promise<Map<string, Decimal>> {
+  const apiUrl = "https://api.alphalend.xyz/public/graphql";
+  const query = `
+      query {
+        coinInfo {
+          coinType
+          coingeckoPrice
+          pythPrice
+        }
       }
-      feedIdToCoinType[id] = coinType;
-      feedIds.push(id);
-    });
+    `;
+  const response = await fetch(apiUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ query }),
+  });
 
-    if (feedIds.length === 0) {
-      return result;
-    }
-
-    // Construct URL with query parameters
-    const queryParams = feedIds.map((id) => `ids[]=${id}`).join("&");
-    const url = `${constants.PYTH_MAINNET_API_ENDPOINT}${constants.PYTH_PRICE_PATH}?${queryParams}`;
-
-    // Fetch data from Pyth Network
-    const response = await fetch(url);
-    if (!response.ok) {
-      console.error(
-        `Failed to fetch from Pyth Network: HTTP ${response.status}`,
-      );
-      return result;
-    }
-    const prices = await response.json();
-    if (!Array.isArray(prices)) {
-      console.error("Invalid response format from Pyth Network");
-      return result;
-    }
-
-    for (const price of prices) {
-      result.set(feedIdToCoinType[price.id], {
-        coinType: feedIdToCoinType[price.id],
-        price: {
-          price: new Decimal(price.price.price)
-            .mul(Math.pow(10, price.price.expo))
-            .toString(),
-          conf: price.price.conf,
-          expo: price.price.expo,
-          publish_time: price.price.publish_time,
-        },
-        ema_price: {
-          price: new Decimal(price.ema_price.price)
-            .mul(Math.pow(10, price.ema_price.expo))
-            .toString(),
-          conf: price.ema_price.conf,
-          expo: price.ema_price.expo,
-          publish_time: price.ema_price.publish_time,
-        },
-      });
-    }
-
-    return result;
-  } catch (error) {
-    console.error("Error fetching prices from Pyth Network:", error);
-    throw error;
+  const dataArr = (await response.json()).data.coinInfo;
+  const priceMap = new Map<string, Decimal>();
+  for (const data of dataArr) {
+    priceMap.set(
+      data.coinType,
+      new Decimal(data.pythPrice ? data.pythPrice : data.coingeckoPrice),
+    );
   }
-};
+  priceMap.set(
+    "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI",
+    priceMap.get("0x2::sui::SUI") || new Decimal(0),
+  );
+  return priceMap;
+}
 
 export async function setPrices(tx: Transaction) {
   await setPrice(

@@ -6,8 +6,8 @@ import {
 } from "../utils/parsedTypes.js";
 import { Decimal } from "decimal.js";
 import { Market } from "./market.js";
-import { getPricesFromPyth } from "../utils/helper.js";
 import { decimalsMap } from "../utils/priceFeedIds.js";
+import { getPricesMap } from "../utils/helper.js";
 
 export class Position {
   position: PositionType;
@@ -23,24 +23,7 @@ export class Position {
       marketMap.set(parseFloat(market.market.marketId), market);
     }
     this.refresh(marketMap);
-    const priceCoinTypes = new Set<string>();
-    for (const collateral of this.position.collaterals) {
-      const market = marketMap.get(parseFloat(collateral.key));
-      if (market) {
-        market.fetchPriceCoinTypes().forEach((coinType) => {
-          priceCoinTypes.add(coinType);
-        });
-      }
-    }
-    for (const loan of this.position.loans) {
-      const market = marketMap.get(parseFloat(loan.marketId));
-      if (market) {
-        market.fetchPriceCoinTypes().forEach((coinType) => {
-          priceCoinTypes.add(coinType);
-        });
-      }
-    }
-    const prices = await getPricesFromPyth([...priceCoinTypes]);
+    const prices = await getPricesMap();
 
     // Calculate total supplied and borrowed values
     // Calculate weighted average liquidation threshold
@@ -68,7 +51,7 @@ export class Position {
         ).div(decimalDivisor);
 
         const price = prices.get(market.market.coinType);
-        const collateralUsd = collateralAmount.mul(price?.price.price ?? 0);
+        const collateralUsd = collateralAmount.mul(price ?? 0);
 
         totalSuppliedUsd = totalSuppliedUsd.add(collateralUsd);
 
@@ -119,7 +102,7 @@ export class Position {
           decimalDivisor,
         );
         const price = prices.get(market.market.coinType);
-        const loanUsd = compoundedLoanAmount.mul(price?.price.price ?? 0);
+        const loanUsd = compoundedLoanAmount.mul(price ?? 0);
 
         totalBorrowedUsd = totalBorrowedUsd.add(loanUsd);
 
@@ -155,12 +138,10 @@ export class Position {
       : new Decimal(0);
 
     const rewardsToClaim = this.calculateRewardsToClaim();
-    const rewardCoinTypes = rewardsToClaim.map((reward) => reward.coinType);
 
-    const rewardPrices = await getPricesFromPyth(rewardCoinTypes);
     const rewardsToClaimUsd = rewardsToClaim.reduce((acc, reward) => {
-      const price = rewardPrices.get(reward.coinType);
-      return acc.add(reward.rewardAmount.mul(price?.price.price ?? 0));
+      const price = prices.get(reward.coinType);
+      return acc.add(reward.rewardAmount.mul(price ?? 0));
     }, new Decimal(0));
 
     return {
