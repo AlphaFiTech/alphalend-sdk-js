@@ -97,59 +97,59 @@ export class AlphalendClient {
    * @returns Transaction object with price update calls
    */
   async updatePrices(tx: Transaction, coinTypes: string[]) {
-    const updatePriceFeedIds: string[] = [];
-    if (
-      coinTypes.includes(
-        "0xd1b72982e40348d069bb1ff701e634c117bb5f741f44dff91e472d3b01461e55::stsui::STSUI",
-      )
-    ) {
-      updatePriceFeedIds.push(
-        pythPriceFeedIdMap[
-          "0xd1b72982e40348d069bb1ff701e634c117bb5f741f44dff91e472d3b01461e55::stsui::STSUI"
-        ],
-      );
-    }
-    if (
-      coinTypes.includes(
-        "0x356a26eb9e012a68958082340d4c4116e7f55615cf27affcff209cf0ae544f59::wal::WAL",
-      )
-    ) {
-      updatePriceFeedIds.push(
-        pythPriceFeedIdMap[
-          "0x356a26eb9e012a68958082340d4c4116e7f55615cf27affcff209cf0ae544f59::wal::WAL"
-        ],
-      );
-    }
-    if (
-      coinTypes.includes(
-        "0x4c981f3ff786cdb9e514da897ab8a953647dae2ace9679e8358eec1e3e8871ac::dmc::DMC",
-      )
-    ) {
-      updatePriceFeedIds.push(
-        pythPriceFeedIdMap[
-          "0x4c981f3ff786cdb9e514da897ab8a953647dae2ace9679e8358eec1e3e8871ac::dmc::DMC"
-        ],
-      );
-    }
-    if (
-      coinTypes.includes(
-        "0x7262fb2f7a3a14c888c438a3cd9b912469a58cf60f367352c46584262e8299aa::ika::IKA",
-      )
-    ) {
-      updatePriceFeedIds.push(
-        pythPriceFeedIdMap[
-          "0x7262fb2f7a3a14c888c438a3cd9b912469a58cf60f367352c46584262e8299aa::ika::IKA"
-        ],
-      );
-    }
-    if (updatePriceFeedIds.length > 0) {
-      await getPriceInfoObjectIdsWithUpdate(
-        tx,
-        updatePriceFeedIds,
-        this.pythClient,
-        this.pythConnection,
-      );
-    }
+    // const updatePriceFeedIds: string[] = [];
+    // if (
+    //   coinTypes.includes(
+    //     "0xd1b72982e40348d069bb1ff701e634c117bb5f741f44dff91e472d3b01461e55::stsui::STSUI",
+    //   )
+    // ) {
+    //   updatePriceFeedIds.push(
+    //     pythPriceFeedIdMap[
+    //       "0xd1b72982e40348d069bb1ff701e634c117bb5f741f44dff91e472d3b01461e55::stsui::STSUI"
+    //     ],
+    //   );
+    // }
+    // if (
+    //   coinTypes.includes(
+    //     "0x356a26eb9e012a68958082340d4c4116e7f55615cf27affcff209cf0ae544f59::wal::WAL",
+    //   )
+    // ) {
+    //   updatePriceFeedIds.push(
+    //     pythPriceFeedIdMap[
+    //       "0x356a26eb9e012a68958082340d4c4116e7f55615cf27affcff209cf0ae544f59::wal::WAL"
+    //     ],
+    //   );
+    // }
+    // if (
+    //   coinTypes.includes(
+    //     "0x4c981f3ff786cdb9e514da897ab8a953647dae2ace9679e8358eec1e3e8871ac::dmc::DMC",
+    //   )
+    // ) {
+    //   updatePriceFeedIds.push(
+    //     pythPriceFeedIdMap[
+    //       "0x4c981f3ff786cdb9e514da897ab8a953647dae2ace9679e8358eec1e3e8871ac::dmc::DMC"
+    //     ],
+    //   );
+    // }
+    // if (
+    //   coinTypes.includes(
+    //     "0x7262fb2f7a3a14c888c438a3cd9b912469a58cf60f367352c46584262e8299aa::ika::IKA",
+    //   )
+    // ) {
+    //   updatePriceFeedIds.push(
+    //     pythPriceFeedIdMap[
+    //       "0x7262fb2f7a3a14c888c438a3cd9b912469a58cf60f367352c46584262e8299aa::ika::IKA"
+    //     ],
+    //   );
+    // }
+    // if (updatePriceFeedIds.length > 0) {
+    //   await getPriceInfoObjectIdsWithUpdate(
+    //     tx,
+    //     updatePriceFeedIds,
+    //     this.pythClient,
+    //     this.pythConnection,
+    //   );
+    // }
 
     for (const coinType of coinTypes) {
       const priceInfoObjectId = priceInfoObjectIdMap[coinType];
