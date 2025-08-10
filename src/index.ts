@@ -5,5 +5,7 @@ export * from "./core/types.js";
 
 // Re-export key types for easier access
 export { AlphalendClient } from "./core/client.js";
+export { Market } from "./models/market.js";
+export { Position } from "./models/position.js";
 export { getUserPositionCapId, getUserPositionIds } from "./models/position/functions.js";
 export { updatePythIdentifierForCoin } from "./admin/oracle.js";
