@@ -662,6 +662,23 @@ export class AlphalendClient {
   }
 
   /**
+   * Gets statistics of the protocol with cached markets data
+   *
+   * @returns Promise resolving to a ProtocolStats object
+   */
+  async getProtocolStatsWithCachedMarkets(
+    markets: Market[],
+  ): Promise<ProtocolStats | undefined> {
+    try {
+      const stats = await this.lendingProtocol.getProtocolStats(markets);
+      return stats;
+    } catch (error) {
+      console.error("Error getting protocol stats:", error);
+      return undefined;
+    }
+  }
+
+  /**
    * Gets all markets data from the protocol
    *
    * @returns Promise resolving to an array of Market objects
@@ -680,7 +697,7 @@ export class AlphalendClient {
    *
    * @returns Promise resolving to a MarketData object
    */
-  async getMarketDataFromId(marketId: number): Promise<MarketData|undefined>{
+  async getMarketDataFromId(marketId: number): Promise<MarketData | undefined> {
     try {
       const market = await this.lendingProtocol.getMarketData(marketId);
       return market;
