@@ -9,6 +9,7 @@
 
 import { SuiClient } from "@mysten/sui/client";
 import { AlphalendClient } from "../src";
+import { getPricesMap } from "../src/utils/helper.js";
 
 // The exact coin type from the error message
 const LBTC_COIN_TYPE =
@@ -93,7 +94,8 @@ describe("LBTC Price Error Reproduction", () => {
 
         // Test market data retrieval (this might trigger the price error)
         try {
-          const marketData = await lbtcMarket.getMarketData();
+          const prices = await getPricesMap();
+          const marketData = await lbtcMarket.getMarketData(prices);
           console.log("LBTC Market data retrieved successfully:", {
             marketId: marketData.marketId,
             coinType: marketData.coinType,
@@ -193,7 +195,7 @@ describe("LBTC Price Error Reproduction", () => {
         }
 
         // Step 3: Test market data retrieval
-        const marketData = await lbtcMarket.getMarketData();
+        const marketData = await lbtcMarket.getMarketData(prices);
         console.log(`Step 3 - Market data: ✅`);
         console.log("Market data:", {
           marketId: marketData.marketId,

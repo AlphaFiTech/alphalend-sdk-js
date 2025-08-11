@@ -12,6 +12,7 @@
 
 import { SuiClient } from "@mysten/sui/client";
 import { AlphalendClient } from "../src";
+import { getPricesMap } from "../src/utils/helper.js";
 import {
   pythPriceFeedIdMap,
   priceInfoObjectIdMap,
@@ -90,7 +91,8 @@ describe("User-Reported Issues Integration Tests", () => {
           });
 
           // Test market data retrieval
-          const marketData = await lbtcMarket.getMarketData();
+          const prices = await getPricesMap();
+          const marketData = await lbtcMarket.getMarketData(prices);
           expect(marketData).toBeDefined();
           expect(marketData.coinType).toBe(LBTC_COIN_TYPE);
         } else {
@@ -254,7 +256,7 @@ describe("User-Reported Issues Integration Tests", () => {
         // It's also acceptable if the function throws
         console.log("ℹ️ Function threw error:", error);
       }
-    });
+    }, 15000);
 
     test("Market data errors should be informative", async () => {
       try {
@@ -263,7 +265,8 @@ describe("User-Reported Issues Integration Tests", () => {
 
         if (markets.length > 0) {
           const market = markets[0];
-          const marketData = await market.getMarketData();
+          const prices = await getPricesMap();
+          const marketData = await market.getMarketData(prices);
 
           expect(marketData).toBeDefined();
           expect(marketData.coinType).toBeDefined();
