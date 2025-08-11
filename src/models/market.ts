@@ -3,7 +3,6 @@ import { MarketType, RewardDistributorType } from "../utils/parsedTypes.js";
 import { MarketData } from "../core/types.js";
 import { decimalsMap } from "../utils/priceFeedIds.js";
 import { fetchStSuiAPR } from "@alphafi/stsui-sdk";
-import { getPricesMap } from "../utils/helper.js";
 
 export class Market {
   market: MarketType;
@@ -12,7 +11,7 @@ export class Market {
     this.market = market;
   }
 
-  async getMarketData(): Promise<MarketData> {
+  async getMarketData(prices: Map<string, Decimal>): Promise<MarketData> {
     this.refresh();
 
     const decimalDigit = new Decimal(this.market.decimalDigit);
@@ -32,10 +31,9 @@ export class Market {
     const borrowApr = this.calculateBorrowApr();
     const supplyApr = await this.calculateSupplyApr();
 
-    const prices = await getPricesMap();
     // reward Aprs
-    borrowApr.rewards = await this.calculateBorrowRewardApr(prices);
-    supplyApr.rewards = await this.calculateSupplyRewardApr(prices);
+    borrowApr.rewards = this.calculateBorrowRewardApr(prices);
+    supplyApr.rewards = this.calculateSupplyRewardApr(prices);
 
     const allowedBorrowAmount = Decimal.max(
       0,
@@ -231,14 +229,12 @@ export class Market {
     rewardDistributor.lastUpdated = currentTime.toString();
   }
 
-  calculateSupplyRewardApr = async (
+  calculateSupplyRewardApr = (
     prices: Map<string, Decimal>,
-  ): Promise<
-    {
-      coinType: string;
-      rewardApr: Decimal;
-    }[]
-  > => {
+  ): {
+    coinType: string;
+    rewardApr: Decimal;
+  }[] => {
     const rewardAprs: {
       coinType: string;
       rewardApr: Decimal;
@@ -304,14 +300,12 @@ export class Market {
     return rewardAprs;
   };
 
-  calculateBorrowRewardApr = async (
+  calculateBorrowRewardApr = (
     prices: Map<string, Decimal>,
-  ): Promise<
-    {
-      coinType: string;
-      rewardApr: Decimal;
-    }[]
-  > => {
+  ): {
+    coinType: string;
+    rewardApr: Decimal;
+  }[] => {
     const rewardAprs: {
       coinType: string;
       rewardApr: Decimal;
