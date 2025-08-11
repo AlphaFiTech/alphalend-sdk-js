@@ -15,16 +15,15 @@ export class LendingProtocol {
   // Protocol-level methods
   async getProtocolStats(markets: Market[]): Promise<ProtocolStats> {
     try {
+      const prices = await getPricesMap();
       const marketData = await Promise.all(
         markets.map((market) => {
-          return market.getMarketData();
+          return market.getMarketData(prices);
         }),
       );
 
       let totalSuppliedUsd = 0;
       let totalBorrowedUsd = 0;
-
-      const prices = await getPricesMap();
 
       for (const market of marketData) {
         const tokenPrice = prices.get(market.coinType);
@@ -64,13 +63,17 @@ export class LendingProtocol {
   }
 
   async getAllMarketsData(): Promise<MarketData[]> {
+    const prices = await getPricesMap();
     const markets = await this.getAllMarkets();
-    return await Promise.all(markets.map((market) => market.getMarketData()));
+    return await Promise.all(
+      markets.map((market) => market.getMarketData(prices)),
+    );
   }
 
   async getMarketData(marketId: number): Promise<MarketData> {
     const market = await this.getMarket(marketId);
-    return await market.getMarketData();
+    const prices = await getPricesMap();
+    return await market.getMarketData(prices);
   }
 
   // Position methods

@@ -33,6 +33,7 @@ import {
   getAlphaReceipt,
   getClaimRewardInput,
   getEstimatedGasBudget,
+  getPricesMap,
   setPrices,
 } from "../utils/helper.js";
 import { Receipt } from "../utils/queryTypes.js";
@@ -715,7 +716,10 @@ export class AlphalendClient {
     markets: Market[],
   ): Promise<MarketData[] | undefined> {
     try {
-      return await Promise.all(markets.map((market) => market.getMarketData()));
+      const prices = await getPricesMap();
+      return await Promise.all(
+        markets.map((market) => market.getMarketData(prices)),
+      );
     } catch (error) {
       console.error("Error getting markets:", error);
       return undefined;
