@@ -59,6 +59,9 @@ export const pythPriceFeedIdMap: { [key: string]: HexString } = {
 
   "0x876a4b7bce8aeaef60464c11f4026903e9afacab79b9b142686158aa86560b50::xbtc::XBTC":
     "e62df6c8b4a85fe1a67db44dc12de5db330f7ac66b72dc658afedf0f4a415b43",
+
+  "0x1a8f4bc33f8ef7fbc851f156857aa65d397a6a6fd27a7ac2ca717b51f2fd9489::alkimi::ALKIMI":
+    "1b2deae525b02c52de4a411c4f37139931215d7cc754e57dd6c84387336ccc74",
 };
 
 /**
@@ -111,6 +114,9 @@ export const priceInfoObjectIdMap: { [key: string]: HexString } = {
 
   "0x876a4b7bce8aeaef60464c11f4026903e9afacab79b9b142686158aa86560b50::xbtc::XBTC":
     "0x9a62b4863bdeaabdc9500fce769cf7e72d5585eeb28a6d26e4cafadc13f76ab2",
+
+  "0x1a8f4bc33f8ef7fbc851f156857aa65d397a6a6fd27a7ac2ca717b51f2fd9489::alkimi::ALKIMI":
+    "0xd0eee5e5f0ee2fb2037998643d6f2bb65aca6a2a9e9a80bf00d3d0baf40e516d",
 };
 
 export const decimalsMap: { [key: string]: number } = {
@@ -144,4 +150,6 @@ export const decimalsMap: { [key: string]: number } = {
   "0x7262fb2f7a3a14c888c438a3cd9b912469a58cf60f367352c46584262e8299aa::ika::IKA": 9,
 
   "0x876a4b7bce8aeaef60464c11f4026903e9afacab79b9b142686158aa86560b50::xbtc::XBTC": 8,
+
+  "0x1a8f4bc33f8ef7fbc851f156857aa65d397a6a6fd27a7ac2ca717b51f2fd9489::alkimi::ALKIMI": 9,
 };

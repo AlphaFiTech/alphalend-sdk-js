@@ -65,7 +65,7 @@ export class Position {
         const supplyApr = await market.calculateSupplyApr();
 
         // Get supply reward APRs and add them to the total
-        const supplyRewards = await market.calculateSupplyRewardApr(prices);
+        const supplyRewards = market.calculateSupplyRewardApr(prices);
         const totalSupplyRewardApr = supplyRewards.reduce(
           (acc, reward) => acc.add(reward.rewardApr),
           new Decimal(0),
@@ -107,7 +107,7 @@ export class Position {
         totalBorrowedUsd = totalBorrowedUsd.add(loanUsd);
 
         const borrowApr = market.calculateBorrowApr();
-        const borrowRewards = await market.calculateBorrowRewardApr(prices);
+        const borrowRewards = market.calculateBorrowRewardApr(prices);
         const totalBorrowRewardApr = borrowRewards.reduce(
           (acc, reward) => acc.add(reward.rewardApr),
           new Decimal(0),
