@@ -110,6 +110,14 @@ export class AlphalendClient {
         ],
       );
     }
+    if (updatePriceFeedIds.length > 0) {
+      await getPriceInfoObjectIdsWithUpdate(
+        tx,
+        updatePriceFeedIds,
+        this.pythClient,
+        this.pythConnection,
+      );
+    }
 
     for (const coinType of coinTypes) {
       const priceInfoObjectId = priceInfoObjectIdMap[coinType];
