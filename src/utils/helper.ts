@@ -154,7 +154,7 @@ export async function getPricesMap(): Promise<Map<string, Decimal>> {
   for (const data of dataArr) {
     priceMap.set(
       data.coinType,
-      new Decimal(data.pythPrice ? data.pythPrice : data.coingeckoPrice),
+      new Decimal(data.pythPrice ? data.pythPrice : data.coingeckoPrice || 0),
     );
   }
   priceMap.set(
