@@ -24,7 +24,7 @@ import {
   MarketData,
   UserPortfolio,
   ProtocolStats,
-  MarketConfig,
+  CoinMetadata,
 } from "./types.js";
 import {
   getAlphaReceipt,
@@ -59,8 +59,8 @@ export class AlphalendClient {
   constants: Constants;
   lendingProtocol: LendingProtocol;
 
-  // Dynamic market data properties
-  private marketConfigMap: Map<string, MarketConfig> = new Map();
+  // Dynamic coin metadata properties
+  private coinMetadataMap: Map<string, CoinMetadata> = new Map();
   private isInitialized: boolean = false;
   private initializationPromise: Promise<void> | null = null;
 
@@ -103,14 +103,14 @@ export class AlphalendClient {
     }
 
     // Start initialization (only happens once)
-    this.initializationPromise = this.fetchAndCacheMarketData();
+    this.initializationPromise = this.fetchAndCacheCoinMetadata();
     return this.initializationPromise;
   }
 
   /**
-   * Fetches market data from GraphQL API and caches it
+   * Fetches coin metadata from GraphQL API and caches it
    */
-  private async fetchAndCacheMarketData(): Promise<void> {
+  private async fetchAndCacheCoinMetadata(): Promise<void> {
     try {
       const apiUrl = "https://api.alphalend.xyz/public/graphql";
 
@@ -120,9 +120,8 @@ export class AlphalendClient {
           coinInfo {
             coinType
             pythPriceFeedId
-            priceInfoObjectId
+            pythPriceInfoObjectId
             decimals
-            marketId
           }
         }
       `;
@@ -147,24 +146,35 @@ export class AlphalendClient {
         if (
           coin.coinType &&
           coin.pythPriceFeedId &&
-          coin.priceInfoObjectId &&
-          coin.decimals !== undefined &&
-          coin.marketId !== undefined
+          coin.pythPriceInfoObjectId &&
+          coin.decimals !== undefined
         ) {
-          this.marketConfigMap.set(coin.coinType, {
+          this.coinMetadataMap.set(coin.coinType, {
             coinType: coin.coinType,
             pythPriceFeedId: coin.pythPriceFeedId,
             priceInfoObjectId: coin.priceInfoObjectId,
             decimals: coin.decimals,
-            marketId: coin.marketId,
           });
         }
       }
 
+      this.coinMetadataMap.set(
+        "0xfe3afec26c59e874f3c1d60b8203cb3852d2bb2aa415df9548b8d688e6683f93::alpha::ALPHA",
+        {
+          coinType:
+            "0xfe3afec26c59e874f3c1d60b8203cb3852d2bb2aa415df9548b8d688e6683f93::alpha::ALPHA",
+          pythPriceFeedId:
+            "23d7315113f5b1d3ba7a83604c44b94d79f4fd69af77f804fc7f920a6dc65744",
+          priceInfoObjectId:
+            "0x801dbc2f0053d34734814b2d6df491ce7807a725fe9a01ad74a07e9c51396c37",
+          decimals: 9,
+        },
+      );
+
       this.isInitialized = true;
 
-      // Update LendingProtocol with the fetched market data
-      this.lendingProtocol.updateMarketConfigMap(this.marketConfigMap);
+      // Update LendingProtocol with the fetched coin metadata
+      this.lendingProtocol.updateCoinMetadataMap(this.coinMetadataMap);
     } catch (error) {
       throw new Error(
         `Failed to initialize market data: ${error instanceof Error ? error.message : "Unknown error"}. The SDK requires market data to function properly.`,
@@ -177,13 +187,13 @@ export class AlphalendClient {
    * Uses dynamic data fetched from GraphQL API
    */
   private getPythPriceFeedId(coinType: string): string {
-    const dynamicData = this.marketConfigMap.get(coinType);
+    const dynamicData = this.coinMetadataMap.get(coinType);
     if (dynamicData?.pythPriceFeedId) {
       return dynamicData.pythPriceFeedId;
     }
 
     throw new Error(
-      `No Pyth price feed ID found for coin type: ${coinType}. Ensure the market data is properly initialized.`,
+      `No Pyth price feed ID found for coin type: ${coinType}. Ensure the coin metadata is properly initialized.`,
     );
   }
 
@@ -192,13 +202,13 @@ export class AlphalendClient {
    * Uses dynamic data fetched from GraphQL API
    */
   private getPriceInfoObjectId(coinType: string): string {
-    const dynamicData = this.marketConfigMap.get(coinType);
+    const dynamicData = this.coinMetadataMap.get(coinType);
     if (dynamicData?.priceInfoObjectId) {
       return dynamicData.priceInfoObjectId;
     }
 
     throw new Error(
-      `No price info object ID found for coin type: ${coinType}. Ensure the market data is properly initialized.`,
+      `No price info object ID found for coin type: ${coinType}. Ensure the coin metadata is properly initialized.`,
     );
   }
 
@@ -207,13 +217,13 @@ export class AlphalendClient {
    * Uses dynamic data fetched from GraphQL API
    */
   private getDecimals(coinType: string): number {
-    const dynamicData = this.marketConfigMap.get(coinType);
+    const dynamicData = this.coinMetadataMap.get(coinType);
     if (dynamicData?.decimals !== undefined) {
       return dynamicData.decimals;
     }
 
     throw new Error(
-      `No decimal places found for coin type: ${coinType}. Ensure the market data is properly initialized.`,
+      `No decimal places found for coin type: ${coinType}. Ensure the coin metadata is properly initialized.`,
     );
   }
 

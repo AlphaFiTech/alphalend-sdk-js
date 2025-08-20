@@ -1,24 +1,24 @@
 import { Decimal } from "decimal.js";
 import { MarketType, RewardDistributorType } from "../utils/parsedTypes.js";
-import { MarketData, MarketConfig } from "../core/types.js";
+import { MarketData, CoinMetadata } from "../core/types.js";
 import { fetchStSuiAPR } from "@alphafi/stsui-sdk";
 
 export class Market {
   market: MarketType;
-  private marketConfigMap: Map<string, MarketConfig>;
+  private coinMetadataMap: Map<string, CoinMetadata>;
 
-  constructor(market: MarketType, marketConfigMap: Map<string, MarketConfig>) {
+  constructor(market: MarketType, coinMetadataMap: Map<string, CoinMetadata>) {
     this.market = market;
-    this.marketConfigMap = marketConfigMap;
+    this.coinMetadataMap = coinMetadataMap;
   }
 
   /**
-   * Gets decimal places for a coin type from market data
+   * Gets decimal places for a coin type from coin metadata
    */
   private getDecimals(coinType: string): number {
-    const marketConfig = this.marketConfigMap.get(coinType);
-    if (marketConfig?.decimals !== undefined) {
-      return marketConfig.decimals;
+    const coinMetadata = this.coinMetadataMap.get(coinType);
+    if (coinMetadata?.decimals !== undefined) {
+      return coinMetadata.decimals;
     }
     throw new Error(`No decimal places found for coin type: ${coinType}`);
   }

@@ -14,15 +14,14 @@ import { Transaction, TransactionArgument } from "@mysten/sui/transactions";
 import { Decimal } from "decimal.js";
 
 /**
- * Interface for market configuration fetched from GraphQL API
- * Contains essential market data used throughout the SDK
+ * Interface for coin metadata fetched from GraphQL API
+ * Contains essential coin data used throughout the SDK
  */
-export interface MarketConfig {
+export interface CoinMetadata {
   coinType: string;
   pythPriceFeedId: string;
   priceInfoObjectId: string;
   decimals: number;
-  marketId: number;
 }
 
 /**

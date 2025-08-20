@@ -1,4 +1,4 @@
-import { UserPortfolio, MarketConfig } from "../core/types.js";
+import { UserPortfolio, CoinMetadata } from "../core/types.js";
 import {
   PositionType,
   RewardDistributorType,
@@ -10,23 +10,23 @@ import { getPricesMap } from "../utils/helper.js";
 
 export class Position {
   position: PositionType;
-  private marketConfigMap: Map<string, MarketConfig>;
+  private coinMetadataMap: Map<string, CoinMetadata>;
 
   constructor(
     position: PositionType,
-    marketConfigMap: Map<string, MarketConfig>,
+    coinMetadataMap: Map<string, CoinMetadata>,
   ) {
     this.position = position;
-    this.marketConfigMap = marketConfigMap;
+    this.coinMetadataMap = coinMetadataMap;
   }
 
   /**
-   * Gets decimal places for a coin type from market data
+   * Gets decimal places for a coin type from coin metadata
    */
   private getDecimals(coinType: string): number {
-    const marketConfig = this.marketConfigMap.get(coinType);
-    if (marketConfig?.decimals !== undefined) {
-      return marketConfig.decimals;
+    const coinMetadata = this.coinMetadataMap.get(coinType);
+    if (coinMetadata?.decimals !== undefined) {
+      return coinMetadata.decimals;
     }
     throw new Error(`No decimal places found for coin type: ${coinType}`);
   }

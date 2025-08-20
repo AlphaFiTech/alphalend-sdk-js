@@ -6,25 +6,25 @@ import {
   MarketData,
   ProtocolStats,
   UserPortfolio,
-  MarketConfig,
+  CoinMetadata,
 } from "../core/types.js";
 import { getPricesMap } from "../utils/helper.js";
 
 export class LendingProtocol {
   private blockchain: Blockchain;
-  private marketConfigMap: Map<string, MarketConfig>;
+  private coinMetadataMap: Map<string, CoinMetadata>;
 
   constructor(network: string, client: SuiClient) {
     this.blockchain = new Blockchain(network, client);
-    this.marketConfigMap = new Map(); // Initialize with empty map
+    this.coinMetadataMap = new Map(); // Initialize with empty map
   }
 
   /**
-   * Updates the market config map with fresh data
-   * Called by AlphalendClient after fetching market data from GraphQL
+   * Updates the coin metadata map with fresh data
+   * Called by AlphalendClient after fetching coin metadata from GraphQL
    */
-  updateMarketConfigMap(marketConfigMap: Map<string, MarketConfig>): void {
-    this.marketConfigMap = marketConfigMap;
+  updateCoinMetadataMap(coinMetadataMap: Map<string, CoinMetadata>): void {
+    this.coinMetadataMap = coinMetadataMap;
   }
 
   // Protocol-level methods
@@ -69,12 +69,12 @@ export class LendingProtocol {
   // Market methods
   async getAllMarkets(): Promise<Market[]> {
     const markets = await this.blockchain.getAllMarkets();
-    return markets.map((market) => new Market(market, this.marketConfigMap));
+    return markets.map((market) => new Market(market, this.coinMetadataMap));
   }
 
   async getMarket(marketId: number): Promise<Market> {
     const market = await this.blockchain.getMarket(marketId);
-    return new Market(market, this.marketConfigMap);
+    return new Market(market, this.coinMetadataMap);
   }
 
   async getAllMarketsData(): Promise<MarketData[]> {
@@ -95,13 +95,13 @@ export class LendingProtocol {
 
   async getPosition(positionId: string): Promise<Position> {
     const position = await this.blockchain.getPosition(positionId);
-    return new Position(position, this.marketConfigMap);
+    return new Position(position, this.coinMetadataMap);
   }
 
   async getPositions(userAddress: string): Promise<Position[]> {
     const positions = await this.blockchain.getPositionsForUser(userAddress);
     return positions.map(
-      (position) => new Position(position, this.marketConfigMap),
+      (position) => new Position(position, this.coinMetadataMap),
     );
   }
 
