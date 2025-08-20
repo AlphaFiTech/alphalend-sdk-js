@@ -14,6 +14,18 @@ import { Transaction, TransactionArgument } from "@mysten/sui/transactions";
 import { Decimal } from "decimal.js";
 
 /**
+ * Interface for market configuration fetched from GraphQL API
+ * Contains essential market data used throughout the SDK
+ */
+export interface MarketConfig {
+  coinType: string;
+  pythPriceFeedId: string;
+  priceInfoObjectId: string;
+  decimals: number;
+  marketId: number;
+}
+
+/**
  * Special constant for maximum u64 value (2^64 - 1)
  * Used to indicate withdrawing all collateral when passed as the amount parameter
  * in withdraw operations.

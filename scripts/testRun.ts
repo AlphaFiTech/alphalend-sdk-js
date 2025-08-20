@@ -2,17 +2,14 @@ import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
 import { Transaction } from "@mysten/sui/transactions";
 import { fromB64 } from "@mysten/sui/utils";
 import { getConstants } from "../src/constants/index.js";
-import { addCoinToOracle } from "../src/admin/oracle.js";
 import { AlphalendClient } from "../src/core/client.js";
 import * as dotenv from "dotenv";
-import { Decimal } from "decimal.js";
 import { setPrices } from "../src/utils/helper.js";
 import { SuiClient } from "@mysten/sui/client";
 import {
   SuiPriceServiceConnection,
   SuiPythClient,
 } from "@pythnetwork/pyth-sui-js";
-import { pythPriceFeedIdMap } from "../src/utils/priceFeedIds.js";
 
 dotenv.config();
 
@@ -54,10 +51,8 @@ export function getExecStuff() {
 }
 
 export async function dryRunTransactionBlock(txb: Transaction) {
-  const { suiClient } = getExecStuff();
-  txb.setSender(
-    "0xa1eb94d1700652aa85b417b46fa6775575b8b98d3352d864fb5146eb45d335fb",
-  );
+  const { suiClient, address } = getExecStuff();
+  txb.setSender(address);
   txb.setGasBudget(1e9);
   try {
     let serializedTxb = await txb.build({ client: suiClient });
@@ -75,76 +70,6 @@ export async function dryRunTransactionBlock(txb: Transaction) {
   } catch (e) {
     console.log(e);
   }
-}
-
-async function addCoinToOracleCaller(tx: Transaction) {
-  const { suiClient } = getExecStuff();
-  const adminCapId = constants.ALPHAFI_ORACLE_ADMIN_CAP_ID;
-  await addCoinToOracle(
-    tx,
-    adminCapId,
-    "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin1::TESTCOIN1",
-    1,
-    1000,
-    "testnet",
-    suiClient,
-  );
-  await addCoinToOracle(
-    tx,
-    adminCapId,
-    "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin2::TESTCOIN2",
-    1,
-    1000,
-    "testnet",
-    suiClient,
-  );
-  await addCoinToOracle(
-    tx,
-    adminCapId,
-    "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin3::TESTCOIN3",
-    1,
-    1000,
-    "testnet",
-    suiClient,
-  );
-  await addCoinToOracle(
-    tx,
-    adminCapId,
-    "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin4::TESTCOIN4",
-    0,
-    1000,
-    "testnet",
-    suiClient,
-  );
-  await addCoinToOracle(
-    tx,
-    adminCapId,
-    "0xf357286b629e3fd7ab921faf9ab1344fdff30244a4ff0897181845546babb2e1::testcoin5::TESTCOIN5",
-    0,
-    1000,
-    "testnet",
-    suiClient,
-  );
-  await addCoinToOracle(
-    tx,
-    adminCapId,
-    "0xf357286b629e3fd7ab921faf9ab1344fdff30244a4ff0897181845546babb2e1::testcoin6::TESTCOIN6",
-    1,
-    1000,
-    "testnet",
-    suiClient,
-  );
-  await addCoinToOracle(
-    tx,
-    adminCapId,
-    "0x2::sui::SUI",
-    1,
-    1000,
-    "testnet",
-    suiClient,
-  );
-
-  return tx;
 }
 
 async function updatePricesCaller() {
@@ -197,47 +122,6 @@ async function borrow() {
   }
 }
 
-function setAlternate(txb: Transaction) {
-  const constants = getConstants("testnet");
-  const suiTypeName = txb.moveCall({
-    target: `0x1::type_name::get`,
-    typeArguments: ["0x2::sui::SUI"],
-  });
-  const walTypeName = txb.moveCall({
-    target: `0x1::type_name::get`,
-    typeArguments: [
-      "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin2::TESTCOIN2",
-    ],
-  });
-  txb.moveCall({
-    target: `${constants.ALPHAFI_LATEST_ORACLE_PACKAGE_ID}::oracle::add_alternate_price_identifier`,
-    arguments: [
-      txb.object(constants.ALPHAFI_ORACLE_OBJECT_ID),
-      txb.object(constants.ALPHAFI_ORACLE_ADMIN_CAP_ID),
-      walTypeName,
-      suiTypeName,
-    ],
-  });
-}
-
-function removeAlternate(txb: Transaction) {
-  const constants = getConstants("testnet");
-  const walTypeName = txb.moveCall({
-    target: `0x1::type_name::get`,
-    typeArguments: [
-      "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin2::TESTCOIN2",
-    ],
-  });
-  txb.moveCall({
-    target: `${constants.ALPHAFI_LATEST_ORACLE_PACKAGE_ID}::oracle::remove_alternate_price_identifier`,
-    arguments: [
-      txb.object(constants.ALPHAFI_ORACLE_OBJECT_ID),
-      txb.object(constants.ALPHAFI_ORACLE_ADMIN_CAP_ID),
-      walTypeName,
-    ],
-  });
-}
-
 export async function executeTransactionBlock() {
   const { keypair, suiClient } = getExecStuff();
   const tx = new Transaction();
@@ -273,6 +157,20 @@ export async function executeTransactionBlock() {
 async function getAllMarkets() {
   const client = new AlphalendClient("mainnet", getSuiClient("mainnet"));
   const res = await client.getAllMarkets();
+  // res?.forEach((market) => {
+  //   let supplyApr = market.supplyApr.interestApr;
+  //   market.supplyApr.rewards.forEach((reward) => {
+  //     supplyApr = supplyApr.add(reward.rewardApr);
+  //   });
+  //   supplyApr = supplyApr.add(market.supplyApr.stakingApr);
+  //   let borrowApr = market.borrowApr.interestApr;
+  //   market.borrowApr.rewards.forEach((reward) => {
+  //     borrowApr = borrowApr.sub(reward.rewardApr);
+  //   });
+  //   console.log("Market#", market.marketId);
+  //   console.log("Supply APR:", supplyApr.toString());
+  //   console.log("Borrow APR:", borrowApr.toString());
+  // });
   console.log(res);
 }
 // getAllMarkets();
@@ -280,11 +178,11 @@ async function getAllMarkets() {
 async function getUserPortfolio() {
   const client = new AlphalendClient("mainnet", getSuiClient("mainnet"));
   const res = await client.getUserPortfolio(
-    "0xe136f0b6faf27ee707725f38f2aeefc51c6c31cc508222bee5cbc4f5fcf222c3",
+    "0x07a5709f3b154311e063bd16d6a5324bc0535159ccd5ee74b3c3bde0cd0d090a",
   );
   console.log(res);
 }
-// getUserPortfolio();
+getUserPortfolio();
 
 async function withdraw() {
   const { suiClient, keypair } = getExecStuff();
@@ -306,7 +204,7 @@ async function withdraw() {
 }
 
 async function run(coinType: string) {
-  const { suiClient, keypair } = getExecStuff();
+  const { suiClient, keypair, address } = getExecStuff();
   const tx = new Transaction();
   const constants = getConstants("mainnet");
   const pythClient = new SuiPythClient(
@@ -317,11 +215,17 @@ async function run(coinType: string) {
   const pythConnection = new SuiPriceServiceConnection(
     "https://hermes.pyth.network",
   );
+  // await getPriceInfoObjectIdsWithUpdate(
+  //   tx,
+  //   [pythPriceFeedIdMap[coinType]],
+  //   pythClient,
+  //   pythConnection,
+  // );
 
   // console.log(pythPriceFeedIdMap[coinType]);
-  // const priceInfoObjectIds = await pythClient.getPriceFeedObjectId(
-  //   pythPriceFeedIdMap[coinType],
-  // );
+  const priceInfoObjectIds = await pythClient.getPriceFeedObjectId(
+    "23d7315113f5b1d3ba7a83604c44b94d79f4fd69af77f804fc7f920a6dc65744",
+  );
 
   // const priceFeedUpdateData = await pythConnection.getPriceFeedsUpdateData([
   //   pythPriceFeedIdMap[coinType],
@@ -331,29 +235,43 @@ async function run(coinType: string) {
   //   tx,
   //   priceFeedUpdateData,
   // );
-  const alc = new AlphalendClient("mainnet", suiClient);
-  await alc.updatePrices(tx, [coinType]);
-  tx.setGasBudget(1e9);
-  dryRunTransactionBlock(tx);
+  // console.log(priceInfoObjectIds);
+  // const alc = new AlphalendClient("mainnet", suiClient);
+  // await alc.updatePrices(tx, [coinType]);
+  // const tx = await alc.borrow({
+  //   marketId: "16",
+  //   amount: 100n,
+  //   coinType: coinType,
+  //   priceUpdateCoinTypes: [
+  //     coinType,
+  //     "0x375f70cf2ae4c00bf37117d0c85a2c71545e6ee05c4a5c7d282cd66a4504b068::usdt::USDT",
+  //     "0xd0e89b2af5e4910726fbcd8b8dd37bb79b29e5f83f7491bca830e94f7f226d29::eth::ETH",
+  //   ],
+  //   address,
+  //   positionCapId:
+  //     "0xf9ca35f404dd3c1ea10c381dd3e1fe8a0c4586adf5e186f4eb52307462a5af7d",
+  // });
+  // // tx.setGasBudget(1e9);
+  // dryRunTransactionBlock(tx);
 
-  await suiClient
-    .signAndExecuteTransaction({
-      signer: keypair,
-      transaction: tx,
-      requestType: "WaitForLocalExecution",
-      options: {
-        showEffects: true,
-        showBalanceChanges: true,
-        showObjectChanges: true,
-      },
-    })
-    .then((res) => {
-      console.log(JSON.stringify(res, null, 2));
-    })
-    .catch((error) => {
-      console.error(error);
-    });
+  // await suiClient
+  //   .signAndExecuteTransaction({
+  //     signer: keypair,
+  //     transaction: tx,
+  //     requestType: "WaitForLocalExecution",
+  //     options: {
+  //       showEffects: true,
+  //       showBalanceChanges: true,
+  //       showObjectChanges: true,
+  //     },
+  //   })
+  //   .then((res) => {
+  //     console.log(JSON.stringify(res, null, 2));
+  //   })
+  //   .catch((error) => {
+  //     console.error(error);
+  //   });
 }
-run(
-  "0x4c981f3ff786cdb9e514da897ab8a953647dae2ace9679e8358eec1e3e8871ac::dmc::DMC",
-);
+// run(
+//   "0x1a8f4bc33f8ef7fbc851f156857aa65d397a6a6fd27a7ac2ca717b51f2fd9489::alkimi::ALKIMI",
+// );

@@ -1,4 +1,4 @@
-import { UserPortfolio } from "../core/types.js";
+import { UserPortfolio, MarketConfig } from "../core/types.js";
 import {
   PositionType,
   RewardDistributorType,
@@ -6,14 +6,29 @@ import {
 } from "../utils/parsedTypes.js";
 import { Decimal } from "decimal.js";
 import { Market } from "./market.js";
-import { decimalsMap } from "../utils/priceFeedIds.js";
 import { getPricesMap } from "../utils/helper.js";
 
 export class Position {
   position: PositionType;
+  private marketConfigMap: Map<string, MarketConfig>;
 
-  constructor(position: PositionType) {
+  constructor(
+    position: PositionType,
+    marketConfigMap: Map<string, MarketConfig>,
+  ) {
     this.position = position;
+    this.marketConfigMap = marketConfigMap;
+  }
+
+  /**
+   * Gets decimal places for a coin type from market data
+   */
+  private getDecimals(coinType: string): number {
+    const marketConfig = this.marketConfigMap.get(coinType);
+    if (marketConfig?.decimals !== undefined) {
+      return marketConfig.decimals;
+    }
+    throw new Error(`No decimal places found for coin type: ${coinType}`);
   }
 
   async getUserPortfolio(markets: Market[]): Promise<UserPortfolio> {
@@ -206,7 +221,9 @@ export class Position {
     for (const distributor of this.position.rewardDistributors) {
       for (const reward of distributor.rewards) {
         if (reward) {
-          const divisor = new Decimal(10).pow(decimalsMap[reward.coinType]);
+          const divisor = new Decimal(10).pow(
+            this.getDecimals(reward.coinType),
+          );
           let earnedRewards = new Decimal(reward.earnedRewards).div(divisor);
           if (rewardCoinTypeMap.has(reward.coinType)) {
             earnedRewards = earnedRewards.add(
