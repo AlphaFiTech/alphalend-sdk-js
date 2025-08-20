@@ -20,8 +20,9 @@ import { Decimal } from "decimal.js";
 export interface CoinMetadata {
   coinType: string;
   pythPriceFeedId: string;
-  priceInfoObjectId: string;
+  pythPriceInfoObjectId: string;
   decimals: number;
+  pythSponsored: boolean;
 }
 
 /**
