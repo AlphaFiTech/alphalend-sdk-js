@@ -53,6 +53,27 @@ export interface SupplyParams {
 }
 
 /**
+ * Parameters for zap-in supply operation to a lending market
+ * Used with the `zapInSupply` method to swap input tokens and supply them as collateral in a single transaction
+ */
+export interface ZapInSupplyParams {
+  /** Market ID where collateral is being added */
+  marketId: string;
+  /** Slippage for the swap (e.g., 0.01 for 1%) */
+  slippage: number;
+  /** Coin type of the market that is being swapped in (e.g., "0x2::sui::SUI") */
+  marketCoinType: string;
+  /** Amount to supply as collateral in base units (in mists) */
+  inputAmount: bigint;
+  /** Supply coin type (e.g., "0x2::sui::SUI") */
+  inputCoinType: string;
+  /** Object ID of the position capability object */
+  positionCapId?: string;
+  /** Address of the user supplying collateral */
+  address: string;
+}
+
+/**
  * Parameters for withdrawing collateral from a lending market
  * Used with the `withdraw` method
  */

@@ -182,7 +182,7 @@ async function getUserPortfolio() {
   );
   console.log(res);
 }
-getUserPortfolio();
+// getUserPortfolio();
 
 async function withdraw() {
   const { suiClient, keypair } = getExecStuff();
@@ -215,6 +215,8 @@ async function run(coinType: string) {
   const pythConnection = new SuiPriceServiceConnection(
     "https://hermes.pyth.network",
   );
+  const positionCapId =
+    "0xf9ca35f404dd3c1ea10c381dd3e1fe8a0c4586adf5e186f4eb52307462a5af7d";
   // await getPriceInfoObjectIdsWithUpdate(
   //   tx,
   //   [pythPriceFeedIdMap[coinType]],
@@ -223,9 +225,9 @@ async function run(coinType: string) {
   // );
 
   // console.log(pythPriceFeedIdMap[coinType]);
-  const priceInfoObjectIds = await pythClient.getPriceFeedObjectId(
-    "23d7315113f5b1d3ba7a83604c44b94d79f4fd69af77f804fc7f920a6dc65744",
-  );
+  // const priceInfoObjectIds = await pythClient.getPriceFeedObjectId(
+  //   "23d7315113f5b1d3ba7a83604c44b94d79f4fd69af77f804fc7f920a6dc65744",
+  // );
 
   // const priceFeedUpdateData = await pythConnection.getPriceFeedsUpdateData([
   //   pythPriceFeedIdMap[coinType],
@@ -236,8 +238,17 @@ async function run(coinType: string) {
   //   priceFeedUpdateData,
   // );
   // console.log(priceInfoObjectIds);
-  // const alc = new AlphalendClient("mainnet", suiClient);
-  // await alc.updatePrices(tx, [coinType]);
+  const alc = new AlphalendClient("mainnet", suiClient);
+  await alc.zapInSupply({
+    marketId: "1",
+    slippage: 0.01,
+    address: address,
+    marketCoinType: "0x2::sui::SUI",
+    inputAmount: 100_000n,
+    inputCoinType:
+      "0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC",
+    positionCapId,
+  });
   // const tx = await alc.borrow({
   //   marketId: "16",
   //   amount: 100n,
@@ -252,7 +263,7 @@ async function run(coinType: string) {
   //     "0xf9ca35f404dd3c1ea10c381dd3e1fe8a0c4586adf5e186f4eb52307462a5af7d",
   // });
   // // tx.setGasBudget(1e9);
-  // dryRunTransactionBlock(tx);
+  dryRunTransactionBlock(tx);
 
   // await suiClient
   //   .signAndExecuteTransaction({
@@ -272,6 +283,6 @@ async function run(coinType: string) {
   //     console.error(error);
   //   });
 }
-// run(
-//   "0x1a8f4bc33f8ef7fbc851f156857aa65d397a6a6fd27a7ac2ca717b51f2fd9489::alkimi::ALKIMI",
-// );
+run(
+  "0x1a8f4bc33f8ef7fbc851f156857aa65d397a6a6fd27a7ac2ca717b51f2fd9489::alkimi::ALKIMI",
+);
