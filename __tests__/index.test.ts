@@ -1,8 +1,4 @@
-import {
-  AlphalendClient,
-  getUserPositionCapId,
-  updatePythIdentifierForCoin,
-} from "../src";
+import { AlphalendClient, getUserPositionCapId } from "../src";
 
 describe("index exports", () => {
   it("should export AlphalendClient", () => {
@@ -11,9 +7,5 @@ describe("index exports", () => {
 
   it("should export getUserPositionCapId", () => {
     expect(getUserPositionCapId).toBeDefined();
-  });
-
-  it("should export updatePythIdentifierForCoin", () => {
-    expect(updatePythIdentifierForCoin).toBeDefined();
   });
 });
