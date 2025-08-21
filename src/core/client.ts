@@ -262,7 +262,7 @@ export class AlphalendClient {
     const updatePriceFeedIds: string[] = [];
 
     for (const coinType of coinTypes) {
-      if (this.getPythSponsored(coinType)) {
+      if (!this.getPythSponsored(coinType)) {
         updatePriceFeedIds.push(this.getPythPriceFeedId(coinType));
       }
     }
