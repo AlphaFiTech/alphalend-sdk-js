@@ -14,6 +14,18 @@ import { Transaction, TransactionArgument } from "@mysten/sui/transactions";
 import { Decimal } from "decimal.js";
 
 /**
+ * Interface for coin metadata fetched from GraphQL API
+ * Contains essential coin data used throughout the SDK
+ */
+export interface CoinMetadata {
+  coinType: string;
+  pythPriceFeedId: string;
+  pythPriceInfoObjectId: string;
+  decimals: number;
+  pythSponsored: boolean;
+}
+
+/**
  * Special constant for maximum u64 value (2^64 - 1)
  * Used to indicate withdrawing all collateral when passed as the amount parameter
  * in withdraw operations.

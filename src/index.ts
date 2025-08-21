@@ -7,5 +7,7 @@ export * from "./core/types.js";
 export { AlphalendClient } from "./core/client.js";
 export { Market } from "./models/market.js";
 export { Position } from "./models/position.js";
-export { getUserPositionCapId, getUserPositionIds } from "./models/position/functions.js";
-export { updatePythIdentifierForCoin } from "./admin/oracle.js";
+export {
+  getUserPositionCapId,
+  getUserPositionIds,
+} from "./models/position/functions.js";

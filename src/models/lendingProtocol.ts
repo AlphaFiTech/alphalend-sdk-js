@@ -2,14 +2,29 @@ import { SuiClient } from "@mysten/sui/client";
 import { Blockchain } from "./blockchain.js";
 import { Position } from "./position.js";
 import { Market } from "./market.js";
-import { MarketData, ProtocolStats, UserPortfolio } from "../core/types.js";
+import {
+  MarketData,
+  ProtocolStats,
+  UserPortfolio,
+  CoinMetadata,
+} from "../core/types.js";
 import { getPricesMap } from "../utils/helper.js";
 
 export class LendingProtocol {
   private blockchain: Blockchain;
+  private coinMetadataMap: Map<string, CoinMetadata>;
 
   constructor(network: string, client: SuiClient) {
     this.blockchain = new Blockchain(network, client);
+    this.coinMetadataMap = new Map(); // Initialize with empty map
+  }
+
+  /**
+   * Updates the coin metadata map with fresh data
+   * Called by AlphalendClient after fetching coin metadata from GraphQL
+   */
+  updateCoinMetadataMap(coinMetadataMap: Map<string, CoinMetadata>): void {
+    this.coinMetadataMap = coinMetadataMap;
   }
 
   // Protocol-level methods
@@ -54,12 +69,12 @@ export class LendingProtocol {
   // Market methods
   async getAllMarkets(): Promise<Market[]> {
     const markets = await this.blockchain.getAllMarkets();
-    return markets.map((market) => new Market(market));
+    return markets.map((market) => new Market(market, this.coinMetadataMap));
   }
 
   async getMarket(marketId: number): Promise<Market> {
     const market = await this.blockchain.getMarket(marketId);
-    return new Market(market);
+    return new Market(market, this.coinMetadataMap);
   }
 
   async getAllMarketsData(): Promise<MarketData[]> {
@@ -80,12 +95,14 @@ export class LendingProtocol {
 
   async getPosition(positionId: string): Promise<Position> {
     const position = await this.blockchain.getPosition(positionId);
-    return new Position(position);
+    return new Position(position, this.coinMetadataMap);
   }
 
   async getPositions(userAddress: string): Promise<Position[]> {
     const positions = await this.blockchain.getPositionsForUser(userAddress);
-    return positions.map((position) => new Position(position));
+    return positions.map(
+      (position) => new Position(position, this.coinMetadataMap),
+    );
   }
 
   async getUserPortfolio(userAddress: string): Promise<UserPortfolio[]> {

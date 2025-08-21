@@ -15,10 +15,6 @@ import {
   updatePriceTransaction,
 } from "../utils/oracle.js";
 import {
-  priceInfoObjectIdMap,
-  pythPriceFeedIdMap,
-} from "../utils/priceFeedIds.js";
-import {
   SupplyParams,
   WithdrawParams,
   BorrowParams,
@@ -28,6 +24,7 @@ import {
   MarketData,
   UserPortfolio,
   ProtocolStats,
+  CoinMetadata,
 } from "./types.js";
 import {
   getAlphaReceipt,
@@ -51,6 +48,7 @@ import { Market } from "../models/market.js";
  * - Manages transaction building for protocol interactions
  * - Exposes query methods for protocol state, markets, and user positions
  * - Initializes and coordinates price feed updates
+ * - Automatically fetches market data on first use (lazy loading)
  */
 
 export class AlphalendClient {
@@ -60,6 +58,11 @@ export class AlphalendClient {
   network: string;
   constants: Constants;
   lendingProtocol: LendingProtocol;
+
+  // Dynamic coin metadata properties
+  private coinMetadataMap: Map<string, CoinMetadata> = new Map();
+  private isInitialized: boolean = false;
+  private initializationPromise: Promise<void> | null = null;
 
   /**
    * Creates a new AlphaLend client instance
@@ -85,6 +88,161 @@ export class AlphalendClient {
   }
 
   /**
+   * Ensures market data is initialized by fetching from GraphQL API
+   * This method is called automatically before any operation that needs market data
+   * Only fetches data once - subsequent calls use cached data
+   */
+  private async ensureInitialized(): Promise<void> {
+    if (this.isInitialized) {
+      return; // Already initialized, return immediately
+    }
+
+    if (this.initializationPromise) {
+      // Already initializing, wait for it to complete
+      return this.initializationPromise;
+    }
+
+    // Start initialization (only happens once)
+    this.initializationPromise = this.fetchAndCacheCoinMetadata();
+    return this.initializationPromise;
+  }
+
+  /**
+   * Fetches coin metadata from GraphQL API and caches it
+   */
+  private async fetchAndCacheCoinMetadata(): Promise<void> {
+    try {
+      const apiUrl = "https://api.alphalend.xyz/public/graphql";
+
+      // Extended query to get all the data we need
+      const query = `
+        query {
+          coinInfo {
+            coinType
+            pythPriceFeedId
+            pythPriceInfoObjectId
+            decimals
+            pythSponsored
+          }
+        }
+      `;
+
+      const response = await fetch(apiUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ query }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`GraphQL request failed: ${response.status}`);
+      }
+
+      const result = await response.json();
+      const coinInfoArray = result.data.coinInfo;
+
+      // Cache the market data
+      for (const coin of coinInfoArray) {
+        if (
+          coin.coinType &&
+          coin.pythPriceFeedId &&
+          coin.pythPriceInfoObjectId &&
+          coin.decimals !== undefined
+        ) {
+          this.coinMetadataMap.set(coin.coinType, {
+            coinType: coin.coinType,
+            pythPriceFeedId: coin.pythPriceFeedId,
+            pythPriceInfoObjectId: coin.pythPriceInfoObjectId,
+            decimals: coin.decimals,
+            pythSponsored: coin.pythSponsored,
+          });
+        }
+      }
+
+      this.coinMetadataMap.set(
+        "0xfe3afec26c59e874f3c1d60b8203cb3852d2bb2aa415df9548b8d688e6683f93::alpha::ALPHA",
+        {
+          coinType:
+            "0xfe3afec26c59e874f3c1d60b8203cb3852d2bb2aa415df9548b8d688e6683f93::alpha::ALPHA",
+          pythPriceFeedId:
+            "23d7315113f5b1d3ba7a83604c44b94d79f4fd69af77f804fc7f920a6dc65744",
+          pythPriceInfoObjectId:
+            "0x801dbc2f0053d34734814b2d6df491ce7807a725fe9a01ad74a07e9c51396c37",
+          decimals: 9,
+          pythSponsored: true,
+        },
+      );
+
+      this.isInitialized = true;
+
+      // Update LendingProtocol with the fetched coin metadata
+      this.lendingProtocol.updateCoinMetadataMap(this.coinMetadataMap);
+    } catch (error) {
+      throw new Error(
+        `Failed to initialize market data: ${error instanceof Error ? error.message : "Unknown error"}. The SDK requires market data to function properly.`,
+      );
+    }
+  }
+
+  /**
+   * Gets Pyth price feed ID for a coin type
+   * Uses dynamic data fetched from GraphQL API
+   */
+  private getPythPriceFeedId(coinType: string): string {
+    const dynamicData = this.coinMetadataMap.get(coinType);
+    if (dynamicData?.pythPriceFeedId) {
+      return dynamicData.pythPriceFeedId;
+    }
+
+    throw new Error(
+      `No Pyth price feed ID found for coin type: ${coinType}. Ensure the coin metadata is properly initialized.`,
+    );
+  }
+
+  /**
+   * Gets price info object ID for a coin type
+   * Uses dynamic data fetched from GraphQL API
+   */
+  private getPythPriceInfoObjectId(coinType: string): string {
+    const dynamicData = this.coinMetadataMap.get(coinType);
+    if (dynamicData?.pythPriceInfoObjectId) {
+      return dynamicData.pythPriceInfoObjectId;
+    }
+
+    throw new Error(
+      `No price info object ID found for coin type: ${coinType}. Ensure the coin metadata is properly initialized.`,
+    );
+  }
+
+  /**
+   * Gets decimal places for a coin type
+   * Uses dynamic data fetched from GraphQL API
+   */
+  private getDecimals(coinType: string): number {
+    const dynamicData = this.coinMetadataMap.get(coinType);
+    if (dynamicData?.decimals !== undefined) {
+      return dynamicData.decimals;
+    }
+
+    throw new Error(
+      `No decimal places found for coin type: ${coinType}. Ensure the coin metadata is properly initialized.`,
+    );
+  }
+
+  /**
+   * Gets whether a coin type is pyth sponsored
+   * Uses dynamic data fetched from GraphQL API
+   */
+  private getPythSponsored(coinType: string): boolean {
+    const dynamicData = this.coinMetadataMap.get(coinType);
+    if (dynamicData?.pythSponsored !== undefined) {
+      return dynamicData.pythSponsored;
+    }
+    return false;
+  }
+
+  /**
    * Updates price information for assets from Pyth oracle
    *
    * This method:
@@ -98,17 +256,15 @@ export class AlphalendClient {
    * @returns Transaction object with price update calls
    */
   async updatePrices(tx: Transaction, coinTypes: string[]) {
+    // Auto-initialize market data if needed
+    await this.ensureInitialized();
+
     const updatePriceFeedIds: string[] = [];
-    if (
-      coinTypes.includes(
-        "0x1a8f4bc33f8ef7fbc851f156857aa65d397a6a6fd27a7ac2ca717b51f2fd9489::alkimi::ALKIMI",
-      )
-    ) {
-      updatePriceFeedIds.push(
-        pythPriceFeedIdMap[
-          "0x1a8f4bc33f8ef7fbc851f156857aa65d397a6a6fd27a7ac2ca717b51f2fd9489::alkimi::ALKIMI"
-        ],
-      );
+
+    for (const coinType of coinTypes) {
+      if (this.getPythSponsored(coinType)) {
+        updatePriceFeedIds.push(this.getPythPriceFeedId(coinType));
+      }
     }
     if (updatePriceFeedIds.length > 0) {
       await getPriceInfoObjectIdsWithUpdate(
@@ -120,7 +276,8 @@ export class AlphalendClient {
     }
 
     for (const coinType of coinTypes) {
-      const priceInfoObjectId = priceInfoObjectIdMap[coinType];
+      // Use dynamic data from GraphQL API
+      const priceInfoObjectId = this.getPythPriceInfoObjectId(coinType);
       updatePriceTransaction(
         tx,
         {
@@ -133,8 +290,12 @@ export class AlphalendClient {
   }
 
   async updateAllPrices(tx: Transaction, coinTypes: string[]) {
+    // Auto-initialize market data if needed
+    await this.ensureInitialized();
+
+    // Use dynamic data with fallback to hardcoded
     const updatePriceFeedIds: string[] = Array.from(
-      new Set(coinTypes.map((coinType) => pythPriceFeedIdMap[coinType])),
+      new Set(coinTypes.map((coinType) => this.getPythPriceFeedId(coinType))),
     );
 
     await getPriceInfoObjectIdsWithUpdate(
@@ -145,7 +306,7 @@ export class AlphalendClient {
     );
 
     for (const coinType of coinTypes) {
-      const priceInfoObjectId = priceInfoObjectIdMap[coinType];
+      const priceInfoObjectId = this.getPythPriceInfoObjectId(coinType);
       updatePriceTransaction(
         tx,
         {
@@ -169,6 +330,9 @@ export class AlphalendClient {
    * @returns Transaction object ready for signing and execution
    */
   async supply(params: SupplyParams): Promise<Transaction | undefined> {
+    // Auto-initialize market data if needed
+    await this.ensureInitialized();
+
     const tx = new Transaction();
 
     // Get coin object
@@ -253,6 +417,9 @@ export class AlphalendClient {
    * @returns Transaction object ready for signing and execution
    */
   async withdraw(params: WithdrawParams): Promise<Transaction> {
+    // Auto-initialize market data if needed
+    await this.ensureInitialized();
+
     const tx = new Transaction();
 
     // First update prices to ensure latest oracle values
@@ -314,6 +481,9 @@ export class AlphalendClient {
    * @returns Transaction object ready for signing and execution
    */
   async borrow(params: BorrowParams): Promise<Transaction> {
+    // Auto-initialize market data if needed
+    await this.ensureInitialized();
+
     const tx = new Transaction();
 
     // First update prices to ensure latest oracle values
@@ -381,6 +551,9 @@ export class AlphalendClient {
    * @returns Transaction object ready for signing and execution
    */
   async repay(params: RepayParams): Promise<Transaction | undefined> {
+    // Auto-initialize market data if needed
+    await this.ensureInitialized();
+
     const tx = new Transaction();
 
     // Get coin object
@@ -441,6 +614,9 @@ export class AlphalendClient {
    * @returns Transaction object ready for signing and execution
    */
   async claimRewards(params: ClaimRewardsParams): Promise<Transaction> {
+    // Auto-initialize market data if needed
+    await this.ensureInitialized();
+
     const tx = new Transaction();
     params.claimAndDepositAlpha =
       params.claimAndDepositAlpha || params.claimAlpha;
@@ -560,6 +736,9 @@ export class AlphalendClient {
    * @returns Transaction object ready for signing and execution
    */
   async liquidate(params: LiquidateParams) {
+    // Auto-initialize market data if needed
+    await this.ensureInitialized();
+
     const tx = params.tx || new Transaction();
 
     // First update prices to ensure latest oracle values
@@ -620,6 +799,7 @@ export class AlphalendClient {
    */
   async getProtocolStats(): Promise<ProtocolStats | undefined> {
     try {
+      await this.ensureInitialized();
       const markets = await this.lendingProtocol.getAllMarkets();
       const stats = await this.lendingProtocol.getProtocolStats(markets);
       return stats;
@@ -638,6 +818,7 @@ export class AlphalendClient {
     markets: Market[],
   ): Promise<ProtocolStats | undefined> {
     try {
+      await this.ensureInitialized();
       const stats = await this.lendingProtocol.getProtocolStats(markets);
       return stats;
     } catch (error) {
@@ -653,6 +834,7 @@ export class AlphalendClient {
    */
   async getAllMarkets(): Promise<MarketData[] | undefined> {
     try {
+      await this.ensureInitialized();
       const markets = await this.lendingProtocol.getAllMarketsData();
       return markets;
     } catch (error) {
@@ -667,6 +849,7 @@ export class AlphalendClient {
    */
   async getMarketDataFromId(marketId: number): Promise<MarketData | undefined> {
     try {
+      await this.ensureInitialized();
       const market = await this.lendingProtocol.getMarketData(marketId);
       return market;
     } catch (error) {
@@ -683,6 +866,7 @@ export class AlphalendClient {
     markets: Market[],
   ): Promise<MarketData[] | undefined> {
     try {
+      await this.ensureInitialized();
       const prices = await getPricesMap();
       return await Promise.all(
         markets.map((market) => market.getMarketData(prices)),
@@ -700,6 +884,7 @@ export class AlphalendClient {
    */
   async getMarketsChain(): Promise<Market[] | undefined> {
     try {
+      await this.ensureInitialized();
       const markets = await this.lendingProtocol.getAllMarkets();
       return markets;
     } catch (error) {
@@ -718,6 +903,7 @@ export class AlphalendClient {
     userAddress: string,
   ): Promise<UserPortfolio[] | undefined> {
     try {
+      await this.ensureInitialized();
       const portfolio =
         await this.lendingProtocol.getUserPortfolio(userAddress);
       return portfolio;
@@ -739,6 +925,7 @@ export class AlphalendClient {
     markets: Market[],
   ): Promise<UserPortfolio | undefined> {
     try {
+      await this.ensureInitialized();
       const position = await this.lendingProtocol.getPosition(positionId);
       return position.getUserPortfolio(markets);
     } catch (error) {
@@ -759,6 +946,7 @@ export class AlphalendClient {
     markets: Market[],
   ): Promise<UserPortfolio[] | undefined> {
     try {
+      await this.ensureInitialized();
       const portfolio = await this.lendingProtocol.getUserPortfolioWithMarkets(
         userAddress,
         markets,
@@ -780,6 +968,7 @@ export class AlphalendClient {
     positionId: string,
   ): Promise<UserPortfolio | undefined> {
     try {
+      await this.ensureInitialized();
       const position = await this.lendingProtocol.getPosition(positionId);
       const markets = await this.lendingProtocol.getAllMarkets();
       return position.getUserPortfolio(markets);
