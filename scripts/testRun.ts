@@ -185,23 +185,33 @@ async function getUserPortfolio() {
 // getUserPortfolio();
 
 async function withdraw() {
-  const { suiClient, keypair } = getExecStuff();
+  const { suiClient } = getExecStuff();
   let tx: Transaction | undefined;
-  let alc = new AlphalendClient("testnet", suiClient);
+  let alc = new AlphalendClient("mainnet", suiClient);
   tx = await alc.withdraw({
     address:
-      "0xa511088cc13a632a5e8f9937028a77ae271832465e067360dd13f548fe934d1a",
+      "0xe136f0b6faf27ee707725f38f2aeefc51c6c31cc508222bee5cbc4f5fcf222c3",
     positionCapId:
-      "0x8465d2416b01d3e76460912cd290e5dd9c4a36cfbe52f348cfe04e8ae769de4e",
-    coinType: "0x2::sui::SUI",
-    marketId: "6",
-    amount: 1000000000n,
-    priceUpdateCoinTypes: [],
+      "0xf9ca35f404dd3c1ea10c381dd3e1fe8a0c4586adf5e186f4eb52307462a5af7d",
+    coinType:
+      "0xd1b72982e40348d069bb1ff701e634c117bb5f741f44dff91e472d3b01461e55::stsui::STSUI",
+    marketId: "2",
+    amount: 1_000_000_000n,
+    priceUpdateCoinTypes: [
+      "0x375f70cf2ae4c00bf37117d0c85a2c71545e6ee05c4a5c7d282cd66a4504b068::usdt::USDT",
+      "0xd0e89b2af5e4910726fbcd8b8dd37bb79b29e5f83f7491bca830e94f7f226d29::eth::ETH",
+      "0xd1b72982e40348d069bb1ff701e634c117bb5f741f44dff91e472d3b01461e55::stsui::STSUI",
+      "0x876a4b7bce8aeaef60464c11f4026903e9afacab79b9b142686158aa86560b50::xbtc::XBTC",
+      "0x356a26eb9e012a68958082340d4c4116e7f55615cf27affcff209cf0ae544f59::wal::WAL",
+      "0xe1b45a0e641b9955a20aa0ad1c1f4ad86aad8afb07296d4085e349a50e90bdca::blue::BLUE",
+      "0x4c981f3ff786cdb9e514da897ab8a953647dae2ace9679e8358eec1e3e8871ac::dmc::DMC",
+    ],
   });
   if (tx) {
     dryRunTransactionBlock(tx);
   }
 }
+withdraw();
 
 async function run(coinType: string) {
   const { suiClient, keypair, address } = getExecStuff();
@@ -225,9 +235,9 @@ async function run(coinType: string) {
   // );
 
   // console.log(pythPriceFeedIdMap[coinType]);
-  // const priceInfoObjectIds = await pythClient.getPriceFeedObjectId(
-  //   "23d7315113f5b1d3ba7a83604c44b94d79f4fd69af77f804fc7f920a6dc65744",
-  // );
+  const priceInfoObjectIds = await pythClient.getPriceFeedObjectId(
+    "d7db067954e28f51a96fd50c6d51775094025ced2d60af61ec9803e553471c88",
+  );
 
   // const priceFeedUpdateData = await pythConnection.getPriceFeedsUpdateData([
   //   pythPriceFeedIdMap[coinType],

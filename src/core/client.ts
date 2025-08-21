@@ -124,6 +124,7 @@ export class AlphalendClient {
             pythPriceFeedId
             pythPriceInfoObjectId
             decimals
+            pythSponsored
           }
         }
       `;
@@ -154,8 +155,9 @@ export class AlphalendClient {
           this.coinMetadataMap.set(coin.coinType, {
             coinType: coin.coinType,
             pythPriceFeedId: coin.pythPriceFeedId,
-            priceInfoObjectId: coin.priceInfoObjectId,
+            pythPriceInfoObjectId: coin.pythPriceInfoObjectId,
             decimals: coin.decimals,
+            pythSponsored: coin.pythSponsored,
           });
         }
       }
@@ -167,9 +169,10 @@ export class AlphalendClient {
             "0xfe3afec26c59e874f3c1d60b8203cb3852d2bb2aa415df9548b8d688e6683f93::alpha::ALPHA",
           pythPriceFeedId:
             "23d7315113f5b1d3ba7a83604c44b94d79f4fd69af77f804fc7f920a6dc65744",
-          priceInfoObjectId:
+          pythPriceInfoObjectId:
             "0x801dbc2f0053d34734814b2d6df491ce7807a725fe9a01ad74a07e9c51396c37",
           decimals: 9,
+          pythSponsored: true,
         },
       );
 
@@ -203,10 +206,10 @@ export class AlphalendClient {
    * Gets price info object ID for a coin type
    * Uses dynamic data fetched from GraphQL API
    */
-  private getPriceInfoObjectId(coinType: string): string {
+  private getPythPriceInfoObjectId(coinType: string): string {
     const dynamicData = this.coinMetadataMap.get(coinType);
-    if (dynamicData?.priceInfoObjectId) {
-      return dynamicData.priceInfoObjectId;
+    if (dynamicData?.pythPriceInfoObjectId) {
+      return dynamicData.pythPriceInfoObjectId;
     }
 
     throw new Error(
@@ -230,6 +233,18 @@ export class AlphalendClient {
   }
 
   /**
+   * Gets whether a coin type is pyth sponsored
+   * Uses dynamic data fetched from GraphQL API
+   */
+  private getPythSponsored(coinType: string): boolean {
+    const dynamicData = this.coinMetadataMap.get(coinType);
+    if (dynamicData?.pythSponsored !== undefined) {
+      return dynamicData.pythSponsored;
+    }
+    return false;
+  }
+
+  /**
    * Updates price information for assets from Pyth oracle
    *
    * This method:
@@ -247,16 +262,11 @@ export class AlphalendClient {
     await this.ensureInitialized();
 
     const updatePriceFeedIds: string[] = [];
-    if (
-      coinTypes.includes(
-        "0x1a8f4bc33f8ef7fbc851f156857aa65d397a6a6fd27a7ac2ca717b51f2fd9489::alkimi::ALKIMI",
-      )
-    ) {
-      updatePriceFeedIds.push(
-        this.getPythPriceFeedId(
-          "0x1a8f4bc33f8ef7fbc851f156857aa65d397a6a6fd27a7ac2ca717b51f2fd9489::alkimi::ALKIMI",
-        ),
-      );
+
+    for (const coinType of coinTypes) {
+      if (this.getPythSponsored(coinType)) {
+        updatePriceFeedIds.push(this.getPythPriceFeedId(coinType));
+      }
     }
     if (updatePriceFeedIds.length > 0) {
       await getPriceInfoObjectIdsWithUpdate(
@@ -269,7 +279,7 @@ export class AlphalendClient {
 
     for (const coinType of coinTypes) {
       // Use dynamic data from GraphQL API
-      const priceInfoObjectId = this.getPriceInfoObjectId(coinType);
+      const priceInfoObjectId = this.getPythPriceInfoObjectId(coinType);
       updatePriceTransaction(
         tx,
         {
@@ -298,7 +308,7 @@ export class AlphalendClient {
     );
 
     for (const coinType of coinTypes) {
-      const priceInfoObjectId = this.getPriceInfoObjectId(coinType);
+      const priceInfoObjectId = this.getPythPriceInfoObjectId(coinType);
       updatePriceTransaction(
         tx,
         {
