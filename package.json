@@ -34,7 +34,8 @@
     "@pythnetwork/pyth-sui-js": "^2.2.0",
     "bech32": "^2.0.0",
     "decimal.js": "^10.5.0",
-    "dotenv": "^16.4.5"
+    "dotenv": "^16.4.5",
+    "tslib": "^2.8.1"
   },
   "devDependencies": {
     "@types/jest": "^29.5.14",

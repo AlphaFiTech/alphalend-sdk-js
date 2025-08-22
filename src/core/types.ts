@@ -95,6 +95,30 @@ export interface WithdrawParams {
 }
 
 /**
+ * Parameters for zap-in withdraw operation to a lending market
+ * Used with the `zapInWithdraw` method to swap input tokens and withdraw them from a single market in a single transaction
+ */
+export interface ZapInWithdrawParams {
+  /** Market ID from which to withdraw */
+  marketId: string;
+  /** Amount to withdraw (in mists, use MAX_U64 constant to withdraw all) */
+  amount: bigint;
+  /** Withdraw coin type (e.g., "0x2::sui::SUI") */
+  marketCoinType: string;
+  /** Object ID of the position capability object */
+  positionCapId: string;
+  /** Address of the user withdrawing collateral */
+  address: string;
+  /** Coin types of the coins whose price needs to be updated
+   * (Will have to pass all market coin types that user has supplied or borrowed in and current market coin type in which user is withdrawing) */
+  priceUpdateCoinTypes: string[];
+  /** Slippage for the swap (e.g., 0.01 for 1%) */
+  slippage: number;
+  /** Withdraw coin type (e.g., "0x2::sui::SUI") */
+  outputCoinType: string;
+}
+
+/**
  * Parameters for borrowing assets from a lending market
  * Used with the `borrow` method
  */

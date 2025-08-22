@@ -1,20 +1,18 @@
-import { buildTx, getQuote, QuoteResponse } from "@7kprotocol/sdk-ts";
+// Import from CJS export to workaround broken ESM exports issue
+// The ESM version has missing DEFAULT_SOURCES export, but CJS version works correctly
+import sdk from "@7kprotocol/sdk-ts/cjs";
+import type { QuoteResponse } from "@7kprotocol/sdk-ts";
 import {
   Transaction,
   TransactionObjectArgument,
 } from "@mysten/sui/transactions";
 
-type sevenKSwapOptions = {
-  tokenIn: string;
-  tokenOut: string;
-  amountIn: string;
-};
+const { buildTx, getQuote } = sdk;
 
 export class SevenKGateway {
   constructor() {}
 
-  async getQuote(options: sevenKSwapOptions) {
-    const { tokenIn, tokenOut, amountIn } = options;
+  async getQuote(tokenIn: string, tokenOut: string, amountIn: string) {
     const quoteResponse = await getQuote({
       tokenIn,
       tokenOut,
@@ -23,27 +21,27 @@ export class SevenKGateway {
     return quoteResponse;
   }
 
-  // getTransactionBlock returns a transaction and also returns a coinOut argument which is some coins left out that we have to transfer to the user seperately.
   async getTransactionBlock(
+    tx: Transaction,
     address: string,
     slippage: number,
     quoteResponse: QuoteResponse,
-    transaction?: Transaction,
+    coinIn?: TransactionObjectArgument,
   ): Promise<TransactionObjectArgument | undefined> {
-    const txb = transaction ? transaction : new Transaction();
-    const commissionPartnerAddress = "";
     const { coinOut } = await buildTx({
       quoteResponse,
       accountAddress: address,
       slippage,
       commission: {
-        partner: commissionPartnerAddress,
-        commissionBps: 0,
+        partner: address, // Use the user's address as partner
+        commissionBps: 0, // 0 basis points = no commission
       },
       extendTx: {
-        tx: txb,
+        tx,
+        coinIn,
       },
     });
+
     return coinOut;
   }
 }
