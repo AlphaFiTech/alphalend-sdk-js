@@ -249,57 +249,57 @@ async function run() {
   // );
   // console.log(priceInfoObjectIds);
   const alc = new AlphalendClient("mainnet", suiClient);
-  // const tx = await alc.zapInSupply({
-  //   marketId: "1",
-  //   slippage: 0.01,
-  //   address: address,
-  //   marketCoinType: "0x2::sui::SUI",
-  //   inputAmount: 100_000n,
-  //   inputCoinType:
-  //     "0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC",
-  //   positionCapId,
-  // });
-  const tx = await alc.zapInWithdraw({
+  const tx = await alc.zapInSupply({
     marketId: "1",
     slippage: 0.01,
-    address,
+    address: address,
     marketCoinType: "0x2::sui::SUI",
-    amount: 18446744073709551615n,
-    outputCoinType:
-      "0x87dfe1248a1dc4ce473bd9cb2937d66cdc6c30fee63f3fe0dbb55c7a09d35dec::up::UP",
+    inputAmount: 100_000n,
+    inputCoinType:
+      "0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC",
     positionCapId,
-    priceUpdateCoinTypes: [
-      "0x2::sui::SUI",
-      "0x375f70cf2ae4c00bf37117d0c85a2c71545e6ee05c4a5c7d282cd66a4504b068::usdt::USDT",
-      "0xd0e89b2af5e4910726fbcd8b8dd37bb79b29e5f83f7491bca830e94f7f226d29::eth::ETH",
-      "0xd1b72982e40348d069bb1ff701e634c117bb5f741f44dff91e472d3b01461e55::stsui::STSUI",
-      "0x876a4b7bce8aeaef60464c11f4026903e9afacab79b9b142686158aa86560b50::xbtc::XBTC",
-      "0x356a26eb9e012a68958082340d4c4116e7f55615cf27affcff209cf0ae544f59::wal::WAL",
-      "0xe1b45a0e641b9955a20aa0ad1c1f4ad86aad8afb07296d4085e349a50e90bdca::blue::BLUE",
-      "0x4c981f3ff786cdb9e514da897ab8a953647dae2ace9679e8358eec1e3e8871ac::dmc::DMC",
-    ],
   });
+  // const tx = await alc.zapInWithdraw({
+  //   marketId: "1",
+  //   slippage: 0.01,
+  //   address,
+  //   marketCoinType: "0x2::sui::SUI",
+  //   amount: 18446744073709551615n,
+  //   outputCoinType:
+  //     "0x87dfe1248a1dc4ce473bd9cb2937d66cdc6c30fee63f3fe0dbb55c7a09d35dec::up::UP",
+  //   positionCapId,
+  //   priceUpdateCoinTypes: [
+  //     "0x2::sui::SUI",
+  //     "0x375f70cf2ae4c00bf37117d0c85a2c71545e6ee05c4a5c7d282cd66a4504b068::usdt::USDT",
+  //     "0xd0e89b2af5e4910726fbcd8b8dd37bb79b29e5f83f7491bca830e94f7f226d29::eth::ETH",
+  //     "0xd1b72982e40348d069bb1ff701e634c117bb5f741f44dff91e472d3b01461e55::stsui::STSUI",
+  //     "0x876a4b7bce8aeaef60464c11f4026903e9afacab79b9b142686158aa86560b50::xbtc::XBTC",
+  //     "0x356a26eb9e012a68958082340d4c4116e7f55615cf27affcff209cf0ae544f59::wal::WAL",
+  //     "0xe1b45a0e641b9955a20aa0ad1c1f4ad86aad8afb07296d4085e349a50e90bdca::blue::BLUE",
+  //     "0x4c981f3ff786cdb9e514da897ab8a953647dae2ace9679e8358eec1e3e8871ac::dmc::DMC",
+  //   ],
+  // });
   // // tx.setGasBudget(1e9);
   if (tx) {
-    // dryRunTransactionBlock(tx);
+    dryRunTransactionBlock(tx);
 
-    await suiClient
-      .signAndExecuteTransaction({
-        signer: keypair,
-        transaction: tx,
-        requestType: "WaitForLocalExecution",
-        options: {
-          showEffects: true,
-          showBalanceChanges: true,
-          showObjectChanges: true,
-        },
-      })
-      .then((res) => {
-        console.log(JSON.stringify(res, null, 2));
-      })
-      .catch((error) => {
-        console.error(error);
-      });
+    // await suiClient
+    //   .signAndExecuteTransaction({
+    //     signer: keypair,
+    //     transaction: tx,
+    //     requestType: "WaitForLocalExecution",
+    //     options: {
+    //       showEffects: true,
+    //       showBalanceChanges: true,
+    //       showObjectChanges: true,
+    //     },
+    //   })
+    //   .then((res) => {
+    //     console.log(JSON.stringify(res, null, 2));
+    //   })
+    //   .catch((error) => {
+    //     console.error(error);
+    //   });
   }
 }
 run();

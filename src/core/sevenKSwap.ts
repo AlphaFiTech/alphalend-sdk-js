@@ -1,19 +1,27 @@
-// Import from CJS export to workaround broken ESM exports issue
-// The ESM version has missing DEFAULT_SOURCES export, but CJS version works correctly
-import sdk from "@7kprotocol/sdk-ts/cjs";
+// Use CJS version to avoid broken ESM exports (DEFAULT_SOURCES missing)
 import type { QuoteResponse } from "@7kprotocol/sdk-ts";
 import {
   Transaction,
   TransactionObjectArgument,
 } from "@mysten/sui/transactions";
 
-const { buildTx, getQuote } = sdk;
+// Dynamically import from CJS version which has working exports
+let sdkPromise: Promise<any> | null = null;
+
+function getSDK() {
+  if (!sdkPromise) {
+    // @ts-ignore - Use CJS export path which has all exports working
+    sdkPromise = import("@7kprotocol/sdk-ts/cjs");
+  }
+  return sdkPromise;
+}
 
 export class SevenKGateway {
   constructor() {}
 
   async getQuote(tokenIn: string, tokenOut: string, amountIn: string) {
-    const quoteResponse = await getQuote({
+    const sdk = await getSDK();
+    const quoteResponse = await sdk.getQuote({
       tokenIn,
       tokenOut,
       amountIn: amountIn.toString(),
@@ -28,7 +36,8 @@ export class SevenKGateway {
     quoteResponse: QuoteResponse,
     coinIn?: TransactionObjectArgument,
   ): Promise<TransactionObjectArgument | undefined> {
-    const { coinOut } = await buildTx({
+    const sdk = await getSDK();
+    const { coinOut } = await sdk.buildTx({
       quoteResponse,
       accountAddress: address,
       slippage,
