@@ -6,11 +6,14 @@ import {
 } from "@mysten/sui/transactions";
 
 // Dynamically import from CJS version which has working exports
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 let sdkPromise: Promise<any> | null = null;
 
 function getSDK() {
   if (!sdkPromise) {
-    // @ts-ignore - Use CJS export path which has all exports working
+    // Use CJS export path which has all exports working
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore - Dynamic import path not resolvable in CJS config but works at runtime
     sdkPromise = import("@7kprotocol/sdk-ts/cjs");
   }
   return sdkPromise;

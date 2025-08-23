@@ -140,7 +140,14 @@ export class Blockchain {
     if (!positionCap) {
       throw new Error(`Position cap ${positionCapId} not found`);
     }
-    const positionId = (positionCap.data?.content as any).fields.position_id;
+    const positionId = (
+      positionCap.data?.content as {
+        dataType: "moveObject";
+        fields: { position_id: string };
+        hasPublicTransfer: boolean;
+        type: string;
+      }
+    ).fields.position_id;
     return this.getPosition(positionId);
   }
 
