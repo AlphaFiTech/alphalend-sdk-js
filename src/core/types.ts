@@ -95,10 +95,10 @@ export interface WithdrawParams {
 }
 
 /**
- * Parameters for zap-in withdraw operation to a lending market
- * Used with the `zapInWithdraw` method to swap input tokens and withdraw them from a single market in a single transaction
+ * Parameters for zap-out withdraw operation to a lending market
+ * Used with the `zapOutWithdraw` method to swap input tokens and withdraw them from a single market in a single transaction
  */
-export interface ZapInWithdrawParams {
+export interface ZapOutWithdrawParams {
   /** Market ID from which to withdraw */
   marketId: string;
   /** Amount to withdraw (in mists, use MAX_U64 constant to withdraw all) */

@@ -26,7 +26,7 @@ import {
   ProtocolStats,
   CoinMetadata,
   ZapInSupplyParams,
-  ZapInWithdrawParams,
+  ZapOutWithdrawParams,
   MAX_U64,
 } from "./types.js";
 import {
@@ -571,7 +571,7 @@ export class AlphalendClient {
    * from the specified market, then swapping the withdrawn tokens to the desired
    * output token via 7k Protocol.
    *
-   * @param params Zap in withdraw parameters
+   * @param params Zap out withdraw parameters
    * @param params.marketId Market ID from which collateral is being withdrawn
    * @param params.amount Amount to withdraw (in base units)
    * @param params.marketCoinType Fully qualified type of the market's collateral token to withdraw from
@@ -582,8 +582,8 @@ export class AlphalendClient {
    * @param params.priceUpdateCoinTypes Coin types of the coins whose price needs to be updated
    * @returns Transaction object ready for signing and execution, or undefined if swap fails
    */
-  async zapInWithdraw(
-    params: ZapInWithdrawParams,
+  async zapOutWithdraw(
+    params: ZapOutWithdrawParams,
   ): Promise<Transaction | undefined> {
     // Auto-initialize market data if needed
     await this.ensureInitialized();

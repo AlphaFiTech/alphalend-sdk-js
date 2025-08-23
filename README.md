@@ -199,7 +199,7 @@ import { Transaction } from "@mysten/sui/transactions";
 import { MAX_U64 } from "alphalend-sdk";
 
 // Withdraw collateral and swap to desired token in a single transaction
-const zapInWithdrawParams = {
+const zapOutWithdrawParams = {
   marketId: "1", // Market ID from which to withdraw
   amount: 500000000n, // Amount to withdraw (in mists)
   marketCoinType: "0x2::sui::SUI", // Market's collateral token type (SUI)
@@ -215,7 +215,7 @@ const zapInWithdrawParams = {
 };
 
 // To withdraw all collateral and swap, use MAX_U64
-const zapInWithdrawAllParams = {
+const zapOutWithdrawAllParams = {
   marketId: "1",
   amount: MAX_U64, // Special value to withdraw all collateral
   marketCoinType: "0x2::sui::SUI",
@@ -230,15 +230,15 @@ const zapInWithdrawAllParams = {
   ],
 };
 
-// Create zap-in withdraw transaction
-const zapInWithdrawTx =
-  await alphalendClient.zapInWithdraw(zapInWithdrawParams);
+// Create zap-out withdraw transaction
+const zapOutWithdrawTx =
+  await alphalendClient.zapOutWithdraw(zapOutWithdrawParams);
 
-if (zapInWithdrawTx) {
+if (zapOutWithdrawTx) {
   // Execute the transaction
-  await wallet.signAndExecuteTransaction(zapInWithdrawTx);
+  await wallet.signAndExecuteTransaction(zapOutWithdrawTx);
 } else {
-  console.error("Failed to create zap-in withdraw transaction");
+  console.error("Failed to create zap-out withdraw transaction");
 }
 ```
 
@@ -365,7 +365,7 @@ The SDK includes TypeScript definitions for all operations, making it easy to us
   - `positionCapId?`: Object ID of the position capability object (optional)
   - `address`: Address of the user performing the zap-in supply
 
-- `ZapInWithdrawParams`: Parameters for zap-in withdraw operation (withdraw and swap in one transaction)
+- `ZapOutWithdrawParams`: Parameters for zap-out withdraw operation (withdraw and swap in one transaction)
   - `marketId`: Market ID from which to withdraw
   - `amount`: Amount to withdraw (bigint, in mists, use MAX_U64 constant to withdraw all)
   - `marketCoinType`: Fully qualified type of the market's collateral token to withdraw from

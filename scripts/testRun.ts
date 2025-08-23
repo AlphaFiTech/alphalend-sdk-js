@@ -178,11 +178,11 @@ async function getAllMarkets() {
 async function getUserPortfolio() {
   const client = new AlphalendClient("mainnet", getSuiClient("mainnet"));
   const res = await client.getUserPortfolio(
-    "0x07a5709f3b154311e063bd16d6a5324bc0535159ccd5ee74b3c3bde0cd0d090a",
+    "0xe136f0b6faf27ee707725f38f2aeefc51c6c31cc508222bee5cbc4f5fcf222c3",
   );
   console.log(res);
 }
-// getUserPortfolio();
+getUserPortfolio();
 
 async function withdraw() {
   const { suiClient } = getExecStuff();
@@ -259,7 +259,7 @@ async function run() {
       "0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC",
     positionCapId,
   });
-  // const tx = await alc.zapInWithdraw({
+  // const tx = await alc.zapOutWithdraw({
   //   marketId: "1",
   //   slippage: 0.01,
   //   address,
@@ -302,4 +302,4 @@ async function run() {
     //   });
   }
 }
-run();
+// run();
