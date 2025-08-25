@@ -1186,17 +1186,21 @@ export class AlphalendClient {
   }
 
   /**
-   * Gets a coin object suitable for a transaction
+   * Gets a coin object suitable for a transaction. Upto 200 coins are merged together and returned.
    *
    * @param tx Transaction to which the coin will be added
    * @param type Fully qualified coin type to get
    * @param address Address of the user that owns the coin
-   * @returns Transaction argument representing the coin or undefined if not found
+   * @param amount Optional coin amount in mists. Providing this improves efficiency.
+   * Returns a coin with at least the requested amount (if possible by merging up to 200 coins).
+   * If the requested amount isn't available, returns the highest value coin that can be created.
+   * @returns Transaction argument representing the coin or undefined if coin not found
    */
   async getCoinObject(
     tx: Transaction,
     type: string,
     address: string,
+    amount?: bigint,
   ): Promise<string | TransactionObjectArgument | undefined> {
     let coins: CoinStruct[] = [];
     let currentCursor: string | null | undefined = null;
@@ -1220,15 +1224,51 @@ export class AlphalendClient {
       }
     } while (currentCursor !== null);
 
-    if (coins.length >= 1) {
-      //coin1
-      const [coin] = tx.splitCoins(coins[0].coinObjectId, [0]);
-      tx.mergeCoins(
-        coin,
-        coins.map((c) => c.coinObjectId),
-      );
+    if (coins.length === 1) {
+      return tx.object(coins[0].coinObjectId);
+    }
+
+    if (coins.length === 0) {
+      return undefined;
+    }
+
+    // find one coin if it fits
+    if (amount) {
+      for (let i = 0; i < coins.length; i++) {
+        if (BigInt(coins[i].balance) >= amount) {
+          return tx.object(coins[i].coinObjectId);
+        }
+      }
+    }
+
+    //sort the coins by value in descending order
+    coins.sort((a, b) => {
+      return Number(b.balance) - Number(a.balance);
+    }).splice(200);
+
+    if (amount) {
+      const coinsToMerge: string[] = [];
+      let currentAmount = 0n;
+      for (let i = 0; i < coins.length; i++) {
+        coinsToMerge.push(coins[i].coinObjectId);
+        currentAmount += BigInt(coins[i].balance);
+        if (currentAmount >= amount) {
+          break;
+        }
+      }
+
+      const [coin] = tx.splitCoins(coinsToMerge[0], [0]);
+      tx.mergeCoins(coin, coinsToMerge);
       return coin;
     }
+
+    //coin1
+    const [coin] = tx.splitCoins(coins[0].coinObjectId, [0]);
+    tx.mergeCoins(
+      coin,
+      coins.map((c) => c.coinObjectId),
+    );
+    return coin;
   }
 
   private async handlePromise(
