@@ -178,11 +178,11 @@ async function getAllMarkets() {
 async function getUserPortfolio() {
   const client = new AlphalendClient("mainnet", getSuiClient("mainnet"));
   const res = await client.getUserPortfolio(
-    "0x07a5709f3b154311e063bd16d6a5324bc0535159ccd5ee74b3c3bde0cd0d090a",
+    "0xe136f0b6faf27ee707725f38f2aeefc51c6c31cc508222bee5cbc4f5fcf222c3",
   );
   console.log(res);
 }
-// getUserPortfolio();
+getUserPortfolio();
 
 async function withdraw() {
   const { suiClient } = getExecStuff();
@@ -211,11 +211,11 @@ async function withdraw() {
     dryRunTransactionBlock(tx);
   }
 }
-withdraw();
+// withdraw();
 
-async function run(coinType: string) {
+async function run() {
   const { suiClient, keypair, address } = getExecStuff();
-  const tx = new Transaction();
+  // const tx = new Transaction();
   const constants = getConstants("mainnet");
   const pythClient = new SuiPythClient(
     suiClient,
@@ -225,6 +225,8 @@ async function run(coinType: string) {
   const pythConnection = new SuiPriceServiceConnection(
     "https://hermes.pyth.network",
   );
+  const positionCapId =
+    "0xf9ca35f404dd3c1ea10c381dd3e1fe8a0c4586adf5e186f4eb52307462a5af7d";
   // await getPriceInfoObjectIdsWithUpdate(
   //   tx,
   //   [pythPriceFeedIdMap[coinType]],
@@ -233,9 +235,9 @@ async function run(coinType: string) {
   // );
 
   // console.log(pythPriceFeedIdMap[coinType]);
-  const priceInfoObjectIds = await pythClient.getPriceFeedObjectId(
-    "d7db067954e28f51a96fd50c6d51775094025ced2d60af61ec9803e553471c88",
-  );
+  // const priceInfoObjectIds = await pythClient.getPriceFeedObjectId(
+  //   "c591a547856b091560b120ee14b165a84ca58eca23b2ab635df641340bde1f10",
+  // );
 
   // const priceFeedUpdateData = await pythConnection.getPriceFeedsUpdateData([
   //   pythPriceFeedIdMap[coinType],
@@ -245,43 +247,59 @@ async function run(coinType: string) {
   //   tx,
   //   priceFeedUpdateData,
   // );
-  console.log(priceInfoObjectIds);
-  // const alc = new AlphalendClient("mainnet", suiClient);
-  // await alc.updatePrices(tx, [coinType]);
-  // const tx = await alc.borrow({
-  //   marketId: "16",
-  //   amount: 100n,
-  //   coinType: coinType,
+  // console.log(priceInfoObjectIds);
+  const alc = new AlphalendClient("mainnet", suiClient);
+  const tx = await alc.zapInSupply({
+    marketId: "1",
+    slippage: 0.01,
+    address: address,
+    marketCoinType: "0x2::sui::SUI",
+    inputAmount: 100_000n,
+    inputCoinType:
+      "0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC",
+    positionCapId,
+  });
+  // const tx = await alc.zapOutWithdraw({
+  //   marketId: "1",
+  //   slippage: 0.01,
+  //   address,
+  //   marketCoinType: "0x2::sui::SUI",
+  //   amount: 18446744073709551615n,
+  //   outputCoinType:
+  //     "0x87dfe1248a1dc4ce473bd9cb2937d66cdc6c30fee63f3fe0dbb55c7a09d35dec::up::UP",
+  //   positionCapId,
   //   priceUpdateCoinTypes: [
-  //     coinType,
+  //     "0x2::sui::SUI",
   //     "0x375f70cf2ae4c00bf37117d0c85a2c71545e6ee05c4a5c7d282cd66a4504b068::usdt::USDT",
   //     "0xd0e89b2af5e4910726fbcd8b8dd37bb79b29e5f83f7491bca830e94f7f226d29::eth::ETH",
+  //     "0xd1b72982e40348d069bb1ff701e634c117bb5f741f44dff91e472d3b01461e55::stsui::STSUI",
+  //     "0x876a4b7bce8aeaef60464c11f4026903e9afacab79b9b142686158aa86560b50::xbtc::XBTC",
+  //     "0x356a26eb9e012a68958082340d4c4116e7f55615cf27affcff209cf0ae544f59::wal::WAL",
+  //     "0xe1b45a0e641b9955a20aa0ad1c1f4ad86aad8afb07296d4085e349a50e90bdca::blue::BLUE",
+  //     "0x4c981f3ff786cdb9e514da897ab8a953647dae2ace9679e8358eec1e3e8871ac::dmc::DMC",
   //   ],
-  //   address,
-  //   positionCapId:
-  //     "0xf9ca35f404dd3c1ea10c381dd3e1fe8a0c4586adf5e186f4eb52307462a5af7d",
   // });
   // // tx.setGasBudget(1e9);
-  // dryRunTransactionBlock(tx);
+  if (tx) {
+    dryRunTransactionBlock(tx);
 
-  // await suiClient
-  //   .signAndExecuteTransaction({
-  //     signer: keypair,
-  //     transaction: tx,
-  //     requestType: "WaitForLocalExecution",
-  //     options: {
-  //       showEffects: true,
-  //       showBalanceChanges: true,
-  //       showObjectChanges: true,
-  //     },
-  //   })
-  //   .then((res) => {
-  //     console.log(JSON.stringify(res, null, 2));
-  //   })
-  //   .catch((error) => {
-  //     console.error(error);
-  //   });
+    // await suiClient
+    //   .signAndExecuteTransaction({
+    //     signer: keypair,
+    //     transaction: tx,
+    //     requestType: "WaitForLocalExecution",
+    //     options: {
+    //       showEffects: true,
+    //       showBalanceChanges: true,
+    //       showObjectChanges: true,
+    //     },
+    //   })
+    //   .then((res) => {
+    //     console.log(JSON.stringify(res, null, 2));
+    //   })
+    //   .catch((error) => {
+    //     console.error(error);
+    //   });
+  }
 }
-// run(
-//   "0x1a8f4bc33f8ef7fbc851f156857aa65d397a6a6fd27a7ac2ca717b51f2fd9489::alkimi::ALKIMI",
-// );
+// run();

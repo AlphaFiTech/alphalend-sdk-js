@@ -29,11 +29,13 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@7kprotocol/sdk-ts": "^3.4.1",
     "@alphafi/stsui-sdk": "^0.0.22",
     "@pythnetwork/pyth-sui-js": "^2.2.0",
     "bech32": "^2.0.0",
     "decimal.js": "^10.5.0",
-    "dotenv": "^16.4.5"
+    "dotenv": "^16.4.5",
+    "tslib": "^2.8.1"
   },
   "devDependencies": {
     "@types/jest": "^29.5.14",

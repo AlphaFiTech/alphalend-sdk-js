@@ -128,6 +128,29 @@ export class Blockchain {
     return positions;
   }
 
+  async getPositionFromPositionCapId(
+    positionCapId: string,
+  ): Promise<PositionType> {
+    const positionCap = await this.client.getObject({
+      id: positionCapId,
+      options: {
+        showContent: true,
+      },
+    });
+    if (!positionCap) {
+      throw new Error(`Position cap ${positionCapId} not found`);
+    }
+    const positionId = (
+      positionCap.data?.content as {
+        dataType: "moveObject";
+        fields: { position_id: string };
+        hasPublicTransfer: boolean;
+        type: string;
+      }
+    ).fields.position_id;
+    return this.getPosition(positionId);
+  }
+
   /**
    * Get all position caps for a user address
    * @param userAddress The user address to get position caps for

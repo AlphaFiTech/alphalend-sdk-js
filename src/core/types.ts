@@ -54,6 +54,27 @@ export interface SupplyParams {
 }
 
 /**
+ * Parameters for zap-in supply operation to a lending market
+ * Used with the `zapInSupply` method to swap input tokens and supply them as collateral in a single transaction
+ */
+export interface ZapInSupplyParams {
+  /** Market ID where collateral is being added */
+  marketId: string;
+  /** Slippage for the swap (e.g., 0.01 for 1%) */
+  slippage: number;
+  /** Coin type of the market that is being swapped in (e.g., "0x2::sui::SUI") */
+  marketCoinType: string;
+  /** Amount to supply as collateral in base units (in mists) */
+  inputAmount: bigint;
+  /** Supply coin type (e.g., "0x2::sui::SUI") */
+  inputCoinType: string;
+  /** Object ID of the position capability object */
+  positionCapId?: string;
+  /** Address of the user supplying collateral */
+  address: string;
+}
+
+/**
  * Parameters for withdrawing collateral from a lending market
  * Used with the `withdraw` method
  */
@@ -71,6 +92,30 @@ export interface WithdrawParams {
   /** Coin types of the coins whose price needs to be updated
    * (Will have to pass all market coin types that user has supplied or borrowed in and current market coin type in which user is withdrawing) */
   priceUpdateCoinTypes: string[];
+}
+
+/**
+ * Parameters for zap-out withdraw operation to a lending market
+ * Used with the `zapOutWithdraw` method to swap input tokens and withdraw them from a single market in a single transaction
+ */
+export interface ZapOutWithdrawParams {
+  /** Market ID from which to withdraw */
+  marketId: string;
+  /** Amount to withdraw (in mists, use MAX_U64 constant to withdraw all) */
+  amount: bigint;
+  /** Withdraw coin type (e.g., "0x2::sui::SUI") */
+  marketCoinType: string;
+  /** Object ID of the position capability object */
+  positionCapId: string;
+  /** Address of the user withdrawing collateral */
+  address: string;
+  /** Coin types of the coins whose price needs to be updated
+   * (Will have to pass all market coin types that user has supplied or borrowed in and current market coin type in which user is withdrawing) */
+  priceUpdateCoinTypes: string[];
+  /** Slippage for the swap (e.g., 0.01 for 1%) */
+  slippage: number;
+  /** Withdraw coin type (e.g., "0x2::sui::SUI") */
+  outputCoinType: string;
 }
 
 /**

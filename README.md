@@ -10,6 +10,8 @@ AlphaLend SDK for JavaScript/TypeScript applications built on the Sui blockchain
 - Borrow assets against your collateral
 - Repay borrowed assets
 - Withdraw collateral
+- Zap-in supply: Swap any token and supply as collateral in one transaction
+- Zap-in withdraw: Withdraw collateral and swap to any token in one transaction
 - Claim rewards
 - Liquidate unhealthy positions
 - Query protocol metrics and market data
@@ -162,6 +164,84 @@ const withdrawTx = await alphalendClient.withdraw(withdrawParams);
 await wallet.signAndExecuteTransaction(withdrawTx);
 ```
 
+### Zap-in Supply (Swap and Supply in One Transaction)
+
+```typescript
+import { Transaction } from "@mysten/sui/transactions";
+
+// Swap any token and supply as collateral in a single transaction
+const zapInSupplyParams = {
+  marketId: "1", // Market ID where collateral is being added
+  inputAmount: 1000000000n, // Amount of input tokens to swap (in mists)
+  inputCoinType:
+    "0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC", // Token to swap from (USDC)
+  marketCoinType: "0x2::sui::SUI", // Market's collateral token to swap to (SUI)
+  slippage: 0.01, // Maximum allowed slippage (1%)
+  positionCapId: "0xYOUR_POSITION_CAP_ID", // Optional: your position capability
+  address: "0xYOUR_ADDRESS", // Address of the user
+};
+
+// Create zap-in supply transaction
+const zapInSupplyTx = await alphalendClient.zapInSupply(zapInSupplyParams);
+
+if (zapInSupplyTx) {
+  // Execute the transaction
+  await wallet.signAndExecuteTransaction(zapInSupplyTx);
+} else {
+  console.error("Failed to create zap-in supply transaction");
+}
+```
+
+### Zap-in Withdraw (Withdraw and Swap in One Transaction)
+
+```typescript
+import { Transaction } from "@mysten/sui/transactions";
+import { MAX_U64 } from "alphalend-sdk";
+
+// Withdraw collateral and swap to desired token in a single transaction
+const zapOutWithdrawParams = {
+  marketId: "1", // Market ID from which to withdraw
+  amount: 500000000n, // Amount to withdraw (in mists)
+  marketCoinType: "0x2::sui::SUI", // Market's collateral token type (SUI)
+  outputCoinType:
+    "0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC", // Token to swap to (USDC)
+  slippage: 0.01, // Maximum allowed slippage (1%)
+  positionCapId: "0xYOUR_POSITION_CAP_ID", // Your position capability
+  address: "0xYOUR_ADDRESS", // Address of the user
+  priceUpdateCoinTypes: [
+    "0x2::sui::SUI",
+    "0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC",
+  ], // Coin types to update prices for
+};
+
+// To withdraw all collateral and swap, use MAX_U64
+const zapOutWithdrawAllParams = {
+  marketId: "1",
+  amount: MAX_U64, // Special value to withdraw all collateral
+  marketCoinType: "0x2::sui::SUI",
+  outputCoinType:
+    "0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC",
+  slippage: 0.01,
+  positionCapId: "0xYOUR_POSITION_CAP_ID",
+  address: "0xYOUR_ADDRESS",
+  priceUpdateCoinTypes: [
+    "0x2::sui::SUI",
+    "0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC",
+  ],
+};
+
+// Create zap-out withdraw transaction
+const zapOutWithdrawTx =
+  await alphalendClient.zapOutWithdraw(zapOutWithdrawParams);
+
+if (zapOutWithdrawTx) {
+  // Execute the transaction
+  await wallet.signAndExecuteTransaction(zapOutWithdrawTx);
+} else {
+  console.error("Failed to create zap-out withdraw transaction");
+}
+```
+
 ### Claim Rewards
 
 ```typescript
@@ -229,7 +309,6 @@ await wallet.signAndExecuteTransaction(tx);
 The SDK includes TypeScript definitions for all operations, making it easy to use in TypeScript projects:
 
 - `SupplyParams`: Parameters for supplying collateral
-
   - `marketId`: Market ID where collateral is being added
   - `amount`: Amount to supply as collateral in base units (bigint, in mists)
   - `coinType`: Fully qualified coin type to supply (e.g., "0x2::sui::SUI")
@@ -237,7 +316,6 @@ The SDK includes TypeScript definitions for all operations, making it easy to us
   - `address`: Address of the user supplying collateral
 
 - `WithdrawParams`: Parameters for withdrawing collateral
-
   - `marketId`: Market ID from which to withdraw
   - `amount`: Amount to withdraw in base units (bigint, in mists, use MAX_U64 constant to withdraw all)
   - `coinType`: Fully qualified coin type to withdraw (e.g., "0x2::sui::SUI")
@@ -246,7 +324,6 @@ The SDK includes TypeScript definitions for all operations, making it easy to us
   - `priceUpdateCoinTypes`: Array of coin types to update prices for
 
 - `BorrowParams`: Parameters for borrowing assets
-
   - `marketId`: Market ID to borrow from
   - `amount`: Amount to borrow in base units (bigint, in mists)
   - `coinType`: Fully qualified coin type to borrow (e.g., "0x2::sui::SUI")
@@ -255,7 +332,6 @@ The SDK includes TypeScript definitions for all operations, making it easy to us
   - `priceUpdateCoinTypes`: Array of coin types to update prices for
 
 - `RepayParams`: Parameters for repaying borrowed assets
-
   - `marketId`: Market ID where the debt exists
   - `amount`: Amount to repay in base units (bigint, in mists)
   - `coinType`: Fully qualified coin type to repay (e.g., "0x2::sui::SUI")
@@ -263,7 +339,6 @@ The SDK includes TypeScript definitions for all operations, making it easy to us
   - `address`: Address of the user repaying the debt
 
 - `ClaimRewardsParams`: Parameters for claiming rewards
-
   - `positionCapId`: Object ID of the position capability object
   - `address`: Address of the user claiming rewards
   - `claimAndDepositAlpha`: Whether to claim and deposit Alpha token rewards (boolean)
@@ -272,7 +347,6 @@ The SDK includes TypeScript definitions for all operations, making it easy to us
   - `claimAll`: ⚠️ **DEPRECATED** - Use `claimAndDepositAll` instead (boolean)
 
 - `LiquidateParams`: Parameters for liquidating unhealthy positions
-
   - `tx?`: Optional existing transaction to build upon
   - `liquidatePositionId`: Object ID of the position to liquidate
   - `borrowMarketId`: Market ID where debt is repaid
@@ -280,6 +354,25 @@ The SDK includes TypeScript definitions for all operations, making it easy to us
   - `repayCoin`: Transaction argument representing the repay coin
   - `borrowCoinType`: Fully qualified coin type for debt repayment
   - `withdrawCoinType`: Fully qualified coin type for collateral to seize
+  - `priceUpdateCoinTypes`: Array of coin types to update prices for
+
+- `ZapInSupplyParams`: Parameters for zap-in supply operation (swap and supply in one transaction)
+  - `marketId`: Market ID where collateral is being added
+  - `inputAmount`: Amount of input tokens to swap and supply (bigint, in mists)
+  - `inputCoinType`: Fully qualified type of the input token to swap from (e.g., "0x2::sui::SUI")
+  - `marketCoinType`: Fully qualified type of the market's collateral token to swap to
+  - `slippage`: Maximum allowed slippage percentage for the swap (e.g., 0.01 for 1%)
+  - `positionCapId?`: Object ID of the position capability object (optional)
+  - `address`: Address of the user performing the zap-in supply
+
+- `ZapOutWithdrawParams`: Parameters for zap-out withdraw operation (withdraw and swap in one transaction)
+  - `marketId`: Market ID from which to withdraw
+  - `amount`: Amount to withdraw (bigint, in mists, use MAX_U64 constant to withdraw all)
+  - `marketCoinType`: Fully qualified type of the market's collateral token to withdraw from
+  - `outputCoinType`: Fully qualified type of the desired output token to swap to
+  - `slippage`: Maximum allowed slippage percentage for the swap (e.g., 0.01 for 1%)
+  - `positionCapId`: Object ID of the position capability object
+  - `address`: Address of the user performing the zap-in withdraw
   - `priceUpdateCoinTypes`: Array of coin types to update prices for
 
 - `updatePrices`: Function to update price feeds
