@@ -25,6 +25,9 @@ import {
   UserPortfolio,
   ProtocolStats,
   CoinMetadata,
+  ZapInSupplyParams,
+  ZapOutWithdrawParams,
+  MAX_U64,
 } from "./types.js";
 import {
   getAlphaReceipt,
@@ -38,6 +41,8 @@ import { Constants } from "../constants/types.js";
 import { getUserPositionCapId } from "../models/position/functions.js";
 import { LendingProtocol } from "../models/lendingProtocol.js";
 import { Market } from "../models/market.js";
+import { SevenKGateway } from "./sevenKSwap.js";
+import { Decimal } from "decimal.js";
 
 /**
  * AlphaLend Client
@@ -405,6 +410,97 @@ export class AlphalendClient {
   }
 
   /**
+   * Supplies collateral to the AlphaLend protocol with automatic token swapping
+   *
+   * This method performs a "zap in" operation by first swapping the input token
+   * to the market's required collateral token via 7k Protocol, then supplying
+   * the swapped tokens as collateral to the specified market.
+   *
+   * @param params Zap in supply parameters
+   * @param params.marketId Market ID where collateral is being added
+   * @param params.inputAmount Amount of input tokens to swap and supply (in base units)
+   * @param params.inputCoinType Fully qualified type of the input token to swap from (e.g., "0x2::sui::SUI")
+   * @param params.marketCoinType Fully qualified type of the market's collateral token to swap to
+   * @param params.slippage Maximum allowed slippage percentage for the swap
+   * @param params.positionCapId Optional: Object ID of the position capability object
+   * @param params.address Address of the user performing the zap in supply
+   * @returns Transaction object ready for signing and execution, or undefined if swap fails
+   */
+  async zapInSupply(
+    params: ZapInSupplyParams,
+  ): Promise<Transaction | undefined> {
+    // Auto-initialize market data if needed
+    await this.ensureInitialized();
+
+    const tx = new Transaction();
+    const sevenKGateway = new SevenKGateway();
+
+    const quoteResponse = await sevenKGateway.getQuote(
+      params.inputCoinType,
+      params.marketCoinType,
+      params.inputAmount.toString(),
+    );
+    const supplyCoin = await sevenKGateway.getTransactionBlock(
+      tx,
+      params.address,
+      params.slippage,
+      quoteResponse,
+    );
+    if (!supplyCoin) {
+      console.error("Failed to get coin out");
+      return undefined;
+    }
+
+    if (params.positionCapId) {
+      // Build add_collateral transaction
+      tx.moveCall({
+        target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::add_collateral`,
+        typeArguments: [params.marketCoinType],
+        arguments: [
+          tx.object(this.constants.LENDING_PROTOCOL_ID), // Protocol object
+          tx.object(params.positionCapId), // Position capability
+          tx.pure.u64(params.marketId), // Market ID
+          supplyCoin, // Coin to supply as collateral
+          tx.object(this.constants.SUI_CLOCK_OBJECT_ID), // Clock object
+        ],
+      });
+    } else {
+      const positionCapId = await getUserPositionCapId(
+        this.client,
+        this.network,
+        params.address,
+      );
+      let positionCap: TransactionObjectArgument;
+      if (positionCapId) {
+        positionCap = tx.object(positionCapId);
+      } else {
+        positionCap = this.createPosition(tx);
+      }
+      // Build add_collateral transaction
+      tx.moveCall({
+        target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::add_collateral`,
+        typeArguments: [params.marketCoinType],
+        arguments: [
+          tx.object(this.constants.LENDING_PROTOCOL_ID), // Protocol object
+          positionCap, // Position capability
+          tx.pure.u64(params.marketId), // Market ID
+          supplyCoin, // Coin to supply as collateral
+          tx.object(this.constants.SUI_CLOCK_OBJECT_ID), // Clock object
+        ],
+      });
+      tx.transferObjects([positionCap], params.address);
+    }
+
+    const estimatedGasBudget = await getEstimatedGasBudget(
+      this.client,
+      tx,
+      params.address,
+    );
+    if (estimatedGasBudget) tx.setGasBudget(estimatedGasBudget);
+    return tx;
+  }
+
+  /**
    * Withdraws token collateral from the AlphaLend protocol
    *
    * @param params Withdraw parameters
@@ -457,6 +553,117 @@ export class AlphalendClient {
     }
     if (coin) {
       tx.transferObjects([coin], params.address);
+    }
+
+    const estimatedGasBudget = await getEstimatedGasBudget(
+      this.client,
+      tx,
+      params.address,
+    );
+    if (estimatedGasBudget) tx.setGasBudget(estimatedGasBudget);
+    return tx;
+  }
+
+  /**
+   * Withdraws collateral from the AlphaLend protocol with automatic token swapping
+   *
+   * This method performs a "zap out" operation by first withdrawing collateral
+   * from the specified market, then swapping the withdrawn tokens to the desired
+   * output token via 7k Protocol.
+   *
+   * @param params Zap out withdraw parameters
+   * @param params.marketId Market ID from which collateral is being withdrawn
+   * @param params.amount Amount to withdraw (in base units)
+   * @param params.marketCoinType Fully qualified type of the market's collateral token to withdraw from
+   * @param params.outputCoinType Fully qualified type of the desired output token to swap to (e.g., "0x2::sui::SUI")
+   * @param params.slippage Maximum allowed slippage percentage for the swap
+   * @param params.positionCapId Object ID of the position capability object
+   * @param params.address Address of the user performing the zap out withdraw
+   * @param params.priceUpdateCoinTypes Coin types of the coins whose price needs to be updated
+   * @returns Transaction object ready for signing and execution, or undefined if swap fails
+   */
+  async zapOutWithdraw(
+    params: ZapOutWithdrawParams,
+  ): Promise<Transaction | undefined> {
+    // Auto-initialize market data if needed
+    await this.ensureInitialized();
+
+    const tx = new Transaction();
+    const sevenKGateway = new SevenKGateway();
+
+    let swapInAmount = (params.amount - 1n).toString();
+    if (params.amount === MAX_U64) {
+      // Refresh position to get latest collateral amount
+      const position = await this.lendingProtocol.getPositionFromPositionCapId(
+        params.positionCapId,
+      );
+      const market = await this.lendingProtocol.getMarket(
+        parseInt(params.marketId),
+      );
+      position.refreshSingleMarket(market);
+      const collateral = position.position.collaterals.find(
+        (collateral) => collateral.key === params.marketId,
+      );
+      if (!collateral) {
+        throw new Error(
+          "Collateral not found. User has not supplied to this market.",
+        );
+      }
+      swapInAmount = new Decimal(collateral.value)
+        .mul(market.market.xtokenRatio)
+        .div(1e18)
+        .floor()
+        .toString();
+    }
+
+    // First update prices to ensure latest oracle values
+    if (this.network === "mainnet") {
+      await this.updatePrices(tx, params.priceUpdateCoinTypes);
+    } else {
+      await setPrices(tx);
+    }
+
+    const promise = tx.moveCall({
+      target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::remove_collateral`,
+      typeArguments: [params.marketCoinType],
+      arguments: [
+        tx.object(this.constants.LENDING_PROTOCOL_ID), // Protocol object
+        tx.object(params.positionCapId), // Position capability
+        tx.pure.u64(params.marketId), // Market ID
+        tx.pure.u64(params.amount), // Amount to withdraw
+        tx.object(this.constants.SUI_CLOCK_OBJECT_ID), // Clock object
+      ],
+    });
+    const isSui = params.marketCoinType === this.constants.SUI_COIN_TYPE;
+    let coin: string | TransactionObjectArgument | undefined;
+    if (isSui) {
+      coin = tx.moveCall({
+        target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::fulfill_promise_SUI`,
+        arguments: [
+          tx.object(this.constants.LENDING_PROTOCOL_ID),
+          promise,
+          tx.object(this.constants.SUI_SYSTEM_STATE_ID),
+          tx.object(this.constants.SUI_CLOCK_OBJECT_ID),
+        ],
+      });
+    } else {
+      coin = await this.handlePromise(tx, promise, params.marketCoinType);
+    }
+
+    const quoteResponse = await sevenKGateway.getQuote(
+      params.marketCoinType,
+      params.outputCoinType,
+      swapInAmount,
+    );
+    const withdrawCoin = await sevenKGateway.getTransactionBlock(
+      tx,
+      params.address,
+      params.slippage,
+      quoteResponse,
+      coin,
+    );
+    if (withdrawCoin) {
+      tx.transferObjects([withdrawCoin], params.address);
     }
 
     const estimatedGasBudget = await getEstimatedGasBudget(

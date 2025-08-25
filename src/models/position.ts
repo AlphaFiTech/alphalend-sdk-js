@@ -247,6 +247,64 @@ export class Position {
     return rewardsToClaim;
   }
 
+  refreshSingleMarket(market: Market) {
+    const currentTime = Date.now();
+
+    // Then process each market
+    {
+      const depositDistributor = market.market.depositRewardDistributor;
+      const userDistributorIdx = this.findOrAddUserRewardDistributor(
+        depositDistributor,
+        currentTime,
+        true,
+      );
+
+      const userDistributor =
+        this.position.rewardDistributors[userDistributorIdx];
+
+      this.refreshUserRewardDistributor(
+        userDistributor,
+        depositDistributor,
+        false,
+        currentTime,
+      );
+    }
+
+    // Process borrow reward distributors and update loan amounts
+    {
+      const borrowDistributor = market.market.borrowRewardDistributor;
+      const userDistributorIdx = this.findOrAddUserRewardDistributor(
+        borrowDistributor,
+        currentTime,
+        false,
+      );
+
+      const userDistributor =
+        this.position.rewardDistributors[userDistributorIdx];
+
+      this.refreshUserRewardDistributor(
+        userDistributor,
+        borrowDistributor,
+        false,
+        currentTime,
+      );
+
+      // Update loan amounts with compounded interest
+      for (const loan of this.position.loans) {
+        if (parseFloat(loan.marketId) === parseFloat(market.market.marketId)) {
+          const newAmount =
+            (BigInt(loan.amount) * BigInt(market.market.compoundedInterest)) /
+            BigInt(loan.borrowCompoundedInterest);
+
+          loan.amount = newAmount.toString();
+          loan.borrowCompoundedInterest = market.market.compoundedInterest;
+        }
+      }
+    }
+
+    this.position.lastRefreshed = currentTime.toString();
+  }
+
   refresh(marketMap: Map<number, Market>) {
     const currentTime = Date.now();
 
