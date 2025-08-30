@@ -440,7 +440,7 @@ export class AlphalendClient {
       params.marketCoinType,
       params.inputAmount.toString(),
     );
-    const supplyCoin = await sevenKGateway.getTransactionBlock(
+    const { tx: updatedTx, coinOut: supplyCoin } = await sevenKGateway.getTransactionBlock(
       tx,
       params.address,
       params.slippage,
@@ -655,7 +655,7 @@ export class AlphalendClient {
       params.outputCoinType,
       swapInAmount,
     );
-    const withdrawCoin = await sevenKGateway.getTransactionBlock(
+    const { tx: updatedTx2, coinOut: withdrawCoin } = await sevenKGateway.getTransactionBlock(
       tx,
       params.address,
       params.slippage,
