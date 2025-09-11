@@ -44,7 +44,8 @@ class SimpleCache<T> {
   private cache = new Map<string, { data: T; timestamp: number }>();
   private ttl: number;
 
-  constructor(ttlMs: number = 60000) { // Default 1 minute TTL
+  constructor(ttlMs: number = 60000) {
+    // Default 1 minute TTL
     this.ttl = ttlMs;
   }
 
@@ -55,12 +56,12 @@ class SimpleCache<T> {
   get(key: string): T | undefined {
     const entry = this.cache.get(key);
     if (!entry) return undefined;
-    
+
     if (Date.now() - entry.timestamp > this.ttl) {
       this.cache.delete(key);
       return undefined;
     }
-    
+
     return entry.data;
   }
 
@@ -96,16 +97,16 @@ export async function getLatestPrices(
   // Check cache first and prepare list of pairs that need fetching
   const prices: string[] = pairs.map((pair, index) => {
     const cacheKey = `getLatestPrice-${pair}`;
-    
+
     if (ignoreCache) {
       latestPriceCache.delete(cacheKey);
     }
-    
+
     const cachedResponse = latestPriceCache.get(cacheKey);
     if (cachedResponse) {
       return cachedResponse;
     }
-    
+
     pairsToFetch.push(pair);
     pairsToFetchIndexes.push(index);
     return "";
@@ -127,7 +128,7 @@ export async function getLatestPrices(
         error,
       );
       // Fill with zeros on error
-      pairsToFetchIndexes.forEach(index => {
+      pairsToFetchIndexes.forEach((index) => {
         prices[index] = "0";
       });
     }
@@ -147,7 +148,7 @@ export async function getLatestPrices(
 /**
  * Fetches required token prices from the AlphaLend API
  * Internal function used by getLatestPrices
- * 
+ *
  * @returns Promise resolving to a map of token symbols to prices
  */
 export async function fetchRequiredPrices(): Promise<{
@@ -163,7 +164,7 @@ export async function fetchRequiredPrices(): Promise<{
       }
     }
   `;
-  
+
   try {
     const response = await fetch(apiUrl, {
       method: "POST",
@@ -181,10 +182,10 @@ export async function fetchRequiredPrices(): Promise<{
     const dataArr = data.data.coinInfo;
 
     const priceMap: { [k: string]: string | undefined } = {};
-    
+
     for (const coinData of dataArr) {
       let coinType = coinData.coinType;
-      
+
       // Normalize coin type format
       if (coinType.startsWith("0x0")) {
         coinType = "0x" + coinType.substring(3);
@@ -192,7 +193,7 @@ export async function fetchRequiredPrices(): Promise<{
 
       // Map coin types to symbols for easier lookup
       let symbol: string | undefined;
-      
+
       // Handle special cases
       if (coinType === "0x2::sui::SUI") {
         symbol = "SUI";

@@ -51,7 +51,6 @@ export type CoinName =
   | "XAUM"
   | "ESUI"
   | "EBTC";
-  
 
 /**
  * Type definition for coin type identifiers on the Sui blockchain

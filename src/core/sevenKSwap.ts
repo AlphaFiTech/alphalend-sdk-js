@@ -24,23 +24,26 @@ function getSDK() {
 export class SevenKGateway {
   constructor() {}
 
-  public async getQuote(tokenIn: string, tokenOut: string, amountIn: string, swapOptions?: SwapOptions) {
+  public async getQuote(
+    tokenIn: string,
+    tokenOut: string,
+    amountIn: string,
+    swapOptions?: SwapOptions,
+  ) {
     const sdk = await getSDK();
-    
+
     const quoteResponse = await sdk.getQuote({
       tokenIn,
       tokenOut,
-      amountIn: amountIn.toString().split(".")[0],//swap_amount.split(".")[0];
+      amountIn: amountIn.toString().split(".")[0], //swap_amount.split(".")[0];
     });
-    if(!swapOptions) {
+    if (!swapOptions) {
       return quoteResponse;
     }
     const sevenKEstimatedAmountOut = BigInt(
-      quoteResponse
-        ? quoteResponse.returnAmountWithDecimal.toString()
-        : 0,
+      quoteResponse ? quoteResponse.returnAmountWithDecimal.toString() : 0,
     );
-    
+
     const sevenKEstimatedAmountOutWithoutFee = BigInt(
       quoteResponse
         ? quoteResponse.returnAmountWithoutSwapFees
@@ -48,8 +51,9 @@ export class SevenKGateway {
           : sevenKEstimatedAmountOut.toString()
         : sevenKEstimatedAmountOut.toString(),
     );
-    
-    const sevenKEstimatedFeeAmount = sevenKEstimatedAmountOut - sevenKEstimatedAmountOutWithoutFee;
+
+    const sevenKEstimatedFeeAmount =
+      sevenKEstimatedAmountOut - sevenKEstimatedAmountOutWithoutFee;
 
     const amount = BigInt(
       quoteResponse ? quoteResponse.swapAmountWithDecimal : 0,
@@ -70,7 +74,6 @@ export class SevenKGateway {
     let quote: SwapQuote;
 
     if (priceA && priceB) {
-
       const inputAmountInUSD =
         (Number(amount) / Math.pow(10, swapOptions.pair.coinA.expo)) *
         parseFloat(priceA);
@@ -92,8 +95,10 @@ export class SevenKGateway {
         slippage: slippage,
       };
     } else {
-      console.warn("Could not get prices from Pyth Network, using fallback pricing.");
-      
+      console.warn(
+        "Could not get prices from Pyth Network, using fallback pricing.",
+      );
+
       // Create quote with basic pricing (assuming 1:1 for simplicity)
       quote = {
         gateway: "7k",
@@ -105,7 +110,7 @@ export class SevenKGateway {
         slippage: swapOptions.slippage,
       };
     }
-    
+
     return quote;
     // return quoteResponse;
   }
@@ -127,7 +132,8 @@ export class SevenKGateway {
         accountAddress: address,
         slippage,
         commission: {
-          partner: "0x401c29204828bed9a2f9f65f9da9b9e54b1e43178c88811e2584e05cf2c3eb6f", // Valid commission partner address
+          partner:
+            "0x401c29204828bed9a2f9f65f9da9b9e54b1e43178c88811e2584e05cf2c3eb6f", // Valid commission partner address
           commissionBps: 0, // 0 basis points = no commission
         },
         extendTx: {

@@ -12,4 +12,4 @@ export {
   getUserPositionIds,
 } from "./models/position/functions.js";
 export { SevenKGateway } from "./core/sevenKSwap.js";
-export {getLatestPrices, fetchRequiredPrices} from "./coin/index.js";
+export { getLatestPrices, fetchRequiredPrices } from "./coin/index.js";

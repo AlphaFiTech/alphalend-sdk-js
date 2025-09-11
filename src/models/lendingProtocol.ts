@@ -94,7 +94,8 @@ export class LendingProtocol {
   // Position methods
 
   async getPositionFromPositionCapId(positionCapId: string): Promise<Position> {
-    const position = await this.blockchain.getPositionFromPositionCapId(positionCapId);
+    const position =
+      await this.blockchain.getPositionFromPositionCapId(positionCapId);
     return new Position(position, this.coinMetadataMap);
   }
 

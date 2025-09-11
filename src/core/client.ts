@@ -440,12 +440,13 @@ export class AlphalendClient {
       params.marketCoinType,
       params.inputAmount.toString(),
     );
-    const { tx: updatedTx, coinOut: supplyCoin } = await sevenKGateway.getTransactionBlock(
-      tx,
-      params.address,
-      params.slippage,
-      quoteResponse,
-    );
+    const { tx: updatedTx, coinOut: supplyCoin } =
+      await sevenKGateway.getTransactionBlock(
+        tx,
+        params.address,
+        params.slippage,
+        quoteResponse,
+      );
     if (!supplyCoin) {
       console.error("Failed to get coin out");
       return undefined;
@@ -655,13 +656,14 @@ export class AlphalendClient {
       params.outputCoinType,
       swapInAmount,
     );
-    const { tx: updatedTx2, coinOut: withdrawCoin } = await sevenKGateway.getTransactionBlock(
-      tx,
-      params.address,
-      params.slippage,
-      quoteResponse,
-      coin,
-    );
+    const { tx: updatedTx2, coinOut: withdrawCoin } =
+      await sevenKGateway.getTransactionBlock(
+        tx,
+        params.address,
+        params.slippage,
+        quoteResponse,
+        coin,
+      );
     if (withdrawCoin) {
       tx.transferObjects([withdrawCoin], params.address);
     }
@@ -1242,9 +1244,11 @@ export class AlphalendClient {
     }
 
     //sort the coins by value in descending order
-    coins.sort((a, b) => {
-      return Number(b.balance) - Number(a.balance);
-    }).splice(200);
+    coins
+      .sort((a, b) => {
+        return Number(b.balance) - Number(a.balance);
+      })
+      .splice(200);
 
     if (amount) {
       const coinsToMerge: string[] = [];
