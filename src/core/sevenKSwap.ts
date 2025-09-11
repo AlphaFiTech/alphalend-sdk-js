@@ -4,6 +4,8 @@ import {
   Transaction,
   TransactionObjectArgument,
 } from "@mysten/sui/transactions";
+import { SwapOptions, SwapQuote } from "./types.js";
+import { getLatestPrices, PythPriceIdPair } from "../coin/index.js";
 
 // Dynamically import from CJS version which has working exports
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -22,17 +24,90 @@ function getSDK() {
 export class SevenKGateway {
   constructor() {}
 
-  async getQuote(tokenIn: string, tokenOut: string, amountIn: string) {
+  public async getQuote(tokenIn: string, tokenOut: string, amountIn: string, swapOptions?: SwapOptions) {
     const sdk = await getSDK();
-    console.log("tokenIn", tokenIn);
-    console.log("tokenOut", tokenOut);
-    console.log("amountIn", amountIn);
+    
     const quoteResponse = await sdk.getQuote({
       tokenIn,
       tokenOut,
-      amountIn: amountIn.toString(),
+      amountIn: amountIn.toString().split(".")[0],//swap_amount.split(".")[0];
     });
-    return quoteResponse;
+    if(!swapOptions) {
+      return quoteResponse;
+    }
+    const sevenKEstimatedAmountOut = BigInt(
+      quoteResponse
+        ? quoteResponse.returnAmountWithDecimal.toString()
+        : 0,
+    );
+    
+    const sevenKEstimatedAmountOutWithoutFee = BigInt(
+      quoteResponse
+        ? quoteResponse.returnAmountWithoutSwapFees
+          ? quoteResponse.returnAmountWithoutSwapFees.toString()
+          : sevenKEstimatedAmountOut.toString()
+        : sevenKEstimatedAmountOut.toString(),
+    );
+    
+    const sevenKEstimatedFeeAmount = sevenKEstimatedAmountOut - sevenKEstimatedAmountOutWithoutFee;
+
+    const amount = BigInt(
+      quoteResponse ? quoteResponse.swapAmountWithDecimal : 0,
+    );
+
+    const pairNameA: PythPriceIdPair = (swapOptions.pair.coinA.name +
+      "/" +
+      "USD") as PythPriceIdPair;
+    const pairNameB: PythPriceIdPair = (swapOptions.pair.coinB.name +
+      "/" +
+      "USD") as PythPriceIdPair;
+
+    const [priceA, priceB] = await getLatestPrices(
+      [pairNameA, pairNameB],
+      true,
+    );
+
+    let quote: SwapQuote;
+
+    if (priceA && priceB) {
+
+      const inputAmountInUSD =
+        (Number(amount) / Math.pow(10, swapOptions.pair.coinA.expo)) *
+        parseFloat(priceA);
+      const outputAmountInUSD =
+        (Number(sevenKEstimatedAmountOut) /
+          Math.pow(10, swapOptions.pair.coinB.expo)) *
+        parseFloat(priceB);
+
+      const slippage =
+        (inputAmountInUSD - outputAmountInUSD) / inputAmountInUSD;
+
+      quote = {
+        gateway: "7k",
+        estimatedAmountOut: sevenKEstimatedAmountOut,
+        estimatedFeeAmount: sevenKEstimatedFeeAmount,
+        inputAmount: amount,
+        inputAmountInUSD: inputAmountInUSD,
+        estimatedAmountOutInUSD: outputAmountInUSD,
+        slippage: slippage,
+      };
+    } else {
+      console.warn("Could not get prices from Pyth Network, using fallback pricing.");
+      
+      // Create quote with basic pricing (assuming 1:1 for simplicity)
+      quote = {
+        gateway: "7k",
+        estimatedAmountOut: sevenKEstimatedAmountOut,
+        estimatedFeeAmount: sevenKEstimatedFeeAmount,
+        inputAmount: amount,
+        inputAmountInUSD: 0, // Will be updated when prices are available
+        estimatedAmountOutInUSD: 0, // Will be updated when prices are available
+        slippage: swapOptions.slippage,
+      };
+    }
+    
+    return quote;
+    // return quoteResponse;
   }
 
   async getTransactionBlock(
@@ -68,7 +143,7 @@ export class SevenKGateway {
           transaction || new Transaction(),
           this.swapOptions.senderAddress,
           this.swapOptions.slippage / 100, // Convert percentage to decimal
-          this.sevenKQuote,
+          quoteResponse,
         );
         
         // Transfer any remaining coins to the sender address

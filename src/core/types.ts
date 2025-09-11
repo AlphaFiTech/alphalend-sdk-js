@@ -335,3 +335,59 @@ export interface UserPortfolio {
     rewardAmount: Decimal;
   }[];
 }
+
+export interface CoinConfig {
+  /** Human-readable name (e.g., "SUI", "USDC") */
+  name: string;
+  /** Fully qualified coin type */
+  coinType: string;
+  /** Number of decimal places */
+  expo: number;
+
+  type: string;
+}
+
+/**
+ * Coin pair configuration for swap operations
+ */
+export interface CoinPair {
+  /** Source coin configuration */
+  coinA: CoinConfig;
+  /** Destination coin configuration */
+  coinB: CoinConfig;
+}
+
+/**
+ * Options for configuring a swap operation
+ */
+export interface SwapOptions {
+  /** The coin pair to swap between */
+  pair: CoinPair;
+  /** Input amount (if swapping exact amount in) */
+  inAmount?: bigint;
+  /** Output amount (if swapping exact amount out) */
+  outAmount?: bigint;
+  /** Maximum slippage tolerance as a percentage (e.g., 0.01 for 1%) */
+  slippage: number;
+  /** Sender's wallet address */
+  senderAddress: string;
+}
+
+export interface SwapQuote {
+  /** Which gateway/DEX provided this quote */
+  gateway: string;
+  /** Estimated amount of output tokens */
+  estimatedAmountOut: bigint;
+  /** Estimated fee amount */
+  estimatedFeeAmount: bigint;
+  /** Input amount being swapped */
+  inputAmount: bigint;
+  /** Input amount in USD */
+  inputAmountInUSD: number;
+  /** Estimated output amount in USD */
+  estimatedAmountOutInUSD: number;
+  /** Slippage percentage */
+  slippage: number;
+  /** Pre-built transaction (if available) */
+  transaction?: Transaction;
+}

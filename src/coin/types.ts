@@ -46,7 +46,12 @@ export type CoinName =
   | "TBTC"
   | "IKA"
   | "xBTC"
-  | "ALKIMI";
+  | "ALKIMI"
+  | "UP"
+  | "XAUM"
+  | "ESUI"
+  | "EBTC";
+  
 
 /**
  * Type definition for coin type identifiers on the Sui blockchain
@@ -98,7 +103,11 @@ export type CoinType =
   | "0x77045f1b9f811a7a8fb9ebd085b5b0c55c5cb0d1520ff55f7037f89b5da9f5f1::TBTC::TBTC"
   | "0x7262fb2f7a3a14c888c438a3cd9b912469a58cf60f367352c46584262e8299aa::ika::IKA"
   | "0x876a4b7bce8aeaef60464c11f4026903e9afacab79b9b142686158aa86560b50::xbtc::XBTC"
-  | "0x1a8f4bc33f8ef7fbc851f156857aa65d397a6a6fd27a7ac2ca717b51f2fd9489::alkimi::ALKIMI";
+  | "0x1a8f4bc33f8ef7fbc851f156857aa65d397a6a6fd27a7ac2ca717b51f2fd9489::alkimi::ALKIMI"
+  | "0x87dfe1248a1dc4ce473bd9cb2937d66cdc6c30fee63f3fe0dbb55c7a09d35dec::up::UP"
+  | "0x9d297676e7a4b771ab023291377b2adfaa4938fb9080b8d12430e4b108b836a9::xaum::XAUM"
+  | "0x66629328922d609cf15af779719e248ae0e63fe0b9d9739623f763b33a9c97da::esui::ESUI"
+  | "0x244b98d29bd0bba401c7cfdd89f017c51759dad615e15a872ddfe45af079bb1d::ebtc::EBTC";
 
 /**
  * Type definition for coin icon URLs
@@ -165,3 +174,49 @@ export interface PythPriceInfo {
     };
   };
 }
+
+export type PythPriceIdPair =
+  | "SUI/USD"
+  | "VSUI/USD"
+  | "AFSUI/USD"
+  | "HASUI/USD"
+  | "USDC/USD"
+  | "USDT/USD"
+  | "CETUS/USD"
+  | "TURBOS/USD"
+  | "SCA/USD"
+  | "CELO/USD"
+  | "WBTC/USD"
+  | "SLP/USD"
+  | "SOL/USD"
+  | "APT/USD"
+  | "WETH/USD"
+  | "ALPHA/USD"
+  | "USDY/USD"
+  | "NAVX/USD"
+  | "BUCK/USD"
+  | "WUSDC/USD"
+  | "WSOL/USD"
+  | "ALPHA/USD"
+  | "FUD/USD"
+  | "BLUB/USD"
+  | "ETH/USD"
+  | "DEEP/USD"
+  | "AUSD/USD"
+  | "NS/USD"
+  | "BLUE/USD"
+  | "SEND/USD"
+  | "STSUI/USD"
+  | "SUIUSDT/USD"
+  | "MUSD/USD"
+  | "SUIBTC/USD"
+  | "LBTC/USD"
+  | "DMC/USD"
+  | "IKA/USD"
+  | "TBTC/USD"
+  | "XBTC/USD"
+  | "ALKIMI/USD"
+  | "XAUM/USD"
+  | "UP/USD"
+  | "ESUI/USD"
+  | "EBTC/USD";
