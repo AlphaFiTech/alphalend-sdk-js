@@ -4,7 +4,6 @@ import {
   Transaction,
   TransactionObjectArgument,
 } from "@mysten/sui/transactions";
-import { SwapOptions, SwapQuote } from "./types.js";
 import { getLatestPrices, PythPriceIdPair } from "../coin/index.js";
 
 // Dynamically import from CJS version which has working exports
@@ -28,7 +27,11 @@ export class SevenKGateway {
     tokenIn: string,
     tokenOut: string,
     amountIn: string,
-    swapOptions?: SwapOptions,
+    slippage?: number,
+    coinAName?: string,
+    coinBName?: string,
+    coinAExpo?: number,
+    coinBExpo?: number,
   ) {
     const sdk = await getSDK();
 
@@ -37,7 +40,7 @@ export class SevenKGateway {
       tokenOut,
       amountIn: amountIn.toString().split(".")[0], //swap_amount.split(".")[0];
     });
-    if (!swapOptions) {
+    if (!slippage) {
       return quoteResponse;
     }
     const sevenKEstimatedAmountOut = BigInt(
@@ -59,10 +62,10 @@ export class SevenKGateway {
       quoteResponse ? quoteResponse.swapAmountWithDecimal : 0,
     );
 
-    const pairNameA: PythPriceIdPair = (swapOptions.pair.coinA.name +
+    const pairNameA: PythPriceIdPair = (coinAName?.toUpperCase() +
       "/" +
       "USD") as PythPriceIdPair;
-    const pairNameB: PythPriceIdPair = (swapOptions.pair.coinB.name +
+    const pairNameB: PythPriceIdPair = (coinBName?.toUpperCase() +
       "/" +
       "USD") as PythPriceIdPair;
 
@@ -71,15 +74,15 @@ export class SevenKGateway {
       true,
     );
 
-    let quote: SwapQuote;
+    let quote: any;
 
-    if (priceA && priceB) {
+    if (priceA && priceB && coinAExpo && coinBExpo) {
       const inputAmountInUSD =
-        (Number(amount) / Math.pow(10, swapOptions.pair.coinA.expo)) *
+        (Number(amount) / Math.pow(10, coinAExpo)) *
         parseFloat(priceA);
       const outputAmountInUSD =
         (Number(sevenKEstimatedAmountOut) /
-          Math.pow(10, swapOptions.pair.coinB.expo)) *
+          Math.pow(10, coinBExpo)) *
         parseFloat(priceB);
 
       const slippage =
@@ -107,7 +110,7 @@ export class SevenKGateway {
         inputAmount: amount,
         inputAmountInUSD: 0, // Will be updated when prices are available
         estimatedAmountOutInUSD: 0, // Will be updated when prices are available
-        slippage: swapOptions.slippage,
+        slippage: slippage,
       };
     }
 
@@ -121,46 +124,22 @@ export class SevenKGateway {
     slippage: number,
     quoteResponse: QuoteResponse,
     coinIn?: TransactionObjectArgument,
-  ): Promise<{
-    tx: Transaction;
-    coinOut: TransactionObjectArgument | undefined;
-  }> {
-    try {
-      const sdk = await getSDK();
-      const { tx: resultTx, coinOut } = await sdk.buildTx({
-        quoteResponse,
-        accountAddress: address,
-        slippage,
-        commission: {
-          partner:
-            "0x401c29204828bed9a2f9f65f9da9b9e54b1e43178c88811e2584e05cf2c3eb6f", // Valid commission partner address
-          commissionBps: 0, // 0 basis points = no commission
-        },
-        extendTx: {
-          tx,
-          coinIn,
-        },
-      });
-      if (coinOut) {
-        tx.transferObjects([coinOut], address);
-      }
-      /*
-      const { tx, coinOut } = await this.sevenKGateway.getTransactionBlock(
-          transaction || new Transaction(),
-          this.swapOptions.senderAddress,
-          this.swapOptions.slippage / 100, // Convert percentage to decimal
-          quoteResponse,
-        );
-        
-        // Transfer any remaining coins to the sender address
-        if (coinOut) {
-          tx.transferObjects([coinOut], this.swapOptions.senderAddress);
-        }
-      */
-      return { tx: resultTx || tx, coinOut };
-    } catch (error) {
-      console.error("Error building 7K transaction:", error);
-      return { tx, coinOut: undefined };
-    }
+  ): Promise<TransactionObjectArgument | undefined> {
+    const sdk = await getSDK();
+    const { coinOut } = await sdk.buildTx({
+      quoteResponse,
+      accountAddress: address,
+      slippage,
+      commission: {
+        partner: address, // Use the user's address as partner
+        commissionBps: 0, // 0 basis points = no commission
+      },
+      extendTx: {
+        tx,
+        coinIn,
+      },
+    });
+
+    return coinOut;
   }
 }

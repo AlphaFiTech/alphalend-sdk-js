@@ -128,6 +128,8 @@ export class AlphalendClient {
             pythPriceInfoObjectId
             decimals
             pythSponsored
+            symbol
+            coingeckoPrice
           }
         }
       `;
@@ -161,6 +163,8 @@ export class AlphalendClient {
             pythPriceInfoObjectId: coin.pythPriceInfoObjectId,
             decimals: coin.decimals,
             pythSponsored: coin.pythSponsored,
+            symbol: coin.symbol,
+            coingeckoPrice: coin.coingeckoPrice,
           });
         }
       }
@@ -176,6 +180,8 @@ export class AlphalendClient {
             "0x801dbc2f0053d34734814b2d6df491ce7807a725fe9a01ad74a07e9c51396c37",
           decimals: 9,
           pythSponsored: true,
+          symbol: "ALPHA",
+          coingeckoPrice: "1",
         },
       );
 
@@ -440,13 +446,12 @@ export class AlphalendClient {
       params.marketCoinType,
       params.inputAmount.toString(),
     );
-    const { tx: updatedTx, coinOut: supplyCoin } =
-      await sevenKGateway.getTransactionBlock(
-        tx,
-        params.address,
-        params.slippage,
-        quoteResponse,
-      );
+    const supplyCoin = await sevenKGateway.getTransactionBlock(
+      tx,
+      params.address,
+      params.slippage,
+      quoteResponse,
+    );
     if (!supplyCoin) {
       console.error("Failed to get coin out");
       return undefined;
@@ -656,14 +661,13 @@ export class AlphalendClient {
       params.outputCoinType,
       swapInAmount,
     );
-    const { tx: updatedTx2, coinOut: withdrawCoin } =
-      await sevenKGateway.getTransactionBlock(
-        tx,
-        params.address,
-        params.slippage,
-        quoteResponse,
-        coin,
-      );
+    const withdrawCoin = await sevenKGateway.getTransactionBlock(
+      tx,
+      params.address,
+      params.slippage,
+      quoteResponse,
+      coin,
+    );
     if (withdrawCoin) {
       tx.transferObjects([withdrawCoin], params.address);
     }
@@ -1244,11 +1248,9 @@ export class AlphalendClient {
     }
 
     //sort the coins by value in descending order
-    coins
-      .sort((a, b) => {
-        return Number(b.balance) - Number(a.balance);
-      })
-      .splice(200);
+    coins.sort((a, b) => {
+      return Number(b.balance) - Number(a.balance);
+    }).splice(200);
 
     if (amount) {
       const coinsToMerge: string[] = [];
