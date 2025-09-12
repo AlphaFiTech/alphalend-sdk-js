@@ -1,10 +1,10 @@
 // Use CJS version to avoid broken ESM exports (DEFAULT_SOURCES missing)
-import type { QuoteResponse } from "@7kprotocol/sdk-ts";
+import { type QuoteResponse } from "@7kprotocol/sdk-ts";
 import {
   Transaction,
   TransactionObjectArgument,
 } from "@mysten/sui/transactions";
-import { getLatestPrices, PythPriceIdPair } from "../coin/index.js";
+import { CoinMetadata } from "./types.js";
 
 // Dynamically import from CJS version which has working exports
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -21,7 +21,14 @@ function getSDK() {
 }
 
 export class SevenKGateway {
-  constructor() {}
+  private coinMetadataMap: Map<string, CoinMetadata>;
+  constructor() {
+    this.coinMetadataMap = new Map();
+  }
+
+  updateCoinMetadataMap(coinMetadataMap: Map<string, CoinMetadata>): void {
+    this.coinMetadataMap = coinMetadataMap;
+  }
 
   public async getQuote(
     tokenIn: string,
@@ -43,6 +50,11 @@ export class SevenKGateway {
     if (!slippage) {
       return quoteResponse;
     }
+    console.log("coin data arr", this.coinMetadataMap);
+
+    // const alphalendClient = new AlphalendClient("mainnet", suiClient);
+    // const coinDataArray = alphalendClient.getCoinMetadataMap();
+    // console.log("coinDataArray", coinDataArray);
     const sevenKEstimatedAmountOut = BigInt(
       quoteResponse ? quoteResponse.returnAmountWithDecimal.toString() : 0,
     );
@@ -62,57 +74,57 @@ export class SevenKGateway {
       quoteResponse ? quoteResponse.swapAmountWithDecimal : 0,
     );
 
-    const pairNameA: PythPriceIdPair = (coinAName?.toUpperCase() +
-      "/" +
-      "USD") as PythPriceIdPair;
-    const pairNameB: PythPriceIdPair = (coinBName?.toUpperCase() +
-      "/" +
-      "USD") as PythPriceIdPair;
+    // const pairNameA: PythPriceIdPair = (coinAName?.toUpperCase() +
+    //   "/" +
+    //   "USD") as PythPriceIdPair;
+    // const pairNameB: PythPriceIdPair = (coinBName?.toUpperCase() +
+    //   "/" +
+    //   "USD") as PythPriceIdPair;
 
-    const [priceA, priceB] = await getLatestPrices(
-      [pairNameA, pairNameB],
-      true,
-    );
+    // const [priceA, priceB] = await getLatestPrices(
+    //   [pairNameA, pairNameB],
+    //   true,
+    // );
 
     let quote: any;
 
-    if (priceA && priceB && coinAExpo && coinBExpo) {
-      const inputAmountInUSD =
-        (Number(amount) / Math.pow(10, coinAExpo)) *
-        parseFloat(priceA);
-      const outputAmountInUSD =
-        (Number(sevenKEstimatedAmountOut) /
-          Math.pow(10, coinBExpo)) *
-        parseFloat(priceB);
+    // if (priceA && priceB && coinAExpo && coinBExpo) {
+    //   const inputAmountInUSD =
+    //     (Number(amount) / Math.pow(10, coinAExpo)) *
+    //     parseFloat(priceA);
+    //   const outputAmountInUSD =
+    //     (Number(sevenKEstimatedAmountOut) /
+    //       Math.pow(10, coinBExpo)) *
+    //     parseFloat(priceB);
 
-      const slippage =
-        (inputAmountInUSD - outputAmountInUSD) / inputAmountInUSD;
+    //   const slippage =
+    //     (inputAmountInUSD - outputAmountInUSD) / inputAmountInUSD;
 
-      quote = {
-        gateway: "7k",
-        estimatedAmountOut: sevenKEstimatedAmountOut,
-        estimatedFeeAmount: sevenKEstimatedFeeAmount,
-        inputAmount: amount,
-        inputAmountInUSD: inputAmountInUSD,
-        estimatedAmountOutInUSD: outputAmountInUSD,
-        slippage: slippage,
-      };
-    } else {
-      console.warn(
-        "Could not get prices from Pyth Network, using fallback pricing.",
-      );
+    //   quote = {
+    //     gateway: "7k",
+    //     estimatedAmountOut: sevenKEstimatedAmountOut,
+    //     estimatedFeeAmount: sevenKEstimatedFeeAmount,
+    //     inputAmount: amount,
+    //     inputAmountInUSD: inputAmountInUSD,
+    //     estimatedAmountOutInUSD: outputAmountInUSD,
+    //     slippage: slippage,
+    //   };
+    // } else {
+    //   console.warn(
+    //     "Could not get prices from Pyth Network, using fallback pricing.",
+    //   );
 
-      // Create quote with basic pricing (assuming 1:1 for simplicity)
-      quote = {
-        gateway: "7k",
-        estimatedAmountOut: sevenKEstimatedAmountOut,
-        estimatedFeeAmount: sevenKEstimatedFeeAmount,
-        inputAmount: amount,
-        inputAmountInUSD: 0, // Will be updated when prices are available
-        estimatedAmountOutInUSD: 0, // Will be updated when prices are available
-        slippage: slippage,
-      };
-    }
+    //   // Create quote with basic pricing (assuming 1:1 for simplicity)
+    //   quote = {
+    //     gateway: "7k",
+    //     estimatedAmountOut: sevenKEstimatedAmountOut,
+    //     estimatedFeeAmount: sevenKEstimatedFeeAmount,
+    //     inputAmount: amount,
+    //     inputAmountInUSD: 0, // Will be updated when prices are available
+    //     estimatedAmountOutInUSD: 0, // Will be updated when prices are available
+    //     slippage: slippage,
+    //   };
+    // }
 
     return quote;
     // return quoteResponse;

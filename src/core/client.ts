@@ -63,6 +63,7 @@ export class AlphalendClient {
   network: string;
   constants: Constants;
   lendingProtocol: LendingProtocol;
+  sevenKGateway: SevenKGateway;
 
   // Dynamic coin metadata properties
   private coinMetadataMap: Map<string, CoinMetadata> = new Map();
@@ -90,6 +91,7 @@ export class AlphalendClient {
         : "https://hermes-beta.pyth.network",
     );
     this.lendingProtocol = new LendingProtocol(network, client);
+    this.sevenKGateway = new SevenKGateway();
   }
 
   /**
@@ -189,6 +191,7 @@ export class AlphalendClient {
 
       // Update LendingProtocol with the fetched coin metadata
       this.lendingProtocol.updateCoinMetadataMap(this.coinMetadataMap);
+      this.sevenKGateway.updateCoinMetadataMap(this.coinMetadataMap);
     } catch (error) {
       throw new Error(
         `Failed to initialize market data: ${error instanceof Error ? error.message : "Unknown error"}. The SDK requires market data to function properly.`,
