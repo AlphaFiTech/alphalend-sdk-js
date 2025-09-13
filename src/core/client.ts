@@ -444,14 +444,13 @@ export class AlphalendClient {
     await this.ensureInitialized();
 
     const tx = new Transaction();
-    const sevenKGateway = new SevenKGateway();
 
-    const quoteResponse = await sevenKGateway.getQuote(
+    const quoteResponse = await this.sevenKGateway.getQuote(
       params.inputCoinType,
       params.marketCoinType,
       params.inputAmount.toString(),
     );
-    const supplyCoin = await sevenKGateway.getTransactionBlock(
+    const supplyCoin = await this.sevenKGateway.getTransactionBlock(
       tx,
       params.address,
       params.slippage,
@@ -600,7 +599,6 @@ export class AlphalendClient {
     await this.ensureInitialized();
 
     const tx = new Transaction();
-    const sevenKGateway = new SevenKGateway();
 
     let swapInAmount = (params.amount - 1n).toString();
     if (params.amount === MAX_U64) {
@@ -661,12 +659,12 @@ export class AlphalendClient {
       coin = await this.handlePromise(tx, promise, params.marketCoinType);
     }
 
-    const quoteResponse = await sevenKGateway.getQuote(
+    const quoteResponse = await this.sevenKGateway.getQuote(
       params.marketCoinType,
       params.outputCoinType,
       swapInAmount,
     );
-    const withdrawCoin = await sevenKGateway.getTransactionBlock(
+    const withdrawCoin = await this.sevenKGateway.getTransactionBlock(
       tx,
       params.address,
       params.slippage,
@@ -1372,12 +1370,7 @@ export class AlphalendClient {
     return this.coinMetadataMap;
   }
 
-  async getSwapQuote(
-    tokenIn: string,
-    tokenOut: string,
-    amountIn: string,
-    slippage: number,
-  ) {
+  async getSwapQuote(tokenIn: string, tokenOut: string, amountIn: string) {
     await this.ensureInitialized();
 
     const quoteResponse = await this.sevenKGateway.getQuote(
@@ -1442,7 +1435,7 @@ export class AlphalendClient {
         inputAmount: amount,
         inputAmountInUSD: 0,
         estimatedAmountOutInUSD: 0,
-        slippage: slippage,
+        slippage: 0,
       };
     }
 
