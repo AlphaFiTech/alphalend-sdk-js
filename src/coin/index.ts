@@ -38,4 +38,3 @@ export async function getWalletCoins(
     console.error("Error fetching tokenBalances!", error);
   }
 }
-

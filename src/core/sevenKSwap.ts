@@ -4,7 +4,6 @@ import {
   Transaction,
   TransactionObjectArgument,
 } from "@mysten/sui/transactions";
-import { CoinMetadata, quoteObject } from "./types.js";
 
 // Dynamically import from CJS version which has working exports
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -21,21 +20,9 @@ function getSDK() {
 }
 
 export class SevenKGateway {
-  private coinMetadataMap: Map<string, CoinMetadata>;
-  constructor() {
-    this.coinMetadataMap = new Map();
-  }
+  constructor() {}
 
-  updateCoinMetadataMap(coinMetadataMap: Map<string, CoinMetadata>): void {
-    this.coinMetadataMap = coinMetadataMap;
-  }
-
-  public async getQuote(
-    tokenIn: string,
-    tokenOut: string,
-    amountIn: string,
-    slippage?: number,
-  ) {
+  public async getQuote(tokenIn: string, tokenOut: string, amountIn: string) {
     const sdk = await getSDK();
 
     const quoteResponse = await sdk.getQuote({
@@ -43,73 +30,7 @@ export class SevenKGateway {
       tokenOut,
       amountIn: amountIn.toString().split(".")[0],
     });
-    if (!slippage) {
-      return quoteResponse;
-    }
-
-    const coinIn = this.coinMetadataMap.get(tokenIn);
-    const coinOut = this.coinMetadataMap.get(tokenOut);
-    const sevenKEstimatedAmountOut = BigInt(
-      quoteResponse ? quoteResponse.returnAmountWithDecimal.toString() : 0,
-    );
-
-    const sevenKEstimatedAmountOutWithoutFee = BigInt(
-      quoteResponse
-        ? quoteResponse.returnAmountWithoutSwapFees
-          ? quoteResponse.returnAmountWithoutSwapFees.toString()
-          : sevenKEstimatedAmountOut.toString()
-        : sevenKEstimatedAmountOut.toString(),
-    );
-
-    const sevenKEstimatedFeeAmount =
-      sevenKEstimatedAmountOut - sevenKEstimatedAmountOutWithoutFee;
-
-    const amount = BigInt(
-      quoteResponse ? quoteResponse.swapAmountWithDecimal : 0,
-    );
-
-    let quote: quoteObject;
-    const priceA = coinIn?.pythPrice || coinIn?.coingeckoPrice;
-    const priceB = coinOut?.pythPrice || coinOut?.coingeckoPrice;
-    const coinAExpo = coinIn?.decimals;
-    const coinBExpo = coinOut?.decimals;
-    if (priceA && priceB && coinAExpo && coinBExpo) {
-      const inputAmountInUSD =
-        (Number(amount) / Math.pow(10, coinAExpo)) *
-        parseFloat(priceA);
-      const outputAmountInUSD =
-        (Number(sevenKEstimatedAmountOut) /
-          Math.pow(10, coinBExpo)) *
-        parseFloat(priceB);
-
-      const slippage =
-        (inputAmountInUSD - outputAmountInUSD) / inputAmountInUSD;
-
-      quote = {
-        gateway: "7k",
-        estimatedAmountOut: sevenKEstimatedAmountOut,
-        estimatedFeeAmount: sevenKEstimatedFeeAmount,
-        inputAmount: amount,
-        inputAmountInUSD: inputAmountInUSD,
-        estimatedAmountOutInUSD: outputAmountInUSD,
-        slippage: slippage,
-      };
-    } else {
-      console.warn(
-        "Could not get prices from Pyth Network, using fallback pricing.",
-      );
-      quote = {
-        gateway: "7k",
-        estimatedAmountOut: sevenKEstimatedAmountOut,
-        estimatedFeeAmount: sevenKEstimatedFeeAmount,
-        inputAmount: amount,
-        inputAmountInUSD: 0,
-        estimatedAmountOutInUSD: 0,
-        slippage: slippage,
-      };
-    }
-
-    return quote;
+    return quoteResponse;
   }
 
   async getTransactionBlock(

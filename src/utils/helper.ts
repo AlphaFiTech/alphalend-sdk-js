@@ -62,9 +62,9 @@ export async function getClaimRewardInput(
           parseFloat(
             marketReward.fields.cummulative_rewards_per_share.fields.value,
           ) >
-          parseFloat(
-            userRewardFields.cummulative_rewards_per_share.fields.value,
-          ) &&
+            parseFloat(
+              userRewardFields.cummulative_rewards_per_share.fields.value,
+            ) &&
           parseFloat(rewardDistributor.fields.share) > 0
         ) {
           coinTypes.add(marketReward.fields.coin_type.fields.name);

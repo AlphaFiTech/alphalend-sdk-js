@@ -28,6 +28,7 @@ import {
   ZapInSupplyParams,
   ZapOutWithdrawParams,
   MAX_U64,
+  quoteObject,
 } from "./types.js";
 import {
   getAlphaReceipt,
@@ -193,7 +194,6 @@ export class AlphalendClient {
 
       // Update LendingProtocol with the fetched coin metadata
       this.lendingProtocol.updateCoinMetadataMap(this.coinMetadataMap);
-      this.sevenKGateway.updateCoinMetadataMap(this.coinMetadataMap);
     } catch (error) {
       throw new Error(
         `Failed to initialize market data: ${error instanceof Error ? error.message : "Unknown error"}. The SDK requires market data to function properly.`,
@@ -344,7 +344,7 @@ export class AlphalendClient {
    * @param params.positionCapId Optional: Object ID of the position capability object
    * @param params.address Address of the user supplying collateral
    * @returns Transaction object ready for signing and execution
-    */
+   */
   async supply(params: SupplyParams): Promise<Transaction | undefined> {
     // Auto-initialize market data if needed
     await this.ensureInitialized();
@@ -1372,14 +1372,97 @@ export class AlphalendClient {
     return this.coinMetadataMap;
   }
 
-  async getQuote(tokenIn: string, tokenOut: string, amountIn: string, slippage?: number) {
+  async getSwapQuote(
+    tokenIn: string,
+    tokenOut: string,
+    amountIn: string,
+    slippage: number,
+  ) {
     await this.ensureInitialized();
-    return await this.sevenKGateway.getQuote(tokenIn, tokenOut, amountIn, slippage);
+
+    const quoteResponse = await this.sevenKGateway.getQuote(
+      tokenIn,
+      tokenOut,
+      amountIn,
+    );
+
+    const coinIn = this.coinMetadataMap.get(tokenIn);
+    const coinOut = this.coinMetadataMap.get(tokenOut);
+    const sevenKEstimatedAmountOut = BigInt(
+      quoteResponse ? quoteResponse.returnAmountWithDecimal.toString() : 0,
+    );
+
+    const sevenKEstimatedAmountOutWithoutFee = BigInt(
+      quoteResponse
+        ? quoteResponse.returnAmountWithoutSwapFees
+          ? quoteResponse.returnAmountWithoutSwapFees.toString()
+          : sevenKEstimatedAmountOut.toString()
+        : sevenKEstimatedAmountOut.toString(),
+    );
+
+    const sevenKEstimatedFeeAmount =
+      sevenKEstimatedAmountOut - sevenKEstimatedAmountOutWithoutFee;
+
+    const amount = BigInt(
+      quoteResponse ? quoteResponse.swapAmountWithDecimal : 0,
+    );
+
+    let quote: quoteObject;
+    const priceA = coinIn?.pythPrice || coinIn?.coingeckoPrice;
+    const priceB = coinOut?.pythPrice || coinOut?.coingeckoPrice;
+    const coinAExpo = coinIn?.decimals;
+    const coinBExpo = coinOut?.decimals;
+    if (priceA && priceB && coinAExpo && coinBExpo) {
+      const inputAmountInUSD =
+        (Number(amount) / Math.pow(10, coinAExpo)) * parseFloat(priceA);
+      const outputAmountInUSD =
+        (Number(sevenKEstimatedAmountOut) / Math.pow(10, coinBExpo)) *
+        parseFloat(priceB);
+
+      const slippage =
+        (inputAmountInUSD - outputAmountInUSD) / inputAmountInUSD;
+
+      quote = {
+        gateway: "7k",
+        estimatedAmountOut: sevenKEstimatedAmountOut,
+        estimatedFeeAmount: sevenKEstimatedFeeAmount,
+        inputAmount: amount,
+        inputAmountInUSD: inputAmountInUSD,
+        estimatedAmountOutInUSD: outputAmountInUSD,
+        slippage: slippage,
+      };
+    } else {
+      console.warn(
+        "Could not get prices from Pyth Network, using fallback pricing.",
+      );
+      quote = {
+        gateway: "7k",
+        estimatedAmountOut: sevenKEstimatedAmountOut,
+        estimatedFeeAmount: sevenKEstimatedFeeAmount,
+        inputAmount: amount,
+        inputAmountInUSD: 0,
+        estimatedAmountOutInUSD: 0,
+        slippage: slippage,
+      };
+    }
+
+    return quote;
   }
 
-  async getTransactionBlock(tx: Transaction, address: string, slippage: number, quoteResponse: QuoteResponse, coinIn?: TransactionObjectArgument) {
+  async getSwapTransactionBlock(
+    tx: Transaction,
+    address: string,
+    slippage: number,
+    quoteResponse: QuoteResponse,
+    coinIn?: TransactionObjectArgument,
+  ) {
     await this.ensureInitialized();
-    return await this.sevenKGateway.getTransactionBlock(tx, address, slippage, quoteResponse, coinIn);
+    return await this.sevenKGateway.getTransactionBlock(
+      tx,
+      address,
+      slippage,
+      quoteResponse,
+      coinIn,
+    );
   }
 }
-
