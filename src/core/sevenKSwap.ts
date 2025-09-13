@@ -22,9 +22,8 @@ function getSDK() {
 export class SevenKGateway {
   constructor() {}
 
-  public async getQuote(tokenIn: string, tokenOut: string, amountIn: string) {
+  async getQuote(tokenIn: string, tokenOut: string, amountIn: string) {
     const sdk = await getSDK();
-
     const quoteResponse = await sdk.getQuote({
       tokenIn,
       tokenOut,
