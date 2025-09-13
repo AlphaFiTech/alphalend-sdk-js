@@ -37,10 +37,6 @@ export class SevenKGateway {
     tokenOut: string,
     amountIn: string,
     slippage?: number,
-    // coinAName?: string,
-    // coinBName?: string,
-    // coinAExpo?: number,
-    // coinBExpo?: number,
   ) {
     const sdk = await getSDK();
 
