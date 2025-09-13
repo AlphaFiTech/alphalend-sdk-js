@@ -132,6 +132,7 @@ export class AlphalendClient {
             pythSponsored
             symbol
             coingeckoPrice
+            pythPrice
           }
         }
       `;
@@ -167,6 +168,7 @@ export class AlphalendClient {
             pythSponsored: coin.pythSponsored,
             symbol: coin.symbol,
             coingeckoPrice: coin.coingeckoPrice,
+            pythPrice: coin.pythPrice,
           });
         }
       }
@@ -184,6 +186,7 @@ export class AlphalendClient {
           pythSponsored: true,
           symbol: "ALPHA",
           coingeckoPrice: "1",
+          pythPrice: "1",
         },
       );
 
@@ -342,7 +345,7 @@ export class AlphalendClient {
    * @param params.positionCapId Optional: Object ID of the position capability object
    * @param params.address Address of the user supplying collateral
    * @returns Transaction object ready for signing and execution
-   */
+    */
   async supply(params: SupplyParams): Promise<Transaction | undefined> {
     // Auto-initialize market data if needed
     await this.ensureInitialized();
@@ -1362,4 +1365,11 @@ export class AlphalendClient {
       });
     }
   }
+
+  async fetchCoinMetadataMap() {
+    await this.ensureInitialized();
+    return this.coinMetadataMap;
+  }
 }
+
+

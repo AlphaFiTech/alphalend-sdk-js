@@ -26,8 +26,10 @@ export class SevenKGateway {
     this.coinMetadataMap = new Map();
   }
 
-  updateCoinMetadataMap(coinMetadataMap: Map<string, CoinMetadata>): void {
+  updateCoinMetadataMap(coinMetadataMap: Map<string, CoinMetadata>): Map<string, CoinMetadata> {
     this.coinMetadataMap = coinMetadataMap;
+    console.log("coinMetadataMap in sevenKSwap", this.coinMetadataMap);
+    return coinMetadataMap;
   }
 
   public async getQuote(
@@ -35,10 +37,10 @@ export class SevenKGateway {
     tokenOut: string,
     amountIn: string,
     slippage?: number,
-    coinAName?: string,
-    coinBName?: string,
-    coinAExpo?: number,
-    coinBExpo?: number,
+    // coinAName?: string,
+    // coinBName?: string,
+    // coinAExpo?: number,
+    // coinBExpo?: number,
   ) {
     const sdk = await getSDK();
 

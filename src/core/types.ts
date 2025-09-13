@@ -25,6 +25,7 @@ export interface CoinMetadata {
   pythSponsored: boolean;
   symbol: string;
   coingeckoPrice: string;
+  pythPrice: string;
 }
 
 /**
