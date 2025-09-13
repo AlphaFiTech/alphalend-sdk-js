@@ -1423,6 +1423,7 @@ export class AlphalendClient {
         inputAmountInUSD: inputAmountInUSD,
         estimatedAmountOutInUSD: outputAmountInUSD,
         slippage: slippage,
+        rawQuote: quoteResponse,
       };
     } else {
       console.warn(
@@ -1436,6 +1437,7 @@ export class AlphalendClient {
         inputAmountInUSD: 0,
         estimatedAmountOutInUSD: 0,
         slippage: 0,
+        rawQuote: quoteResponse,
       };
     }
 
