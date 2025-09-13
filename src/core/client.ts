@@ -128,6 +128,9 @@ export class AlphalendClient {
             pythPriceInfoObjectId
             decimals
             pythSponsored
+            symbol
+            coingeckoPrice
+            pythPrice
           }
         }
       `;
@@ -151,9 +154,9 @@ export class AlphalendClient {
       for (const coin of coinInfoArray) {
         if (
           coin.coinType &&
-          coin.pythPriceFeedId &&
-          coin.pythPriceInfoObjectId &&
-          coin.decimals !== undefined
+          coin.pythSponsored !== null &&
+          coin.decimals &&
+          coin.symbol
         ) {
           this.coinMetadataMap.set(coin.coinType, {
             coinType: coin.coinType,
@@ -161,23 +164,27 @@ export class AlphalendClient {
             pythPriceInfoObjectId: coin.pythPriceInfoObjectId,
             decimals: coin.decimals,
             pythSponsored: coin.pythSponsored,
+            symbol: coin.symbol,
+            coingeckoPrice: coin.coingeckoPrice,
+            pythPrice: coin.pythPrice,
           });
         }
       }
 
-      this.coinMetadataMap.set(
-        "0xfe3afec26c59e874f3c1d60b8203cb3852d2bb2aa415df9548b8d688e6683f93::alpha::ALPHA",
-        {
-          coinType:
-            "0xfe3afec26c59e874f3c1d60b8203cb3852d2bb2aa415df9548b8d688e6683f93::alpha::ALPHA",
+      const alphaCoinType =
+        "0xfe3afec26c59e874f3c1d60b8203cb3852d2bb2aa415df9548b8d688e6683f93::alpha::ALPHA";
+      const alphaCoin = this.coinMetadataMap.get(alphaCoinType);
+      if (alphaCoin) {
+        this.coinMetadataMap.set(alphaCoinType, {
+          ...alphaCoin,
           pythPriceFeedId:
             "23d7315113f5b1d3ba7a83604c44b94d79f4fd69af77f804fc7f920a6dc65744",
           pythPriceInfoObjectId:
             "0x801dbc2f0053d34734814b2d6df491ce7807a725fe9a01ad74a07e9c51396c37",
-          decimals: 9,
           pythSponsored: true,
-        },
-      );
+          pythPrice: alphaCoin.coingeckoPrice,
+        });
+      }
 
       this.isInitialized = true;
 
@@ -1242,9 +1249,11 @@ export class AlphalendClient {
     }
 
     //sort the coins by value in descending order
-    coins.sort((a, b) => {
-      return Number(b.balance) - Number(a.balance);
-    }).splice(200);
+    coins
+      .sort((a, b) => {
+        return Number(b.balance) - Number(a.balance);
+      })
+      .splice(200);
 
     if (amount) {
       const coinsToMerge: string[] = [];
