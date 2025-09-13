@@ -19,10 +19,13 @@ import { Decimal } from "decimal.js";
  */
 export interface CoinMetadata {
   coinType: string;
-  pythPriceFeedId: string;
-  pythPriceInfoObjectId: string;
+  pythPriceFeedId: string | null;
+  pythPriceInfoObjectId: string | null;
   decimals: number;
   pythSponsored: boolean;
+  symbol: string;
+  coingeckoPrice: string | null;
+  pythPrice: string | null;
 }
 
 /**
