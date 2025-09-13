@@ -43,6 +43,7 @@ import { LendingProtocol } from "../models/lendingProtocol.js";
 import { Market } from "../models/market.js";
 import { SevenKGateway } from "./sevenKSwap.js";
 import { Decimal } from "decimal.js";
+import { QuoteResponse } from "@7kprotocol/sdk-ts";
 
 /**
  * AlphaLend Client
@@ -1370,6 +1371,15 @@ export class AlphalendClient {
     await this.ensureInitialized();
     return this.coinMetadataMap;
   }
-}
 
+  async getQuote(tokenIn: string, tokenOut: string, amountIn: string, slippage?: number) {
+    await this.ensureInitialized();
+    return await this.sevenKGateway.getQuote(tokenIn, tokenOut, amountIn, slippage);
+  }
+
+  async getTransactionBlock(tx: Transaction, address: string, slippage: number, quoteResponse: QuoteResponse, coinIn?: TransactionObjectArgument) {
+    await this.ensureInitialized();
+    return await this.sevenKGateway.getTransactionBlock(tx, address, slippage, quoteResponse, coinIn);
+  }
+}
 

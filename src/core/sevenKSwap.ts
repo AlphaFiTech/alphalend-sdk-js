@@ -4,7 +4,7 @@ import {
   Transaction,
   TransactionObjectArgument,
 } from "@mysten/sui/transactions";
-import { CoinMetadata } from "./types.js";
+import { CoinMetadata, quoteObject } from "./types.js";
 
 // Dynamically import from CJS version which has working exports
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -22,14 +22,12 @@ function getSDK() {
 
 export class SevenKGateway {
   private coinMetadataMap: Map<string, CoinMetadata>;
-  private static globalCoinMetadataMap: Map<string, CoinMetadata> = new Map();
   constructor() {
     this.coinMetadataMap = new Map();
   }
 
   updateCoinMetadataMap(coinMetadataMap: Map<string, CoinMetadata>): void {
     this.coinMetadataMap = coinMetadataMap;
-    SevenKGateway.globalCoinMetadataMap = new Map(coinMetadataMap);
   }
 
   public async getQuote(
@@ -43,18 +41,14 @@ export class SevenKGateway {
     const quoteResponse = await sdk.getQuote({
       tokenIn,
       tokenOut,
-      amountIn: amountIn.toString().split(".")[0], //swap_amount.split(".")[0];
+      amountIn: amountIn.toString().split(".")[0],
     });
     if (!slippage) {
       return quoteResponse;
     }
-    // Use global map if instance map is empty
-    const coinMap = this.coinMetadataMap.size > 0
-      ? this.coinMetadataMap
-      : SevenKGateway.globalCoinMetadataMap;
 
-    const coinIn = coinMap.get(tokenIn);
-    const coinOut = coinMap.get(tokenOut);
+    const coinIn = this.coinMetadataMap.get(tokenIn);
+    const coinOut = this.coinMetadataMap.get(tokenOut);
     const sevenKEstimatedAmountOut = BigInt(
       quoteResponse ? quoteResponse.returnAmountWithDecimal.toString() : 0,
     );
@@ -74,7 +68,7 @@ export class SevenKGateway {
       quoteResponse ? quoteResponse.swapAmountWithDecimal : 0,
     );
 
-    let quote: any;
+    let quote: quoteObject;
     const priceA = coinIn?.pythPrice || coinIn?.coingeckoPrice;
     const priceB = coinOut?.pythPrice || coinOut?.coingeckoPrice;
     const coinAExpo = coinIn?.decimals;
@@ -104,21 +98,18 @@ export class SevenKGateway {
       console.warn(
         "Could not get prices from Pyth Network, using fallback pricing.",
       );
-
-      // Create quote with basic pricing (assuming 1:1 for simplicity)
       quote = {
         gateway: "7k",
         estimatedAmountOut: sevenKEstimatedAmountOut,
         estimatedFeeAmount: sevenKEstimatedFeeAmount,
         inputAmount: amount,
-        inputAmountInUSD: 0, // Will be updated when prices are available
-        estimatedAmountOutInUSD: 0, // Will be updated when prices are available
+        inputAmountInUSD: 0,
+        estimatedAmountOutInUSD: 0,
         slippage: slippage,
       };
     }
 
     return quote;
-    // return quoteResponse;
   }
 
   async getTransactionBlock(

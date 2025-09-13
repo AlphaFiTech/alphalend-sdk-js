@@ -11,4 +11,3 @@ export {
   getUserPositionCapId,
   getUserPositionIds,
 } from "./models/position/functions.js";
-export { SevenKGateway } from "./core/sevenKSwap.js";

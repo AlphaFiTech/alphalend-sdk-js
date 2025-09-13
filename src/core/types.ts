@@ -338,3 +338,13 @@ export interface UserPortfolio {
     rewardAmount: Decimal;
   }[];
 }
+
+export interface quoteObject {
+  gateway: string;
+  estimatedAmountOut: bigint;
+  estimatedFeeAmount: bigint;
+  inputAmount: bigint;
+  inputAmountInUSD: number;
+  estimatedAmountOutInUSD: number;
+  slippage: number;
+}
