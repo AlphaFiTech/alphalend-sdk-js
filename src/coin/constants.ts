@@ -264,4 +264,28 @@ export const coinsList: { [key in CoinName]: Coin } = {
     icon: "",
     expo: 9,
   },
+  UP: {
+    expo: 6,
+    name: "UP",
+    icon: "",
+    type: "0x87dfe1248a1dc4ce473bd9cb2937d66cdc6c30fee63f3fe0dbb55c7a09d35dec::up::UP",
+  },
+  XAUM: {
+    expo: 9,
+    name: "XAUM",
+    icon: "",
+    type: "0x9d297676e7a4b771ab023291377b2adfaa4938fb9080b8d12430e4b108b836a9::xaum::XAUM",
+  },
+  ESUI: {
+    expo: 9,
+    name: "ESUI",
+    icon: "",
+    type: "0x66629328922d609cf15af779719e248ae0e63fe0b9d9739623f763b33a9c97da::esui::ESUI",
+  },
+  EBTC: {
+    expo: 8,
+    name: "EBTC",
+    icon: "",
+    type: "0x244b98d29bd0bba401c7cfdd89f017c51759dad615e15a872ddfe45af079bb1d::ebtc::EBTC",
+  },
 };

@@ -1,10 +1,7 @@
 import { Transaction } from "@mysten/sui/transactions";
 import { PaginatedObjectsResponse, SuiClient } from "@mysten/sui/client";
 import { getAlphafiConstants, getConstants } from "../constants/index.js";
-import {
-  Receipt,
-  RewardDistributorQueryType,
-} from "./queryTypes.js";
+import { Receipt, RewardDistributorQueryType } from "./queryTypes.js";
 import { getUserPosition } from "../models/position/functions.js";
 import { Blockchain } from "../models/blockchain.js";
 import { Decimal } from "decimal.js";

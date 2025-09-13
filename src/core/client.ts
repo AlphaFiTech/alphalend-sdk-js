@@ -28,6 +28,7 @@ import {
   ZapInSupplyParams,
   ZapOutWithdrawParams,
   MAX_U64,
+  quoteObject,
 } from "./types.js";
 import {
   getAlphaReceipt,
@@ -43,6 +44,7 @@ import { LendingProtocol } from "../models/lendingProtocol.js";
 import { Market } from "../models/market.js";
 import { SevenKGateway } from "./sevenKSwap.js";
 import { Decimal } from "decimal.js";
+import { QuoteResponse } from "@7kprotocol/sdk-ts";
 
 /**
  * AlphaLend Client
@@ -63,6 +65,7 @@ export class AlphalendClient {
   network: string;
   constants: Constants;
   lendingProtocol: LendingProtocol;
+  sevenKGateway: SevenKGateway;
 
   // Dynamic coin metadata properties
   private coinMetadataMap: Map<string, CoinMetadata> = new Map();
@@ -90,6 +93,7 @@ export class AlphalendClient {
         : "https://hermes-beta.pyth.network",
     );
     this.lendingProtocol = new LendingProtocol(network, client);
+    this.sevenKGateway = new SevenKGateway();
   }
 
   /**
@@ -440,14 +444,13 @@ export class AlphalendClient {
     await this.ensureInitialized();
 
     const tx = new Transaction();
-    const sevenKGateway = new SevenKGateway();
 
-    const quoteResponse = await sevenKGateway.getQuote(
+    const quoteResponse = await this.sevenKGateway.getQuote(
       params.inputCoinType,
       params.marketCoinType,
       params.inputAmount.toString(),
     );
-    const supplyCoin = await sevenKGateway.getTransactionBlock(
+    const supplyCoin = await this.sevenKGateway.getTransactionBlock(
       tx,
       params.address,
       params.slippage,
@@ -596,7 +599,6 @@ export class AlphalendClient {
     await this.ensureInitialized();
 
     const tx = new Transaction();
-    const sevenKGateway = new SevenKGateway();
 
     let swapInAmount = (params.amount - 1n).toString();
     if (params.amount === MAX_U64) {
@@ -657,12 +659,12 @@ export class AlphalendClient {
       coin = await this.handlePromise(tx, promise, params.marketCoinType);
     }
 
-    const quoteResponse = await sevenKGateway.getQuote(
+    const quoteResponse = await this.sevenKGateway.getQuote(
       params.marketCoinType,
       params.outputCoinType,
       swapInAmount,
     );
-    const withdrawCoin = await sevenKGateway.getTransactionBlock(
+    const withdrawCoin = await this.sevenKGateway.getTransactionBlock(
       tx,
       params.address,
       params.slippage,
@@ -1361,5 +1363,101 @@ export class AlphalendClient {
         ],
       });
     }
+  }
+
+  async fetchCoinMetadataMap() {
+    await this.ensureInitialized();
+    return this.coinMetadataMap;
+  }
+
+  async getSwapQuote(tokenIn: string, tokenOut: string, amountIn: string) {
+    await this.ensureInitialized();
+
+    const quoteResponse = await this.sevenKGateway.getQuote(
+      tokenIn,
+      tokenOut,
+      amountIn,
+    );
+
+    const coinIn = this.coinMetadataMap.get(tokenIn);
+    const coinOut = this.coinMetadataMap.get(tokenOut);
+    const sevenKEstimatedAmountOut = BigInt(
+      quoteResponse ? quoteResponse.returnAmountWithDecimal.toString() : 0,
+    );
+
+    const sevenKEstimatedAmountOutWithoutFee = BigInt(
+      quoteResponse
+        ? quoteResponse.returnAmountWithoutSwapFees
+          ? quoteResponse.returnAmountWithoutSwapFees.toString()
+          : sevenKEstimatedAmountOut.toString()
+        : sevenKEstimatedAmountOut.toString(),
+    );
+
+    const sevenKEstimatedFeeAmount =
+      sevenKEstimatedAmountOut - sevenKEstimatedAmountOutWithoutFee;
+
+    const amount = BigInt(
+      quoteResponse ? quoteResponse.swapAmountWithDecimal : 0,
+    );
+
+    let quote: quoteObject;
+    const priceA = coinIn?.pythPrice || coinIn?.coingeckoPrice;
+    const priceB = coinOut?.pythPrice || coinOut?.coingeckoPrice;
+    const coinAExpo = coinIn?.decimals;
+    const coinBExpo = coinOut?.decimals;
+    if (priceA && priceB && coinAExpo && coinBExpo) {
+      const inputAmountInUSD =
+        (Number(amount) / Math.pow(10, coinAExpo)) * parseFloat(priceA);
+      const outputAmountInUSD =
+        (Number(sevenKEstimatedAmountOut) / Math.pow(10, coinBExpo)) *
+        parseFloat(priceB);
+
+      const slippage =
+        (inputAmountInUSD - outputAmountInUSD) / inputAmountInUSD;
+
+      quote = {
+        gateway: "7k",
+        estimatedAmountOut: sevenKEstimatedAmountOut,
+        estimatedFeeAmount: sevenKEstimatedFeeAmount,
+        inputAmount: amount,
+        inputAmountInUSD: inputAmountInUSD,
+        estimatedAmountOutInUSD: outputAmountInUSD,
+        slippage: slippage,
+        rawQuote: quoteResponse,
+      };
+    } else {
+      console.warn(
+        "Could not get prices from Pyth Network, using fallback pricing.",
+      );
+      quote = {
+        gateway: "7k",
+        estimatedAmountOut: sevenKEstimatedAmountOut,
+        estimatedFeeAmount: sevenKEstimatedFeeAmount,
+        inputAmount: amount,
+        inputAmountInUSD: 0,
+        estimatedAmountOutInUSD: 0,
+        slippage: 0,
+        rawQuote: quoteResponse,
+      };
+    }
+
+    return quote;
+  }
+
+  async getSwapTransactionBlock(
+    tx: Transaction,
+    address: string,
+    slippage: number,
+    quoteResponse: QuoteResponse,
+    coinIn?: TransactionObjectArgument,
+  ) {
+    await this.ensureInitialized();
+    return await this.sevenKGateway.getTransactionBlock(
+      tx,
+      address,
+      slippage,
+      quoteResponse,
+      coinIn,
+    );
   }
 }

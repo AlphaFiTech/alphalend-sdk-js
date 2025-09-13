@@ -25,7 +25,7 @@ export interface UpdatePriceTransactionArgs {
 
 /**
  * Fetches price feed data from Pyth and adds update instructions to the transaction
- * 
+ *
  * @param tx - The transaction to add price updates to
  * @param priceIDs - Array of Pyth price feed IDs
  * @param pythClient - SuiPythClient instance
@@ -52,7 +52,7 @@ export async function getPriceInfoObjectIdsWithUpdate(
 
 /**
  * Retrieves price info object IDs from Pyth without updating them
- * 
+ *
  * @param priceIDs - Array of Pyth price feed IDs
  * @param pythClient - SuiPythClient instance
  * @returns Promise resolving to an array of price info object IDs or undefined
@@ -71,7 +71,7 @@ export async function getPriceInfoObjectIdsWithoutUpdate(
 
 /**
  * Adds oracle price update instructions to a transaction
- * 
+ *
  * @param tx - The transaction to add price updates to
  * @param args - Update price transaction arguments
  * @param constants - Protocol constants

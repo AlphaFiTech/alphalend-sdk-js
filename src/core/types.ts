@@ -10,6 +10,7 @@
  * - Blockchain-specific type mappings
  */
 
+import { QuoteResponse } from "@7kprotocol/sdk-ts";
 import { Transaction, TransactionArgument } from "@mysten/sui/transactions";
 import { Decimal } from "decimal.js";
 
@@ -337,4 +338,15 @@ export interface UserPortfolio {
     coinType: string;
     rewardAmount: Decimal;
   }[];
+}
+
+export interface quoteObject {
+  gateway: string;
+  estimatedAmountOut: bigint;
+  estimatedFeeAmount: bigint;
+  inputAmount: bigint;
+  inputAmountInUSD: number;
+  estimatedAmountOutInUSD: number;
+  slippage: number;
+  rawQuote: QuoteResponse;
 }

@@ -1,5 +1,5 @@
 // Use CJS version to avoid broken ESM exports (DEFAULT_SOURCES missing)
-import type { QuoteResponse } from "@7kprotocol/sdk-ts";
+import { type QuoteResponse } from "@7kprotocol/sdk-ts";
 import {
   Transaction,
   TransactionObjectArgument,
@@ -27,7 +27,7 @@ export class SevenKGateway {
     const quoteResponse = await sdk.getQuote({
       tokenIn,
       tokenOut,
-      amountIn: amountIn.toString(),
+      amountIn: amountIn.toString().split(".")[0],
     });
     return quoteResponse;
   }

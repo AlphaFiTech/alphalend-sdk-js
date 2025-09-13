@@ -102,6 +102,44 @@ async function claimRewards() {
   }
 }
 
+async function zapInSupply() {
+  const { suiClient, keypair } = getExecStuff();
+  let alc = new AlphalendClient("mainnet", suiClient);
+  const tx = await alc.zapInSupply({
+    address:
+      "0xe136f0b6faf27ee707725f38f2aeefc51c6c31cc508222bee5cbc4f5fcf222c3",
+    positionCapId:
+      "0xf9ca35f404dd3c1ea10c381dd3e1fe8a0c4586adf5e186f4eb52307462a5af7d",
+    marketId: "2",
+    slippage: 0.01,
+    marketCoinType:
+      "0xd1b72982e40348d069bb1ff701e634c117bb5f741f44dff91e472d3b01461e55::stsui::STSUI",
+    inputAmount: 100_000_000n,
+    inputCoinType: "0x2::sui::SUI",
+  });
+  if (tx) {
+    // dryRunTransactionBlock(tx);
+    // await suiClient
+    //   .signAndExecuteTransaction({
+    //     signer: keypair,
+    //     transaction: tx,
+    //     requestType: "WaitForLocalExecution",
+    //     options: {
+    //       showEffects: true,
+    //       showBalanceChanges: true,
+    //       showObjectChanges: true,
+    //     },
+    //   })
+    //   .then((res) => {
+    //     console.log(JSON.stringify(res, null, 2));
+    //   })
+    //   .catch((error) => {
+    //     console.error(error);
+    //   });
+  }
+}
+// zapInSupply();
+
 async function borrow() {
   const { suiClient, keypair } = getExecStuff();
   let tx: Transaction | undefined;
