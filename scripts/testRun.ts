@@ -216,17 +216,19 @@ async function withdraw() {
 async function run() {
   const { suiClient, keypair, address } = getExecStuff();
   // const tx = new Transaction();
-  const constants = getConstants("mainnet");
-  const pythClient = new SuiPythClient(
-    suiClient,
-    constants.PYTH_STATE_ID,
-    constants.WORMHOLE_STATE_ID,
-  );
-  const pythConnection = new SuiPriceServiceConnection(
-    "https://hermes.pyth.network",
-  );
-  const positionCapId =
-    "0xf9ca35f404dd3c1ea10c381dd3e1fe8a0c4586adf5e186f4eb52307462a5af7d";
+  // const constants = getConstants("mainnet");
+  // const pythClient = new SuiPythClient(
+  //   suiClient,
+  //   constants.PYTH_STATE_ID,
+  //   constants.WORMHOLE_STATE_ID,
+  // );
+  // const pythConnection = new SuiPriceServiceConnection(
+  //   "https://hermes.pyth.network",
+  // );
+  // const positionCapId =
+  //   "0xf9ca35f404dd3c1ea10c381dd3e1fe8a0c4586adf5e186f4eb52307462a5af7d";
+  const tx = new Transaction();
+  await 
   // await getPriceInfoObjectIdsWithUpdate(
   //   tx,
   //   [pythPriceFeedIdMap[coinType]],
@@ -248,17 +250,17 @@ async function run() {
   //   priceFeedUpdateData,
   // );
   // console.log(priceInfoObjectIds);
-  const alc = new AlphalendClient("mainnet", suiClient);
-  const tx = await alc.zapInSupply({
-    marketId: "1",
-    slippage: 0.01,
-    address: address,
-    marketCoinType: "0x2::sui::SUI",
-    inputAmount: 100_000n,
-    inputCoinType:
-      "0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC",
-    positionCapId,
-  });
+  // const alc = new AlphalendClient("mainnet", suiClient);
+  // const tx = await alc.zapInSupply({
+  //   marketId: "1",
+  //   slippage: 0.01,
+  //   address: address,
+  //   marketCoinType: "0x2::sui::SUI",
+  //   inputAmount: 100_000n,
+  //   inputCoinType:
+  //     "0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC",
+  //   positionCapId,
+  // });
   // const tx = await alc.zapOutWithdraw({
   //   marketId: "1",
   //   slippage: 0.01,

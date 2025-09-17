@@ -183,6 +183,8 @@ export class AlphalendClient {
 
       // Update LendingProtocol with the fetched coin metadata
       this.lendingProtocol.updateCoinMetadataMap(this.coinMetadataMap);
+
+      
     } catch (error) {
       throw new Error(
         `Failed to initialize market data: ${error instanceof Error ? error.message : "Unknown error"}. The SDK requires market data to function properly.`,
@@ -283,6 +285,7 @@ export class AlphalendClient {
     for (const coinType of coinTypes) {
       // Use dynamic data from GraphQL API
       const priceInfoObjectId = this.getPythPriceInfoObjectId(coinType);
+      
       updatePriceTransaction(
         tx,
         {
