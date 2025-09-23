@@ -346,9 +346,6 @@ export class AlphalendClient {
    * @returns Transaction object ready for signing and execution
    */
   async supply(params: SupplyParams): Promise<Transaction | undefined> {
-    // Auto-initialize market data if needed
-    await this.ensureInitialized();
-
     const tx = new Transaction();
 
     // Get coin object
@@ -440,9 +437,6 @@ export class AlphalendClient {
   async zapInSupply(
     params: ZapInSupplyParams,
   ): Promise<Transaction | undefined> {
-    // Auto-initialize market data if needed
-    await this.ensureInitialized();
-
     const tx = new Transaction();
 
     const quoteResponse = await this.sevenKGateway.getQuote(
@@ -523,9 +517,6 @@ export class AlphalendClient {
    * @returns Transaction object ready for signing and execution
    */
   async withdraw(params: WithdrawParams): Promise<Transaction> {
-    // Auto-initialize market data if needed
-    await this.ensureInitialized();
-
     const tx = new Transaction();
 
     // First update prices to ensure latest oracle values
@@ -595,9 +586,6 @@ export class AlphalendClient {
   async zapOutWithdraw(
     params: ZapOutWithdrawParams,
   ): Promise<Transaction | undefined> {
-    // Auto-initialize market data if needed
-    await this.ensureInitialized();
-
     const tx = new Transaction();
 
     let swapInAmount = (params.amount - 1n).toString();
@@ -697,9 +685,6 @@ export class AlphalendClient {
    * @returns Transaction object ready for signing and execution
    */
   async borrow(params: BorrowParams): Promise<Transaction> {
-    // Auto-initialize market data if needed
-    await this.ensureInitialized();
-
     const tx = new Transaction();
 
     // First update prices to ensure latest oracle values
@@ -767,9 +752,6 @@ export class AlphalendClient {
    * @returns Transaction object ready for signing and execution
    */
   async repay(params: RepayParams): Promise<Transaction | undefined> {
-    // Auto-initialize market data if needed
-    await this.ensureInitialized();
-
     const tx = new Transaction();
 
     // Get coin object
@@ -830,9 +812,6 @@ export class AlphalendClient {
    * @returns Transaction object ready for signing and execution
    */
   async claimRewards(params: ClaimRewardsParams): Promise<Transaction> {
-    // Auto-initialize market data if needed
-    await this.ensureInitialized();
-
     const tx = new Transaction();
     params.claimAndDepositAlpha =
       params.claimAndDepositAlpha || params.claimAlpha;
@@ -952,9 +931,6 @@ export class AlphalendClient {
    * @returns Transaction object ready for signing and execution
    */
   async liquidate(params: LiquidateParams) {
-    // Auto-initialize market data if needed
-    await this.ensureInitialized();
-
     const tx = params.tx || new Transaction();
 
     // First update prices to ensure latest oracle values
