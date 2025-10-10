@@ -1,0 +1,15 @@
+{
+  "name": "alphalend-sdk-examples",
+  "version": "1.0.0",
+  "description": "Examples for testing AlphaLend SDK",
+  "type": "module",
+  "scripts": {
+    "test:published": "node getUserPortfolioPublished.mjs",
+    "test:local": "node getUserPortfolioLocal.mjs",
+    "diagnose": "node diagnoseInit.mjs"
+  },
+  "dependencies": {
+    "@alphafi/alphalend-sdk": "1.1.20",
+    "@mysten/sui": "^1.30.0"
+  }
+}
