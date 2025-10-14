@@ -8,7 +8,6 @@ import {
   UserPortfolio,
   CoinMetadata,
 } from "../core/types.js";
-import { getPricesMap } from "../utils/helper.js";
 
 export class LendingProtocol {
   private blockchain: Blockchain;
@@ -30,10 +29,9 @@ export class LendingProtocol {
   // Protocol-level methods
   async getProtocolStats(markets: Market[]): Promise<ProtocolStats> {
     try {
-      const prices = await getPricesMap();
       const marketData = await Promise.all(
         markets.map((market) => {
-          return market.getMarketData(prices);
+          return market.getMarketData();
         }),
       );
 
@@ -41,16 +39,8 @@ export class LendingProtocol {
       let totalBorrowedUsd = 0;
 
       for (const market of marketData) {
-        const tokenPrice = prices.get(market.coinType);
-
-        if (!tokenPrice) {
-          console.error(`No price found for ${market.coinType}`);
-          continue;
-        }
-
-        // Add to total supplied and borrowed
-        totalSuppliedUsd += Number(market.totalSupply) * Number(tokenPrice);
-        totalBorrowedUsd += Number(market.totalBorrow) * Number(tokenPrice);
+        totalSuppliedUsd += Number(market.totalSupply) * Number(market.price);
+        totalBorrowedUsd += Number(market.totalBorrow) * Number(market.price);
       }
 
       return {
@@ -78,17 +68,13 @@ export class LendingProtocol {
   }
 
   async getAllMarketsData(): Promise<MarketData[]> {
-    const prices = await getPricesMap();
     const markets = await this.getAllMarkets();
-    return await Promise.all(
-      markets.map((market) => market.getMarketData(prices)),
-    );
+    return await Promise.all(markets.map((market) => market.getMarketData()));
   }
 
   async getMarketData(marketId: number): Promise<MarketData> {
     const market = await this.getMarket(marketId);
-    const prices = await getPricesMap();
-    return await market.getMarketData(prices);
+    return await market.getMarketData();
   }
 
   // Position methods

@@ -195,30 +195,26 @@ export async function executeTransactionBlock() {
 async function getAllMarkets() {
   const client = new AlphalendClient("mainnet", getSuiClient("mainnet"));
   const res = await client.getAllMarkets();
-  // res?.forEach((market) => {
-  //   let supplyApr = market.supplyApr.interestApr;
-  //   market.supplyApr.rewards.forEach((reward) => {
-  //     supplyApr = supplyApr.add(reward.rewardApr);
-  //   });
-  //   supplyApr = supplyApr.add(market.supplyApr.stakingApr);
-  //   let borrowApr = market.borrowApr.interestApr;
-  //   market.borrowApr.rewards.forEach((reward) => {
-  //     borrowApr = borrowApr.sub(reward.rewardApr);
-  //   });
-  //   console.log("Market#", market.marketId);
-  //   console.log("Supply APR:", supplyApr.toString());
-  //   console.log("Borrow APR:", borrowApr.toString());
-  // });
   console.log(res);
 }
-// getAllMarkets();
+getAllMarkets();
 
 async function getUserPortfolio() {
   const client = new AlphalendClient("mainnet", getSuiClient("mainnet"));
-  const res = await client.getUserPortfolio(
+  const markets = await client.getMarketsChain();
+  if (!markets) {
+    console.error("Failed to fetch markets");
+    process.exit(1);
+  }
+  const result = await client.getUserPortfolioWithCachedMarkets(
     "0xe136f0b6faf27ee707725f38f2aeefc51c6c31cc508222bee5cbc4f5fcf222c3",
+    markets,
   );
-  console.log(res);
+  console.log(result);
+  // const res = await client.getUserPortfolio(
+  //   "0xe136f0b6faf27ee707725f38f2aeefc51c6c31cc508222bee5cbc4f5fcf222c3",
+  // );
+  // console.log(res);
 }
 getUserPortfolio();
 
@@ -253,7 +249,7 @@ async function withdraw() {
 
 async function run() {
   const { suiClient, keypair, address } = getExecStuff();
-  // const tx = new Transaction();
+  const tx = new Transaction();
   const constants = getConstants("mainnet");
   const pythClient = new SuiPythClient(
     suiClient,
@@ -263,8 +259,8 @@ async function run() {
   const pythConnection = new SuiPriceServiceConnection(
     "https://hermes.pyth.network",
   );
-  const positionCapId =
-    "0xf9ca35f404dd3c1ea10c381dd3e1fe8a0c4586adf5e186f4eb52307462a5af7d";
+  // const positionCapId =
+  // "0xf9ca35f404dd3c1ea10c381dd3e1fe8a0c4586adf5e186f4eb52307462a5af7d";
   // await getPriceInfoObjectIdsWithUpdate(
   //   tx,
   //   [pythPriceFeedIdMap[coinType]],
@@ -273,30 +269,27 @@ async function run() {
   // );
 
   // console.log(pythPriceFeedIdMap[coinType]);
-  // const priceInfoObjectIds = await pythClient.getPriceFeedObjectId(
-  //   "c591a547856b091560b120ee14b165a84ca58eca23b2ab635df641340bde1f10",
-  // );
+  const priceInfoObjectIds = await pythClient.getPriceFeedObjectId(
+    "14890ba9c221092cba3d6ce86846d61f8606cefaf3dfc20bf3e2ab99de2644c0",
+  );
 
   // const priceFeedUpdateData = await pythConnection.getPriceFeedsUpdateData([
-  //   pythPriceFeedIdMap[coinType],
+  //   "14890ba9c221092cba3d6ce86846d61f8606cefaf3dfc20bf3e2ab99de2644c0",
   // ]);
 
   // const priceInfoObjectIds = await pythClient.createPriceFeed(
   //   tx,
   //   priceFeedUpdateData,
   // );
-  // console.log(priceInfoObjectIds);
-  const alc = new AlphalendClient("mainnet", suiClient);
-  const tx = await alc.zapInSupply({
-    marketId: "1",
-    slippage: 0.01,
-    address: address,
-    marketCoinType: "0x2::sui::SUI",
-    inputAmount: 100_000n,
-    inputCoinType:
-      "0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC",
-    positionCapId,
-  });
+  console.log(priceInfoObjectIds);
+  // const alc = new AlphalendClient("mainnet", suiClient);
+  // const tx = await alc.supply({
+  //   marketId: "1",
+  //   address,
+  //   coinType: "0x2::sui::SUI",
+  //   amount: 100_000_000n,
+  //   positionCapId,
+  // });
   // const tx = await alc.zapOutWithdraw({
   //   marketId: "1",
   //   slippage: 0.01,
@@ -319,8 +312,7 @@ async function run() {
   // });
   // // tx.setGasBudget(1e9);
   if (tx) {
-    dryRunTransactionBlock(tx);
-
+    // dryRunTransactionBlock(tx);
     // await suiClient
     //   .signAndExecuteTransaction({
     //     signer: keypair,
