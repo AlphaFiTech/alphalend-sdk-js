@@ -33,8 +33,6 @@ import {
 import {
   getAlphaReceipt,
   getClaimRewardInput,
-  getEstimatedGasBudget,
-  getPricesMap,
   setPrices,
 } from "../utils/helper.js";
 import { Receipt } from "../utils/queryTypes.js";
@@ -188,6 +186,13 @@ export class AlphalendClient {
           pythSponsored: true,
           pythPrice: alphaCoin.coingeckoPrice,
         });
+      }
+
+      const longSuiCoinType =
+        "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI";
+      const suiCoinMetadata = this.coinMetadataMap.get("0x2::sui::SUI");
+      if (suiCoinMetadata) {
+        this.coinMetadataMap.set(longSuiCoinType, suiCoinMetadata);
       }
 
       this.isInitialized = true;
@@ -408,12 +413,6 @@ export class AlphalendClient {
       tx.transferObjects([positionCap], params.address);
     }
 
-    const estimatedGasBudget = await getEstimatedGasBudget(
-      this.client,
-      tx,
-      params.address,
-    );
-    if (estimatedGasBudget) tx.setGasBudget(estimatedGasBudget);
     return tx;
   }
 
@@ -495,12 +494,6 @@ export class AlphalendClient {
       tx.transferObjects([positionCap], params.address);
     }
 
-    const estimatedGasBudget = await getEstimatedGasBudget(
-      this.client,
-      tx,
-      params.address,
-    );
-    if (estimatedGasBudget) tx.setGasBudget(estimatedGasBudget);
     return tx;
   }
 
@@ -556,12 +549,6 @@ export class AlphalendClient {
       tx.transferObjects([coin], params.address);
     }
 
-    const estimatedGasBudget = await getEstimatedGasBudget(
-      this.client,
-      tx,
-      params.address,
-    );
-    if (estimatedGasBudget) tx.setGasBudget(estimatedGasBudget);
     return tx;
   }
 
@@ -663,12 +650,6 @@ export class AlphalendClient {
       tx.transferObjects([withdrawCoin], params.address);
     }
 
-    const estimatedGasBudget = await getEstimatedGasBudget(
-      this.client,
-      tx,
-      params.address,
-    );
-    if (estimatedGasBudget) tx.setGasBudget(estimatedGasBudget);
     return tx;
   }
 
@@ -730,13 +711,6 @@ export class AlphalendClient {
     }
     tx.transferObjects([coin], params.address);
 
-    const estimatedGasBudget = await getEstimatedGasBudget(
-      this.client,
-      tx,
-      params.address,
-    );
-    if (estimatedGasBudget) tx.setGasBudget(estimatedGasBudget);
-
     return tx;
   }
 
@@ -788,12 +762,6 @@ export class AlphalendClient {
     });
     tx.transferObjects([repayCoin], params.address);
 
-    const estimatedGasBudget = await getEstimatedGasBudget(
-      this.client,
-      tx,
-      params.address,
-    );
-    if (estimatedGasBudget) tx.setGasBudget(estimatedGasBudget);
     return tx;
   }
 
@@ -892,12 +860,6 @@ export class AlphalendClient {
       await this.depositAlphaTransaction(tx, alphaCoin, params.address);
     }
 
-    const estimatedGasBudget = await getEstimatedGasBudget(
-      this.client,
-      tx,
-      params.address,
-    );
-    if (estimatedGasBudget) tx.setGasBudget(estimatedGasBudget);
     return tx;
   }
 
@@ -1059,10 +1021,7 @@ export class AlphalendClient {
   ): Promise<MarketData[] | undefined> {
     try {
       await this.ensureInitialized();
-      const prices = await getPricesMap();
-      return await Promise.all(
-        markets.map((market) => market.getMarketData(prices)),
-      );
+      return await Promise.all(markets.map((market) => market.getMarketData()));
     } catch (error) {
       console.error("Error getting markets:", error);
       return undefined;
@@ -1338,6 +1297,26 @@ export class AlphalendClient {
           tx.object(this.constants.SUI_CLOCK_OBJECT_ID),
         ],
       });
+    }
+  }
+
+  async getEstimatedGasBudget(
+    suiClient: SuiClient,
+    tx: Transaction,
+    address: string,
+  ): Promise<number | undefined> {
+    try {
+      const simResult = await suiClient.devInspectTransactionBlock({
+        transactionBlock: tx,
+        sender: address,
+      });
+      return (
+        Number(simResult.effects.gasUsed.computationCost) +
+        Number(simResult.effects.gasUsed.nonRefundableStorageFee) +
+        1e8
+      );
+    } catch (err) {
+      console.error(`Error estimating transaction gasBudget`, err);
     }
   }
 

@@ -6,7 +6,6 @@ import {
 } from "../utils/parsedTypes.js";
 import { Decimal } from "decimal.js";
 import { Market } from "./market.js";
-import { getPricesMap } from "../utils/helper.js";
 
 export class Position {
   position: PositionType;
@@ -38,7 +37,6 @@ export class Position {
       marketMap.set(parseFloat(market.market.marketId), market);
     }
     this.refresh(marketMap);
-    const prices = await getPricesMap();
 
     // Calculate total supplied and borrowed values
     // Calculate weighted average liquidation threshold
@@ -65,7 +63,7 @@ export class Position {
           ).toString(),
         ).div(decimalDivisor);
 
-        const price = prices.get(market.market.coinType);
+        const price = this.getPrice(market.market.coinType);
         const collateralUsd = collateralAmount.mul(price ?? 0);
 
         totalSuppliedUsd = totalSuppliedUsd.add(collateralUsd);
@@ -80,7 +78,7 @@ export class Position {
         const supplyApr = await market.calculateSupplyApr();
 
         // Get supply reward APRs and add them to the total
-        const supplyRewards = market.calculateSupplyRewardApr(prices);
+        const supplyRewards = market.calculateSupplyRewardApr();
         const totalSupplyRewardApr = supplyRewards.reduce(
           (acc, reward) => acc.add(reward.rewardApr),
           new Decimal(0),
@@ -116,13 +114,13 @@ export class Position {
         const compoundedLoanAmount = new Decimal(loan.amount).div(
           decimalDivisor,
         );
-        const price = prices.get(market.market.coinType);
+        const price = this.getPrice(market.market.coinType);
         const loanUsd = compoundedLoanAmount.mul(price ?? 0);
 
         totalBorrowedUsd = totalBorrowedUsd.add(loanUsd);
 
         const borrowApr = market.calculateBorrowApr();
-        const borrowRewards = market.calculateBorrowRewardApr(prices);
+        const borrowRewards = market.calculateBorrowRewardApr();
         const totalBorrowRewardApr = borrowRewards.reduce(
           (acc, reward) => acc.add(reward.rewardApr),
           new Decimal(0),
@@ -155,7 +153,7 @@ export class Position {
     const rewardsToClaim = this.calculateRewardsToClaim();
 
     const rewardsToClaimUsd = rewardsToClaim.reduce((acc, reward) => {
-      const price = prices.get(reward.coinType);
+      const price = this.getPrice(reward.coinType);
       return acc.add(reward.rewardAmount.mul(price ?? 0));
     }, new Decimal(0));
 
@@ -470,5 +468,18 @@ export class Position {
       }
     }
     userDistributor.lastUpdated = currentTime.toString();
+  }
+
+  private getPrice(coinType: string): Decimal {
+    if (this.coinMetadataMap.get(coinType)?.pythPrice) {
+      return new Decimal(this.coinMetadataMap.get(coinType)?.pythPrice ?? 0);
+    }
+    if (this.coinMetadataMap.get(coinType)?.coingeckoPrice) {
+      return new Decimal(
+        this.coinMetadataMap.get(coinType)?.coingeckoPrice ?? 0,
+      );
+    }
+    console.error(`No price found for coin type: ${coinType}`);
+    return new Decimal(0);
   }
 }
