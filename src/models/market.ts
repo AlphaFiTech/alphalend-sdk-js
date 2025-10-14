@@ -23,7 +23,7 @@ export class Market {
     throw new Error(`No decimal places found for coin type: ${coinType}`);
   }
 
-  async getMarketData(prices: Map<string, Decimal>): Promise<MarketData> {
+  async getMarketData(): Promise<MarketData> {
     this.refresh();
 
     const decimalDigit = new Decimal(this.market.decimalDigit);
@@ -44,8 +44,8 @@ export class Market {
     const supplyApr = await this.calculateSupplyApr();
 
     // reward Aprs
-    borrowApr.rewards = this.calculateBorrowRewardApr(prices);
-    supplyApr.rewards = this.calculateSupplyRewardApr(prices);
+    borrowApr.rewards = this.calculateBorrowRewardApr();
+    supplyApr.rewards = this.calculateSupplyRewardApr();
 
     const allowedBorrowAmount = Decimal.max(
       0,
@@ -67,7 +67,7 @@ export class Market {
 
     return {
       marketId: this.market.marketId,
-      price: new Decimal(prices.get(this.market.coinType) ?? 0),
+      price: this.getPrice(this.market.coinType),
       coinType: this.market.coinType,
       decimalDigit: decimalDigit.log(10).toNumber(),
       totalSupply,
@@ -241,9 +241,7 @@ export class Market {
     rewardDistributor.lastUpdated = currentTime.toString();
   }
 
-  calculateSupplyRewardApr = (
-    prices: Map<string, Decimal>,
-  ): {
+  calculateSupplyRewardApr = (): {
     coinType: string;
     rewardApr: Decimal;
   }[] => {
@@ -262,7 +260,7 @@ export class Market {
       return rewardAprs;
     }
 
-    const marketPrice = prices.get(this.market.coinType);
+    const marketPrice = this.getPrice(this.market.coinType);
     if (!marketPrice) {
       throw new Error("Market price not found for " + this.market.coinType);
     }
@@ -291,7 +289,7 @@ export class Market {
       const rewardDecimalDivisor = new Decimal(10).pow(
         this.getDecimals(rewardCoinType),
       );
-      const price = prices.get(rewardCoinType);
+      const price = this.getPrice(rewardCoinType);
       if (!price) continue;
 
       const rewardAmount = new Decimal(reward.totalRewards)
@@ -312,9 +310,7 @@ export class Market {
     return rewardAprs;
   };
 
-  calculateBorrowRewardApr = (
-    prices: Map<string, Decimal>,
-  ): {
+  calculateBorrowRewardApr = (): {
     coinType: string;
     rewardApr: Decimal;
   }[] => {
@@ -333,7 +329,7 @@ export class Market {
       return rewardAprs;
     }
 
-    const marketPrice = prices.get(this.market.coinType);
+    const marketPrice = this.getPrice(this.market.coinType);
     if (!marketPrice) {
       throw new Error("Market price not found for " + this.market.coinType);
     }
@@ -361,7 +357,7 @@ export class Market {
       const rewardDecimalDivisor = new Decimal(10).pow(
         this.getDecimals(rewardCoinType),
       );
-      const price = prices.get(rewardCoinType);
+      const price = this.getPrice(rewardCoinType);
       if (!price) continue;
 
       const rewardAmount = new Decimal(reward.totalRewards)
@@ -467,4 +463,17 @@ export class Market {
       rewards: [], // Rewards would be added here if available
     };
   };
+
+  private getPrice(coinType: string): Decimal {
+    if (this.coinMetadataMap.get(coinType)?.pythPrice) {
+      return new Decimal(this.coinMetadataMap.get(coinType)?.pythPrice ?? 0);
+    }
+    if (this.coinMetadataMap.get(coinType)?.coingeckoPrice) {
+      return new Decimal(
+        this.coinMetadataMap.get(coinType)?.coingeckoPrice ?? 0,
+      );
+    }
+    console.error(`No price found for coin type: ${coinType}`);
+    return new Decimal(0);
+  }
 }

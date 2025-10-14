@@ -4,7 +4,6 @@ import { getAlphafiConstants, getConstants } from "../constants/index.js";
 import { Receipt, RewardDistributorQueryType } from "./queryTypes.js";
 import { getUserPosition } from "../models/position/functions.js";
 import { Blockchain } from "../models/blockchain.js";
-import { Decimal } from "decimal.js";
 
 export async function getClaimRewardInput(
   suiClient: SuiClient,
@@ -105,60 +104,6 @@ async function getRewardDistributor(
   return isDepositRewardDistributor
     ? market.content.fields.value.fields.deposit_reward_distributor.fields
     : market.content.fields.value.fields.borrow_reward_distributor.fields;
-}
-
-export async function getEstimatedGasBudget(
-  suiClient: SuiClient,
-  tx: Transaction,
-  address: string,
-): Promise<number | undefined> {
-  try {
-    const simResult = await suiClient.devInspectTransactionBlock({
-      transactionBlock: tx,
-      sender: address,
-    });
-    return (
-      Number(simResult.effects.gasUsed.computationCost) +
-      Number(simResult.effects.gasUsed.nonRefundableStorageFee) +
-      1e8
-    );
-  } catch (err) {
-    console.error(`Error estimating transaction gasBudget`, err);
-  }
-}
-
-export async function getPricesMap(): Promise<Map<string, Decimal>> {
-  const apiUrl = "https://api.alphalend.xyz/public/graphql";
-  const query = `
-      query {
-        coinInfo {
-          coinType
-          coingeckoPrice
-          pythPrice
-        }
-      }
-    `;
-  const response = await fetch(apiUrl, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ query }),
-  });
-
-  const dataArr = (await response.json()).data.coinInfo;
-  const priceMap = new Map<string, Decimal>();
-  for (const data of dataArr) {
-    priceMap.set(
-      data.coinType,
-      new Decimal(data.pythPrice ? data.pythPrice : data.coingeckoPrice || 0),
-    );
-  }
-  priceMap.set(
-    "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI",
-    priceMap.get("0x2::sui::SUI") || new Decimal(0),
-  );
-  return priceMap;
 }
 
 export async function setPrices(tx: Transaction) {
