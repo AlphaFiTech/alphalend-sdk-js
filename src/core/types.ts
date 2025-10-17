@@ -14,6 +14,9 @@ import { QuoteResponse } from "@7kprotocol/sdk-ts";
 import { Transaction, TransactionArgument } from "@mysten/sui/transactions";
 import { Decimal } from "decimal.js";
 
+/**
+ * Options for the AlphalendClient constructor
+ */
 export interface AlphalendClientOptions {
   coinMetadataMap?: Map<string, CoinMetadata>;
 }
