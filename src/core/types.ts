@@ -14,6 +14,10 @@ import { QuoteResponse } from "@7kprotocol/sdk-ts";
 import { Transaction, TransactionArgument } from "@mysten/sui/transactions";
 import { Decimal } from "decimal.js";
 
+export interface AlphalendClientOptions {
+  coinMetadataMap?: Map<string, CoinMetadata>;
+}
+
 /**
  * Interface for coin metadata fetched from GraphQL API
  * Contains essential coin data used throughout the SDK

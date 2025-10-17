@@ -29,6 +29,7 @@ import {
   ZapOutWithdrawParams,
   MAX_U64,
   quoteObject,
+  AlphalendClientOptions,
 } from "./types.js";
 import {
   getAlphaReceipt,
@@ -79,7 +80,7 @@ export class AlphalendClient {
   constructor(
     network: string,
     client: SuiClient,
-    coinMetadataMap?: Map<string, CoinMetadata>,
+    options?: AlphalendClientOptions,
   ) {
     this.network = network;
     this.client = client;
@@ -98,8 +99,8 @@ export class AlphalendClient {
     this.sevenKGateway = new SevenKGateway();
 
     // If a coin metadata map is provided, use it and mark as initialized
-    if (coinMetadataMap) {
-      this.coinMetadataMap = coinMetadataMap;
+    if (options?.coinMetadataMap) {
+      this.coinMetadataMap = options.coinMetadataMap;
       this.isInitialized = true;
       this.lendingProtocol.updateCoinMetadataMap(this.coinMetadataMap);
     }
