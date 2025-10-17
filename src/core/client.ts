@@ -76,7 +76,11 @@ export class AlphalendClient {
    * @param network Network to connect to ("mainnet", "testnet", or "devnet")
    * @param client SuiClient instance for blockchain interaction
    */
-  constructor(network: string, client: SuiClient) {
+  constructor(
+    network: string,
+    client: SuiClient,
+    coinMetadataMap?: Map<string, CoinMetadata>,
+  ) {
     this.network = network;
     this.client = client;
     this.constants = getConstants(network);
@@ -92,175 +96,23 @@ export class AlphalendClient {
     );
     this.lendingProtocol = new LendingProtocol(network, client);
     this.sevenKGateway = new SevenKGateway();
-  }
 
-  /**
-   * Ensures market data is initialized by fetching from GraphQL API
-   * This method is called automatically before any operation that needs market data
-   * Only fetches data once - subsequent calls use cached data
-   */
-  private async ensureInitialized(): Promise<void> {
-    if (this.isInitialized) {
-      return; // Already initialized, return immediately
-    }
-
-    if (this.initializationPromise) {
-      // Already initializing, wait for it to complete
-      return this.initializationPromise;
-    }
-
-    // Start initialization (only happens once)
-    this.initializationPromise = this.fetchAndCacheCoinMetadata();
-    return this.initializationPromise;
-  }
-
-  /**
-   * Fetches coin metadata from GraphQL API and caches it
-   */
-  private async fetchAndCacheCoinMetadata(): Promise<void> {
-    try {
-      const apiUrl = "https://api.alphalend.xyz/public/graphql";
-
-      // Extended query to get all the data we need
-      const query = `
-        query {
-          coinInfo {
-            coinType
-            pythPriceFeedId
-            pythPriceInfoObjectId
-            decimals
-            pythSponsored
-            symbol
-            coingeckoPrice
-            pythPrice
-          }
-        }
-      `;
-
-      const response = await fetch(apiUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ query }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`GraphQL request failed: ${response.status}`);
-      }
-
-      const result = await response.json();
-      const coinInfoArray = result.data.coinInfo;
-
-      // Cache the market data
-      for (const coin of coinInfoArray) {
-        if (
-          coin.coinType &&
-          coin.pythSponsored !== null &&
-          coin.decimals &&
-          coin.symbol
-        ) {
-          this.coinMetadataMap.set(coin.coinType, {
-            coinType: coin.coinType,
-            pythPriceFeedId: coin.pythPriceFeedId,
-            pythPriceInfoObjectId: coin.pythPriceInfoObjectId,
-            decimals: coin.decimals,
-            pythSponsored: coin.pythSponsored,
-            symbol: coin.symbol,
-            coingeckoPrice: coin.coingeckoPrice,
-            pythPrice: coin.pythPrice,
-          });
-        }
-      }
-
-      const alphaCoinType =
-        "0xfe3afec26c59e874f3c1d60b8203cb3852d2bb2aa415df9548b8d688e6683f93::alpha::ALPHA";
-      const alphaCoin = this.coinMetadataMap.get(alphaCoinType);
-      if (alphaCoin) {
-        this.coinMetadataMap.set(alphaCoinType, {
-          ...alphaCoin,
-          pythPriceFeedId:
-            "23d7315113f5b1d3ba7a83604c44b94d79f4fd69af77f804fc7f920a6dc65744",
-          pythPriceInfoObjectId:
-            "0x801dbc2f0053d34734814b2d6df491ce7807a725fe9a01ad74a07e9c51396c37",
-          pythSponsored: true,
-          pythPrice: alphaCoin.coingeckoPrice,
-        });
-      }
-
-      const longSuiCoinType =
-        "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI";
-      const suiCoinMetadata = this.coinMetadataMap.get("0x2::sui::SUI");
-      if (suiCoinMetadata) {
-        this.coinMetadataMap.set(longSuiCoinType, suiCoinMetadata);
-      }
-
+    // If a coin metadata map is provided, use it and mark as initialized
+    if (coinMetadataMap) {
+      this.coinMetadataMap = coinMetadataMap;
       this.isInitialized = true;
-
-      // Update LendingProtocol with the fetched coin metadata
       this.lendingProtocol.updateCoinMetadataMap(this.coinMetadataMap);
-    } catch (error) {
-      throw new Error(
-        `Failed to initialize market data: ${error instanceof Error ? error.message : "Unknown error"}. The SDK requires market data to function properly.`,
-      );
     }
   }
 
   /**
-   * Gets Pyth price feed ID for a coin type
-   * Uses dynamic data fetched from GraphQL API
+   * Fetches the coin metadata map
+   *
+   * @returns Promise resolving to a Map<string, CoinMetadata> object
    */
-  private getPythPriceFeedId(coinType: string): string {
-    const dynamicData = this.coinMetadataMap.get(coinType);
-    if (dynamicData?.pythPriceFeedId) {
-      return dynamicData.pythPriceFeedId;
-    }
-
-    throw new Error(
-      `No Pyth price feed ID found for coin type: ${coinType}. Ensure the coin metadata is properly initialized.`,
-    );
-  }
-
-  /**
-   * Gets price info object ID for a coin type
-   * Uses dynamic data fetched from GraphQL API
-   */
-  private getPythPriceInfoObjectId(coinType: string): string {
-    const dynamicData = this.coinMetadataMap.get(coinType);
-    if (dynamicData?.pythPriceInfoObjectId) {
-      return dynamicData.pythPriceInfoObjectId;
-    }
-
-    throw new Error(
-      `No price info object ID found for coin type: ${coinType}. Ensure the coin metadata is properly initialized.`,
-    );
-  }
-
-  /**
-   * Gets decimal places for a coin type
-   * Uses dynamic data fetched from GraphQL API
-   */
-  private getDecimals(coinType: string): number {
-    const dynamicData = this.coinMetadataMap.get(coinType);
-    if (dynamicData?.decimals !== undefined) {
-      return dynamicData.decimals;
-    }
-
-    throw new Error(
-      `No decimal places found for coin type: ${coinType}. Ensure the coin metadata is properly initialized.`,
-    );
-  }
-
-  /**
-   * Gets whether a coin type is pyth sponsored
-   * Uses dynamic data fetched from GraphQL API
-   */
-  private getPythSponsored(coinType: string): boolean {
-    const dynamicData = this.coinMetadataMap.get(coinType);
-    if (dynamicData?.pythSponsored !== undefined) {
-      return dynamicData.pythSponsored;
-    }
-    return false;
+  async fetchCoinMetadataMap(): Promise<Map<string, CoinMetadata>> {
+    await this.ensureInitialized();
+    return this.coinMetadataMap;
   }
 
   /**
@@ -1320,11 +1172,6 @@ export class AlphalendClient {
     }
   }
 
-  async fetchCoinMetadataMap() {
-    await this.ensureInitialized();
-    return this.coinMetadataMap;
-  }
-
   async getSwapQuote(tokenIn: string, tokenOut: string, amountIn: string) {
     await this.ensureInitialized();
 
@@ -1414,5 +1261,174 @@ export class AlphalendClient {
       quoteResponse,
       coinIn,
     );
+  }
+
+  /**
+   * Ensures market data is initialized by fetching from GraphQL API
+   * This method is called automatically before any operation that needs market data
+   * Only fetches data once - subsequent calls use cached data
+   */
+  private async ensureInitialized(): Promise<void> {
+    if (this.isInitialized) {
+      return; // Already initialized, return immediately
+    }
+
+    if (this.initializationPromise) {
+      // Already initializing, wait for it to complete
+      return this.initializationPromise;
+    }
+
+    // Start initialization (only happens once)
+    this.initializationPromise = this.fetchAndCacheCoinMetadata();
+    return this.initializationPromise;
+  }
+
+  /**
+   * Fetches coin metadata from GraphQL API and caches it
+   */
+  private async fetchAndCacheCoinMetadata(): Promise<void> {
+    try {
+      const apiUrl = "https://api.alphalend.xyz/public/graphql";
+
+      // Extended query to get all the data we need
+      const query = `
+        query {
+          coinInfo {
+            coinType
+            pythPriceFeedId
+            pythPriceInfoObjectId
+            decimals
+            pythSponsored
+            symbol
+            coingeckoPrice
+            pythPrice
+          }
+        }
+      `;
+
+      const response = await fetch(apiUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ query }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`GraphQL request failed: ${response.status}`);
+      }
+
+      const result = await response.json();
+      const coinInfoArray = result.data.coinInfo;
+
+      // Cache the market data
+      for (const coin of coinInfoArray) {
+        if (
+          coin.coinType &&
+          coin.pythSponsored !== null &&
+          coin.decimals &&
+          coin.symbol
+        ) {
+          this.coinMetadataMap.set(coin.coinType, {
+            coinType: coin.coinType,
+            pythPriceFeedId: coin.pythPriceFeedId,
+            pythPriceInfoObjectId: coin.pythPriceInfoObjectId,
+            decimals: coin.decimals,
+            pythSponsored: coin.pythSponsored,
+            symbol: coin.symbol,
+            coingeckoPrice: coin.coingeckoPrice,
+            pythPrice: coin.pythPrice,
+          });
+        }
+      }
+
+      const alphaCoinType =
+        "0xfe3afec26c59e874f3c1d60b8203cb3852d2bb2aa415df9548b8d688e6683f93::alpha::ALPHA";
+      const alphaCoin = this.coinMetadataMap.get(alphaCoinType);
+      if (alphaCoin) {
+        this.coinMetadataMap.set(alphaCoinType, {
+          ...alphaCoin,
+          pythPriceFeedId:
+            "23d7315113f5b1d3ba7a83604c44b94d79f4fd69af77f804fc7f920a6dc65744",
+          pythPriceInfoObjectId:
+            "0x801dbc2f0053d34734814b2d6df491ce7807a725fe9a01ad74a07e9c51396c37",
+          pythSponsored: true,
+          pythPrice: alphaCoin.coingeckoPrice,
+        });
+      }
+
+      const longSuiCoinType =
+        "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI";
+      const suiCoinMetadata = this.coinMetadataMap.get("0x2::sui::SUI");
+      if (suiCoinMetadata) {
+        this.coinMetadataMap.set(longSuiCoinType, suiCoinMetadata);
+      }
+
+      this.isInitialized = true;
+
+      // Update LendingProtocol with the fetched coin metadata
+      this.lendingProtocol.updateCoinMetadataMap(this.coinMetadataMap);
+    } catch (error) {
+      throw new Error(
+        `Failed to initialize market data: ${error instanceof Error ? error.message : "Unknown error"}. The SDK requires market data to function properly.`,
+      );
+    }
+  }
+
+  /**
+   * Gets Pyth price feed ID for a coin type
+   * Uses dynamic data fetched from GraphQL API
+   */
+  private getPythPriceFeedId(coinType: string): string {
+    const dynamicData = this.coinMetadataMap.get(coinType);
+    if (dynamicData?.pythPriceFeedId) {
+      return dynamicData.pythPriceFeedId;
+    }
+
+    throw new Error(
+      `No Pyth price feed ID found for coin type: ${coinType}. Ensure the coin metadata is properly initialized.`,
+    );
+  }
+
+  /**
+   * Gets price info object ID for a coin type
+   * Uses dynamic data fetched from GraphQL API
+   */
+  private getPythPriceInfoObjectId(coinType: string): string {
+    const dynamicData = this.coinMetadataMap.get(coinType);
+    if (dynamicData?.pythPriceInfoObjectId) {
+      return dynamicData.pythPriceInfoObjectId;
+    }
+
+    throw new Error(
+      `No price info object ID found for coin type: ${coinType}. Ensure the coin metadata is properly initialized.`,
+    );
+  }
+
+  /**
+   * Gets decimal places for a coin type
+   * Uses dynamic data fetched from GraphQL API
+   */
+  private getDecimals(coinType: string): number {
+    const dynamicData = this.coinMetadataMap.get(coinType);
+    if (dynamicData?.decimals !== undefined) {
+      return dynamicData.decimals;
+    }
+
+    throw new Error(
+      `No decimal places found for coin type: ${coinType}. Ensure the coin metadata is properly initialized.`,
+    );
+  }
+
+  /**
+   * Gets whether a coin type is pyth sponsored
+   * Uses dynamic data fetched from GraphQL API
+   */
+  private getPythSponsored(coinType: string): boolean {
+    const dynamicData = this.coinMetadataMap.get(coinType);
+    if (dynamicData?.pythSponsored !== undefined) {
+      return dynamicData.pythSponsored;
+    }
+    return false;
   }
 }
