@@ -15,6 +15,13 @@ import { Transaction, TransactionArgument } from "@mysten/sui/transactions";
 import { Decimal } from "decimal.js";
 
 /**
+ * Options for the AlphalendClient constructor
+ */
+export interface AlphalendClientOptions {
+  coinMetadataMap?: Map<string, CoinMetadata>;
+}
+
+/**
  * Interface for coin metadata fetched from GraphQL API
  * Contains essential coin data used throughout the SDK
  */
