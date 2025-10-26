@@ -1350,9 +1350,9 @@ export class AlphalendClient {
         this.coinMetadataMap.set(alphaCoinType, {
           ...alphaCoin,
           pythPriceFeedId:
-            "23d7315113f5b1d3ba7a83604c44b94d79f4fd69af77f804fc7f920a6dc65744",
+            "0b3eae8cb6e221e7388a435290e0f2211172563f94769077b7f4c4c6a11eea76",
           pythPriceInfoObjectId:
-            "0x801dbc2f0053d34734814b2d6df491ce7807a725fe9a01ad74a07e9c51396c37",
+            "0x1366f68b08a61380189dbb5cfca51c541309e7856bc2bbe5adbcdc966bab8734",
           pythSponsored: true,
           pythPrice: alphaCoin.coingeckoPrice,
         });
