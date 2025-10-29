@@ -1343,6 +1343,13 @@ export class AlphalendClient {
         }
       }
 
+      const longSuiCoinType =
+        "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI";
+      const suiCoinMetadata = this.coinMetadataMap.get("0x2::sui::SUI");
+      if (suiCoinMetadata) {
+        this.coinMetadataMap.set(longSuiCoinType, suiCoinMetadata);
+      }
+
       const alphaCoinType =
         "0xfe3afec26c59e874f3c1d60b8203cb3852d2bb2aa415df9548b8d688e6683f93::alpha::ALPHA";
       const alphaCoin = this.coinMetadataMap.get(alphaCoinType);
@@ -1354,15 +1361,11 @@ export class AlphalendClient {
           pythPriceInfoObjectId:
             "0x1366f68b08a61380189dbb5cfca51c541309e7856bc2bbe5adbcdc966bab8734",
           pythSponsored: true,
-          pythPrice: alphaCoin.coingeckoPrice,
+          pythPrice:
+            suiCoinMetadata?.pythPrice ||
+            suiCoinMetadata?.coingeckoPrice ||
+            "0",
         });
-      }
-
-      const longSuiCoinType =
-        "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI";
-      const suiCoinMetadata = this.coinMetadataMap.get("0x2::sui::SUI");
-      if (suiCoinMetadata) {
-        this.coinMetadataMap.set(longSuiCoinType, suiCoinMetadata);
       }
 
       this.isInitialized = true;
