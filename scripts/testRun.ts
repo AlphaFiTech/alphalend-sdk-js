@@ -56,7 +56,7 @@ export async function dryRunTransactionBlock(txb: Transaction) {
   txb.setGasBudget(1e9);
   try {
     let serializedTxb = await txb.build({ client: suiClient });
-    suiClient
+    await suiClient
       .dryRunTransactionBlock({
         transactionBlock: serializedTxb,
       })
@@ -74,13 +74,14 @@ export async function dryRunTransactionBlock(txb: Transaction) {
 
 async function updatePricesCaller() {
   const { suiClient } = getExecStuff();
-  const alphalendClient = new AlphalendClient("testnet", suiClient);
+  const alphalendClient = new AlphalendClient("mainnet", suiClient);
   let tx = new Transaction();
-  return await alphalendClient.updatePrices(tx, [
+  await alphalendClient.updatePrices(tx, [
     "0x2::sui::SUI",
-    "0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC",
-    // "0x356a26eb9e012a68958082340d4c4116e7f55615cf27affcff209cf0ae544f59::wal::WAL",
+    "0xfe3afec26c59e874f3c1d60b8203cb3852d2bb2aa415df9548b8d688e6683f93::alpha::ALPHA",
+    "0x66629328922d609cf15af779719e248ae0e63fe0b9d9739623f763b33a9c97da::esui::ESUI",
   ]);
+  return tx;
 }
 
 async function claimRewards() {
@@ -207,7 +208,7 @@ async function getUserPortfolio() {
     process.exit(1);
   }
   const result = await client.getUserPortfolioWithCachedMarkets(
-    "0xe136f0b6faf27ee707725f38f2aeefc51c6c31cc508222bee5cbc4f5fcf222c3",
+    "0xe66862b7f2656b6b2c0bb580aa4aff561782e7e218bf143433e60efd4bfe179e",
     markets,
   );
   console.log(result);
@@ -216,7 +217,7 @@ async function getUserPortfolio() {
   // );
   // console.log(res);
 }
-getUserPortfolio();
+// getUserPortfolio();
 
 async function withdraw() {
   const { suiClient } = getExecStuff();
@@ -249,7 +250,7 @@ async function withdraw() {
 
 async function run() {
   const { suiClient, keypair, address } = getExecStuff();
-  const tx = new Transaction();
+  // const tx = new Transaction();
   const constants = getConstants("mainnet");
   const pythClient = new SuiPythClient(
     suiClient,
@@ -269,9 +270,9 @@ async function run() {
   // );
 
   // console.log(pythPriceFeedIdMap[coinType]);
-  const priceInfoObjectIds = await pythClient.getPriceFeedObjectId(
-    "14890ba9c221092cba3d6ce86846d61f8606cefaf3dfc20bf3e2ab99de2644c0",
-  );
+  // const priceInfoObjectIds = await pythClient.getPriceFeedObjectId(
+  //   "14890ba9c221092cba3d6ce86846d61f8606cefaf3dfc20bf3e2ab99de2644c0",
+  // );
 
   // const priceFeedUpdateData = await pythConnection.getPriceFeedsUpdateData([
   //   "14890ba9c221092cba3d6ce86846d61f8606cefaf3dfc20bf3e2ab99de2644c0",
@@ -281,8 +282,8 @@ async function run() {
   //   tx,
   //   priceFeedUpdateData,
   // );
-  console.log(priceInfoObjectIds);
-  // const alc = new AlphalendClient("mainnet", suiClient);
+  // console.log(priceInfoObjectIds);
+  const tx = await updatePricesCaller();
   // const tx = await alc.supply({
   //   marketId: "1",
   //   address,
@@ -313,23 +314,23 @@ async function run() {
   // // tx.setGasBudget(1e9);
   if (tx) {
     // dryRunTransactionBlock(tx);
-    // await suiClient
-    //   .signAndExecuteTransaction({
-    //     signer: keypair,
-    //     transaction: tx,
-    //     requestType: "WaitForLocalExecution",
-    //     options: {
-    //       showEffects: true,
-    //       showBalanceChanges: true,
-    //       showObjectChanges: true,
-    //     },
-    //   })
-    //   .then((res) => {
-    //     console.log(JSON.stringify(res, null, 2));
-    //   })
-    //   .catch((error) => {
-    //     console.error(error);
-    //   });
+    await suiClient
+      .signAndExecuteTransaction({
+        signer: keypair,
+        transaction: tx,
+        requestType: "WaitForLocalExecution",
+        options: {
+          showEffects: true,
+          showBalanceChanges: true,
+          showObjectChanges: true,
+        },
+      })
+      .then((res) => {
+        console.log(JSON.stringify(res, null, 2));
+      })
+      .catch((error) => {
+        console.error(error);
+      });
   }
 }
 // run();

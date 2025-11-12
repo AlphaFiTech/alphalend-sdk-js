@@ -1,7 +1,6 @@
 import { Decimal } from "decimal.js";
 import { MarketType, RewardDistributorType } from "../utils/parsedTypes.js";
 import { MarketData, CoinMetadata } from "../core/types.js";
-import { fetchStSuiAPR } from "@alphafi/stsui-sdk";
 
 export class Market {
   market: MarketType;
@@ -402,8 +401,18 @@ export class Market {
       this.market.coinType ===
       "0xd1b72982e40348d069bb1ff701e634c117bb5f741f44dff91e472d3b01461e55::stsui::STSUI"
     ) {
-      const res = await fetchStSuiAPR(7);
-      stakingApr = new Decimal(res);
+      try {
+        const response = await fetch("https://ws.stsui.com/api/variables");
+        if (response.ok) {
+          const data = await response.json();
+          stakingApr = new Decimal(data.APR);
+        } else {
+          console.warn("Failed to fetch stSUI APR from API, using 0");
+        }
+      } catch (error) {
+        console.error("Error fetching stSUI APR:", error);
+        // Fallback to 0 if API call fails
+      }
     }
 
     return {
