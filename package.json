@@ -30,7 +30,6 @@
   "license": "ISC",
   "dependencies": {
     "@7kprotocol/sdk-ts": "^3.4.1",
-    "@alphafi/stsui-sdk": "^0.0.22",
     "@pythnetwork/pyth-sui-js": "^2.2.0",
     "bech32": "^2.0.0",
     "decimal.js": "^10.5.0",
