@@ -17,7 +17,7 @@ interface CacheEntry<T> {
  */
 class BlockchainCacheManager {
   private static instance: BlockchainCacheManager;
-  private cache: Map<string, CacheEntry<any>>;
+  private cache: Map<string, CacheEntry<unknown>>;
 
   // Default TTLs for different data types
   private static readonly DEFAULT_MARKETS_TTL = 60000; // 60 seconds - markets change rarely
@@ -64,7 +64,7 @@ class BlockchainCacheManager {
 
     // Check if cache is still fresh
     if (cachedEntry && Date.now() - cachedEntry.timestamp < cachedEntry.ttl) {
-      return cachedEntry.data;
+      return cachedEntry.data as T;
     }
 
     // Fetch fresh data

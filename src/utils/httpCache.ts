@@ -85,7 +85,7 @@ function isCacheFresh(
  */
 class HttpCacheManager {
   private static instance: HttpCacheManager;
-  private cache: Map<string, CacheEntry<any>>;
+  private cache: Map<string, CacheEntry<unknown>>;
 
   private constructor() {
     this.cache = new Map();
@@ -107,7 +107,7 @@ class HttpCacheManager {
 
     // Check if we have fresh cached data (within max-age)
     if (cachedEntry && isCacheFresh(cachedEntry.cacheControl, cachedEntry.timestamp)) {
-      return cachedEntry.data;
+      return cachedEntry.data as T;
     }
 
     // Prepare headers
@@ -127,7 +127,7 @@ class HttpCacheManager {
     if (response.status === 304 && cachedEntry) {
       // Update timestamp to extend cache lifetime
       cachedEntry.timestamp = Date.now();
-      return cachedEntry.data;
+      return cachedEntry.data as T;
     }
 
     // Handle errors
