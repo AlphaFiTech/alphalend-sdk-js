@@ -11,3 +11,7 @@ export {
   getUserPositionCapId,
   getUserPositionIds,
 } from "./models/position/functions.js";
+
+// Export caching utilities for advanced users
+export { httpCache } from "./utils/httpCache.js";
+export { blockchainCache } from "./utils/blockchainCache.js";
