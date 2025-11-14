@@ -85,7 +85,7 @@ function isCacheFresh(
  */
 class HttpCacheManager {
   private static instance: HttpCacheManager;
-  private cache: Map<string, CacheEntry<any>>;
+  private cache: Map<string, CacheEntry<unknown>>;
 
   private constructor() {
     this.cache = new Map();
