@@ -44,6 +44,7 @@ import { Market } from "../models/market.js";
 import { SevenKGateway } from "./sevenKSwap.js";
 import { Decimal } from "decimal.js";
 import { QuoteResponse } from "@7kprotocol/sdk-ts";
+import { blockchainCache } from "../utils/blockchainCache.js";
 
 /**
  * AlphaLend Client
@@ -837,13 +838,32 @@ export class AlphalendClient {
   /**
    * Gets all markets data from the protocol
    *
+   * @param options - Optional configuration for caching
+   * @param options.useCache - Whether to use blockchain cache (default: false)
+   * @param options.cacheTTL - Custom cache TTL in milliseconds (default: 60000)
    * @returns Promise resolving to an array of Market objects
    */
-  async getAllMarkets(): Promise<MarketData[] | undefined> {
+  async getAllMarkets(options?: {
+    useCache?: boolean;
+    cacheTTL?: number;
+  }): Promise<MarketData[] | undefined> {
     try {
       await this.ensureInitialized();
-      const markets = await this.lendingProtocol.getAllMarketsData();
-      return markets;
+
+      const useCache = options?.useCache ?? false;
+      const cacheTTL = options?.cacheTTL;
+
+      return await blockchainCache.getOrFetch(
+        "markets:all",
+        async () => {
+          const markets = await this.lendingProtocol.getAllMarketsData();
+          return markets;
+        },
+        {
+          skipCache: !useCache,
+          ttl: cacheTTL,
+        },
+      );
     } catch (error) {
       console.error("Error getting markets:", error);
       return undefined;
