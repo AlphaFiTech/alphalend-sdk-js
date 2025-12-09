@@ -198,7 +198,7 @@ async function getAllMarkets() {
   const res = await client.getAllMarkets();
   console.log(res);
 }
-getAllMarkets();
+// getAllMarkets();
 
 async function getUserPortfolio() {
   const client = new AlphalendClient("mainnet", getSuiClient("mainnet"));
@@ -270,9 +270,9 @@ async function run() {
   // );
 
   // console.log(pythPriceFeedIdMap[coinType]);
-  // const priceInfoObjectIds = await pythClient.getPriceFeedObjectId(
-  //   "14890ba9c221092cba3d6ce86846d61f8606cefaf3dfc20bf3e2ab99de2644c0",
-  // );
+  const priceInfoObjectIds = await pythClient.getPriceFeedObjectId(
+    "93da3352f9f1d105fdfe4971cfa80e9dd777bfc5d0f683ebb6e1294b92137bb7",
+  );
 
   // const priceFeedUpdateData = await pythConnection.getPriceFeedsUpdateData([
   //   "14890ba9c221092cba3d6ce86846d61f8606cefaf3dfc20bf3e2ab99de2644c0",
@@ -282,8 +282,8 @@ async function run() {
   //   tx,
   //   priceFeedUpdateData,
   // );
-  // console.log(priceInfoObjectIds);
-  const tx = await updatePricesCaller();
+  console.log(priceInfoObjectIds);
+  // const tx = await updatePricesCaller();
   // const tx = await alc.supply({
   //   marketId: "1",
   //   address,
@@ -312,25 +312,25 @@ async function run() {
   //   ],
   // });
   // // tx.setGasBudget(1e9);
-  if (tx) {
-    // dryRunTransactionBlock(tx);
-    await suiClient
-      .signAndExecuteTransaction({
-        signer: keypair,
-        transaction: tx,
-        requestType: "WaitForLocalExecution",
-        options: {
-          showEffects: true,
-          showBalanceChanges: true,
-          showObjectChanges: true,
-        },
-      })
-      .then((res) => {
-        console.log(JSON.stringify(res, null, 2));
-      })
-      .catch((error) => {
-        console.error(error);
-      });
-  }
+  // if (tx) {
+  // dryRunTransactionBlock(tx);
+  // await suiClient
+  //   .signAndExecuteTransaction({
+  //     signer: keypair,
+  //     transaction: tx,
+  //     requestType: "WaitForLocalExecution",
+  //     options: {
+  //       showEffects: true,
+  //       showBalanceChanges: true,
+  //       showObjectChanges: true,
+  //     },
+  //   })
+  //   .then((res) => {
+  //     console.log(JSON.stringify(res, null, 2));
+  //   })
+  //   .catch((error) => {
+  //     console.error(error);
+  //   });
+  // }
 }
-// run();
+run();
