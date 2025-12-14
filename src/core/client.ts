@@ -405,7 +405,20 @@ export class AlphalendClient {
 
     return tx;
   }
-
+  async getUserPortfolioFromPositionCapId(
+    positionCapId: string,
+  ): Promise<UserPortfolio | undefined> {
+    try {
+      await this.ensureInitialized();
+      const position =
+        await this.lendingProtocol.getPositionFromPositionCapId(positionCapId);
+      const markets = await this.lendingProtocol.getAllMarkets();
+      return position.getUserPortfolio(markets);
+    } catch (error) {
+      console.error("Error getting position:", error);
+      return undefined;
+    }
+  }
   /**
    * Withdraws collateral from the AlphaLend protocol with automatic token swapping
    *
