@@ -11,6 +11,7 @@
  */
 
 import { QuoteResponse } from "@7kprotocol/sdk-ts";
+import { RouterDataV3 } from "@cetusprotocol/aggregator-sdk";
 import { Transaction, TransactionArgument } from "@mysten/sui/transactions";
 import { Decimal } from "decimal.js";
 
@@ -355,5 +356,5 @@ export interface quoteObject {
   inputAmountInUSD: number;
   estimatedAmountOutInUSD: number;
   slippage: number;
-  rawQuote: QuoteResponse;
+  rawQuote: RouterDataV3;
 }

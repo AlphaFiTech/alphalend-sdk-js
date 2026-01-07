@@ -288,4 +288,40 @@ export const coinsList: { [key in CoinName]: Coin } = {
     icon: "",
     type: "0x244b98d29bd0bba401c7cfdd89f017c51759dad615e15a872ddfe45af079bb1d::ebtc::EBTC",
   },
+  ETHIRD: {
+    expo: 6,
+    name: "ETHIRD",
+    icon: "",
+    type: "0x89b0d4407f17cc1b1294464f28e176e29816a40612f7a553313ea0a797a5f803::ethird::ETHIRD",
+  },
+  EGUSDC: {
+    name: "EGUSDC",
+    type: "0x68532559a19101b58757012207d82328e75fde7a696d20a59e8307c1a7f42ad7::egusdc::EGUSDC",
+    icon: "",
+    expo: 6,
+  },
+  SDEUSD: {
+    name: "SDEUSD",
+    type: "0xf6b468748dced8435f4407d0ecb0457b921a2e89266a60862e36dbf243c71841::sdeusd::SDEUSD",
+    icon: "",
+    expo: 6,
+  },
+  EWAL: {
+    name: "EWAL",
+    type: "0x8a398f65f8635be31c181632bf730aea25074505d70c77d9b287e7d4f063ef70::ewal::EWAL",
+    icon: "",
+    expo: 9,
+  },
+  WBTC_Layer0: {
+    name: "WBTC_Layer0",
+    type: "0x0041f9f9344cac094454cd574e333c4fdb132d7bcc9379bcd4aab485b2a63942::wbtc::WBTC",
+    icon: "",
+    expo: 8,
+  },
+  BTCVC: {
+    name: "BTCVC",
+    type: "0xd8fe9619ff2bcef53e0330b83b31ab380a04ee787dafecc19aac365a9824517f::btcvc::BTCVC",
+    icon: "",
+    expo: 8,
+  },
 };
