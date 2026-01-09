@@ -20,6 +20,10 @@ import {
   BorrowParams,
   RepayParams,
   ClaimRewardsParams,
+  ClaimAndSwapRewardsParams,
+  ClaimSwapAndSupplyParams,
+  ClaimSwapAndRepayParams,
+  ClaimRepayAndSupplyAllParams,
   LiquidateParams,
   MarketData,
   UserPortfolio,
@@ -819,6 +823,598 @@ export class AlphalendClient {
       tx.mergeCoins(alphaCoin, coins);
     }
     return alphaCoin;
+  }
+
+  /**
+   * Merges multiple coins of the same type into a single coin
+   *
+   * @param tx Transaction to add merge operation to
+   * @param targetCoin Existing coin to merge into (or undefined)
+   * @param coins Array of coins to merge
+   * @returns Transaction argument representing the merged coin
+   */
+  private mergeCoins(
+    tx: Transaction,
+    targetCoin: TransactionObjectArgument | undefined,
+    coins: TransactionObjectArgument[],
+  ): TransactionObjectArgument {
+    if (targetCoin) {
+      tx.mergeCoins(targetCoin, coins);
+    } else {
+      targetCoin = tx.splitCoins(coins[0], [0]);
+      tx.mergeCoins(targetCoin, coins);
+    }
+    return targetCoin;
+  }
+
+  /**
+   * Claims rewards and swaps them to a single target token
+   * All rewards are claimed, swapped to the target coin type, and transferred to the user's wallet
+   *
+   * @param params ClaimAndSwapRewardsParams - includes positionCapId, address, targetCoinType, slippage
+   * @returns Transaction object ready for signing and execution
+   */
+  async claimAndSwapRewards(
+    params: ClaimAndSwapRewardsParams,
+  ): Promise<Transaction | undefined> {
+    const tx = new Transaction();
+
+    // Get all claimable rewards
+    const rewardInput = await getClaimRewardInput(
+      this.client,
+      this.network,
+      params.address,
+    );
+
+    if (!rewardInput || rewardInput.length === 0) {
+      console.log("No rewards to claim");
+      return undefined;
+    }
+
+    // Collect all reward coins by coin type
+    const rewardCoinsByType: Map<string, TransactionObjectArgument[]> =
+      new Map();
+
+    // Claim all rewards
+    for (const data of rewardInput) {
+      for (let coinType of data.coinTypes) {
+        coinType = "0x" + coinType;
+        const [coin1, promise] = tx.moveCall({
+          target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::collect_reward`,
+          typeArguments: [coinType],
+          arguments: [
+            tx.object(this.constants.LENDING_PROTOCOL_ID),
+            tx.pure.u64(data.marketId),
+            tx.object(params.positionCapId),
+            tx.object(this.constants.SUI_CLOCK_OBJECT_ID),
+          ],
+        });
+
+        // Handle promise if exists
+        if (promise) {
+          const coin2 = await this.handlePromise(tx, promise, coinType);
+          if (coin2) {
+            if (!rewardCoinsByType.has(coinType)) {
+              rewardCoinsByType.set(coinType, []);
+            }
+            rewardCoinsByType.get(coinType)!.push(coin2);
+          }
+        }
+
+        if (coin1) {
+          if (!rewardCoinsByType.has(coinType)) {
+            rewardCoinsByType.set(coinType, []);
+          }
+          rewardCoinsByType.get(coinType)!.push(coin1);
+        }
+      }
+    }
+
+    // Merge coins of the same type and swap to target coin
+    let targetCoin: TransactionObjectArgument | undefined = undefined;
+
+    for (const [coinType, coins] of rewardCoinsByType.entries()) {
+      if (coins.length === 0) continue;
+
+      // Merge all coins of this type
+      let mergedCoin = this.mergeCoins(tx, undefined, coins);
+
+      // If this is already the target coin type, just merge it
+      if (coinType.toLowerCase() === params.targetCoinType.toLowerCase()) {
+        if (targetCoin) {
+          tx.mergeCoins(targetCoin, [mergedCoin]);
+        } else {
+          targetCoin = mergedCoin;
+        }
+      } else {
+        // For reward swaps, we don't know the exact amount until on-chain
+        // Use a placeholder amount just to get the swap route
+        // The actual swap will use the entire mergedCoin object
+        const placeholderAmount = "1000000000"; // 1 token with 9 decimals (works for most tokens)
+
+        // Get swap quote with placeholder amount
+        const quoteResponse = await this.cetusSwap.getCetusSwapQuote(
+          coinType,
+          params.targetCoinType,
+          placeholderAmount,
+        );
+
+        if (!quoteResponse) {
+          console.error(
+            `Failed to get swap quote for ${coinType} to ${params.targetCoinType}`,
+          );
+          // For claimAndSwapRewards, we should NOT fall back to transferring original tokens
+          // The user expects ONLY the target token, so fail if swap cannot happen
+          throw new Error(
+            `Cannot swap ${coinType} to ${params.targetCoinType}: No swap route available`,
+          );
+        }
+
+        // Perform swap with the actual coin object
+        // Note: The swap will use the entire mergedCoin, not the placeholder amount
+        const swappedCoin = await this.cetusSwap.cetusSwapTokensTxb(
+          quoteResponse as RouterDataV3,
+          params.slippage,
+          mergedCoin,
+          params.address,
+          tx,
+        );
+
+        if (!swappedCoin || swappedCoin instanceof Transaction) {
+          console.error(
+            `Failed to swap ${coinType} to ${params.targetCoinType}`,
+          );
+          // For claimAndSwapRewards, we should NOT fall back to transferring original tokens
+          throw new Error(
+            `Swap failed for ${coinType} to ${params.targetCoinType}`,
+          );
+        }
+
+        // Merge swapped coin with target coin
+        if (targetCoin) {
+          tx.mergeCoins(targetCoin, [swappedCoin as TransactionObjectArgument]);
+        } else {
+          targetCoin = swappedCoin as TransactionObjectArgument;
+        }
+      }
+    }
+
+    // Transfer the final merged coin to user
+    if (targetCoin) {
+      tx.transferObjects([targetCoin], params.address);
+    }
+
+    tx.setGasBudget(1000000000);
+    return tx;
+  }
+
+  /**
+   * Claims rewards, swaps them to target token, and supplies to a market
+   * If the same coin exists in borrows, it repays first and supplies the remaining amount
+   *
+   * @param params ClaimSwapAndSupplyParams - includes positionCapId, address, targetCoinType, targetMarketId, slippage
+   * @returns Transaction object ready for signing and execution
+   */
+  async claimSwapAndSupply(
+    params: ClaimSwapAndSupplyParams,
+  ): Promise<Transaction | undefined> {
+    const tx = new Transaction();
+
+    // Get all claimable rewards
+    const rewardInput = await getClaimRewardInput(
+      this.client,
+      this.network,
+      params.address,
+    );
+
+    if (!rewardInput || rewardInput.length === 0) {
+      console.log("No rewards to claim");
+      return undefined;
+    }
+
+    // Update prices if provided
+    if (
+      this.network === "mainnet" &&
+      params.priceUpdateCoinTypes &&
+      params.priceUpdateCoinTypes.length > 0
+    ) {
+      await this.updatePrices(tx, params.priceUpdateCoinTypes);
+    }
+
+    // Collect all reward coins by coin type
+    const rewardCoinsByType: Map<string, TransactionObjectArgument[]> =
+      new Map();
+
+    // Claim all rewards
+    for (const data of rewardInput) {
+      for (let coinType of data.coinTypes) {
+        coinType = "0x" + coinType;
+        const [coin1, promise] = tx.moveCall({
+          target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::collect_reward`,
+          typeArguments: [coinType],
+          arguments: [
+            tx.object(this.constants.LENDING_PROTOCOL_ID),
+            tx.pure.u64(data.marketId),
+            tx.object(params.positionCapId),
+            tx.object(this.constants.SUI_CLOCK_OBJECT_ID),
+          ],
+        });
+
+        if (promise) {
+          const coin2 = await this.handlePromise(tx, promise, coinType);
+          if (coin2) {
+            if (!rewardCoinsByType.has(coinType)) {
+              rewardCoinsByType.set(coinType, []);
+            }
+            rewardCoinsByType.get(coinType)!.push(coin2);
+          }
+        }
+
+        if (coin1) {
+          if (!rewardCoinsByType.has(coinType)) {
+            rewardCoinsByType.set(coinType, []);
+          }
+          rewardCoinsByType.get(coinType)!.push(coin1);
+        }
+      }
+    }
+
+    // Merge coins and swap to target coin
+    let targetCoin: TransactionObjectArgument | undefined = undefined;
+
+    for (const [coinType, coins] of rewardCoinsByType.entries()) {
+      if (coins.length === 0) continue;
+
+      let mergedCoin = this.mergeCoins(tx, undefined, coins);
+
+      if (coinType.toLowerCase() === params.targetCoinType.toLowerCase()) {
+        if (targetCoin) {
+          tx.mergeCoins(targetCoin, [mergedCoin]);
+        } else {
+          targetCoin = mergedCoin;
+        }
+      } else {
+        // Use placeholder amount to get swap route
+        const placeholderAmount = "1000000000"; // 1 token with 9 decimals
+
+        const quoteResponse = await this.cetusSwap.getCetusSwapQuote(
+          coinType,
+          params.targetCoinType,
+          placeholderAmount,
+        );
+
+        if (!quoteResponse) {
+          console.error(`Failed to get swap quote for ${coinType}`);
+          tx.transferObjects([mergedCoin], params.address);
+          continue;
+        }
+
+        const swappedCoin = await this.cetusSwap.cetusSwapTokensTxb(
+          quoteResponse as RouterDataV3,
+          params.slippage,
+          mergedCoin,
+          params.address,
+          tx,
+        );
+
+        if (!swappedCoin || swappedCoin instanceof Transaction) {
+          console.error(`Failed to swap ${coinType}`);
+          tx.transferObjects([mergedCoin], params.address);
+          continue;
+        }
+
+        if (targetCoin) {
+          tx.mergeCoins(targetCoin, [swappedCoin as TransactionObjectArgument]);
+        } else {
+          targetCoin = swappedCoin as TransactionObjectArgument;
+        }
+      }
+    }
+
+    if (!targetCoin) {
+      console.error("No target coin available for supply");
+      return undefined;
+    }
+
+    // Supply the target coin to the market
+    tx.moveCall({
+      target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::add_collateral`,
+      typeArguments: [params.targetCoinType],
+      arguments: [
+        tx.object(this.constants.LENDING_PROTOCOL_ID),
+        tx.object(params.positionCapId),
+        tx.pure.u64(params.targetMarketId),
+        targetCoin,
+        tx.object(this.constants.SUI_CLOCK_OBJECT_ID),
+      ],
+    });
+
+    tx.setGasBudget(1000000000);
+    return tx;
+  }
+
+  /**
+   * Claims rewards, swaps them to target token, and repays borrowed amount
+   * Any remaining amount after repayment goes to the user's wallet
+   *
+   * @param params ClaimSwapAndRepayParams - includes positionCapId, address, targetCoinType, targetMarketId, slippage, debtAmount
+   * @returns Transaction object ready for signing and execution
+   */
+  async claimSwapAndRepay(
+    params: ClaimSwapAndRepayParams,
+  ): Promise<Transaction | undefined> {
+    const tx = new Transaction();
+
+    // Get all claimable rewards
+    const rewardInput = await getClaimRewardInput(
+      this.client,
+      this.network,
+      params.address,
+    );
+
+    if (!rewardInput || rewardInput.length === 0) {
+      console.log("No rewards to claim");
+      return undefined;
+    }
+
+    // Collect all reward coins by coin type
+    const rewardCoinsByType: Map<string, TransactionObjectArgument[]> =
+      new Map();
+
+    // Claim all rewards
+    for (const data of rewardInput) {
+      for (let coinType of data.coinTypes) {
+        coinType = "0x" + coinType;
+        const [coin1, promise] = tx.moveCall({
+          target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::collect_reward`,
+          typeArguments: [coinType],
+          arguments: [
+            tx.object(this.constants.LENDING_PROTOCOL_ID),
+            tx.pure.u64(data.marketId),
+            tx.object(params.positionCapId),
+            tx.object(this.constants.SUI_CLOCK_OBJECT_ID),
+          ],
+        });
+
+        if (promise) {
+          const coin2 = await this.handlePromise(tx, promise, coinType);
+          if (coin2) {
+            if (!rewardCoinsByType.has(coinType)) {
+              rewardCoinsByType.set(coinType, []);
+            }
+            rewardCoinsByType.get(coinType)!.push(coin2);
+          }
+        }
+
+        if (coin1) {
+          if (!rewardCoinsByType.has(coinType)) {
+            rewardCoinsByType.set(coinType, []);
+          }
+          rewardCoinsByType.get(coinType)!.push(coin1);
+        }
+      }
+    }
+
+    // Merge coins and swap to target coin
+    let targetCoin: TransactionObjectArgument | undefined = undefined;
+
+    for (const [coinType, coins] of rewardCoinsByType.entries()) {
+      if (coins.length === 0) continue;
+
+      let mergedCoin = this.mergeCoins(tx, undefined, coins);
+
+      if (coinType.toLowerCase() === params.targetCoinType.toLowerCase()) {
+        if (targetCoin) {
+          tx.mergeCoins(targetCoin, [mergedCoin]);
+        } else {
+          targetCoin = mergedCoin;
+        }
+      } else {
+        // Use placeholder amount to get swap route
+        const placeholderAmount = "1000000000"; // 1 token with 9 decimals
+
+        const quoteResponse = await this.cetusSwap.getCetusSwapQuote(
+          coinType,
+          params.targetCoinType,
+          placeholderAmount,
+        );
+
+        if (!quoteResponse) {
+          console.error(`Failed to get swap quote for ${coinType}`);
+          tx.transferObjects([mergedCoin], params.address);
+          continue;
+        }
+
+        const swappedCoin = await this.cetusSwap.cetusSwapTokensTxb(
+          quoteResponse as RouterDataV3,
+          params.slippage,
+          mergedCoin,
+          params.address,
+          tx,
+        );
+
+        if (!swappedCoin || swappedCoin instanceof Transaction) {
+          console.error(`Failed to swap ${coinType}`);
+          tx.transferObjects([mergedCoin], params.address);
+          continue;
+        }
+
+        if (targetCoin) {
+          tx.mergeCoins(targetCoin, [swappedCoin as TransactionObjectArgument]);
+        } else {
+          targetCoin = swappedCoin as TransactionObjectArgument;
+        }
+      }
+    }
+
+    if (!targetCoin) {
+      console.error("No target coin available for repay");
+      return undefined;
+    }
+
+    // If debt amount is specified, split that amount for repay
+    let repayCoin: TransactionObjectArgument;
+    if (params.debtAmount) {
+      repayCoin = tx.splitCoins(targetCoin, [params.debtAmount]);
+    } else {
+      repayCoin = targetCoin;
+    }
+
+    // Repay the debt
+    const remainingCoin = tx.moveCall({
+      target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::repay`,
+      typeArguments: [params.targetCoinType],
+      arguments: [
+        tx.object(this.constants.LENDING_PROTOCOL_ID),
+        tx.object(params.positionCapId),
+        tx.pure.u64(params.targetMarketId),
+        repayCoin,
+        tx.object(this.constants.SUI_CLOCK_OBJECT_ID),
+      ],
+    });
+
+    // Transfer remaining coins back to user
+    if (params.debtAmount) {
+      // If we split coins, transfer both the remaining from repay and the unsplit portion
+      tx.transferObjects([remainingCoin, targetCoin], params.address);
+    } else {
+      // Transfer only the remaining coin from repay
+      tx.transferObjects([remainingCoin], params.address);
+    }
+
+    tx.setGasBudget(1000000000);
+    return tx;
+  }
+
+  /**
+   * Claims rewards, repays borrowed coins, and supplies non-borrowed coins to their markets
+   * Coins without markets are transferred to wallet
+   *
+   * @param params ClaimRepayAndSupplyAllParams - includes positionCapId, address, borrowedCoins, supplyableMarkets
+   * @returns Transaction object ready for signing and execution
+   */
+  async claimRepayAndSupplyAll(
+    params: ClaimRepayAndSupplyAllParams,
+  ): Promise<Transaction | undefined> {
+    const tx = new Transaction();
+
+    // Update prices if specified
+    if (
+      this.network === "mainnet" &&
+      params.priceUpdateCoinTypes &&
+      params.priceUpdateCoinTypes.length > 0
+    ) {
+      await this.updateAllPrices(tx, params.priceUpdateCoinTypes);
+    }
+
+    // Get reward input data (markets and coin types)
+    const rewardInput = await getClaimRewardInput(
+      this.client,
+      this.network,
+      params.address,
+    );
+
+    // Collect rewards for each market and coin type
+    const rewardCoinsByType = new Map<string, TransactionObjectArgument[]>();
+
+    for (const data of rewardInput) {
+      for (let coinType of data.coinTypes) {
+        coinType = "0x" + coinType;
+
+        // Collect reward for this coin type
+        const [coin1, promise] = tx.moveCall({
+          target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::collect_reward`,
+          typeArguments: [coinType],
+          arguments: [
+            tx.object(this.constants.LENDING_PROTOCOL_ID),
+            tx.pure.u64(data.marketId),
+            tx.object(params.positionCapId),
+            tx.object(this.constants.SUI_CLOCK_OBJECT_ID),
+          ],
+        });
+
+        // Handle promise if present
+        if (promise) {
+          const coin2 = await this.handlePromise(tx, promise, coinType);
+          if (coin2) {
+            if (!rewardCoinsByType.has(coinType)) {
+              rewardCoinsByType.set(coinType, []);
+            }
+            rewardCoinsByType.get(coinType)!.push(coin2);
+          }
+        }
+
+        if (coin1) {
+          if (!rewardCoinsByType.has(coinType)) {
+            rewardCoinsByType.set(coinType, []);
+          }
+          rewardCoinsByType.get(coinType)!.push(coin1);
+        }
+      }
+    }
+
+    // Process each reward coin type
+    for (const [coinType, coins] of rewardCoinsByType.entries()) {
+      if (coins.length === 0) continue;
+
+      // Merge all coins of this type
+      let mergedCoin = this.mergeCoins(tx, undefined, coins);
+
+      // Check if this is a borrowed coin
+      const borrowInfo = params.borrowedCoins.get(coinType);
+      if (borrowInfo) {
+        // This coin is borrowed - repay it
+        let repayCoin: TransactionObjectArgument;
+        if (borrowInfo.debtAmount) {
+          repayCoin = tx.splitCoins(mergedCoin, [borrowInfo.debtAmount]);
+        } else {
+          repayCoin = mergedCoin;
+        }
+
+        // Repay the debt
+        const remainingCoin = tx.moveCall({
+          target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::repay`,
+          typeArguments: [coinType],
+          arguments: [
+            tx.object(this.constants.LENDING_PROTOCOL_ID),
+            tx.object(params.positionCapId),
+            tx.pure.u64(borrowInfo.marketId),
+            repayCoin,
+            tx.object(this.constants.SUI_CLOCK_OBJECT_ID),
+          ],
+        });
+
+        // Transfer remaining coins back to user
+        if (borrowInfo.debtAmount) {
+          tx.transferObjects([remainingCoin, mergedCoin], params.address);
+        } else {
+          tx.transferObjects([remainingCoin], params.address);
+        }
+      } else {
+        // Not borrowed - check if we can supply it
+        const supplyMarketId = params.supplyableMarkets.get(coinType);
+        if (supplyMarketId) {
+          // Supply to the market using add_collateral
+          tx.moveCall({
+            target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::add_collateral`,
+            typeArguments: [coinType],
+            arguments: [
+              tx.object(this.constants.LENDING_PROTOCOL_ID),
+              tx.object(params.positionCapId),
+              tx.pure.u64(supplyMarketId),
+              mergedCoin,
+              tx.object(this.constants.SUI_CLOCK_OBJECT_ID),
+            ],
+          });
+        } else {
+          // No market to supply - transfer to wallet
+          tx.transferObjects([mergedCoin], params.address);
+        }
+      }
+    }
+
+    tx.setGasBudget(1000000000);
+    return tx;
   }
 
   /**
