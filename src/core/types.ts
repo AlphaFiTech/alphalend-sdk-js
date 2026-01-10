@@ -192,6 +192,33 @@ export interface ClaimRewardsParams {
 }
 
 /**
+ * Market info for repay and supply operations
+ */
+export interface MarketInfo {
+  /** Market ID */
+  marketId: string;
+  /** Debt amount to repay (only for borrowed coins) */
+  debtAmount?: bigint;
+}
+
+/**
+ * Parameters for claiming rewards, repaying borrowed coins, and supplying the rest
+ * Used with the `claimAndSupplyOrRepay` method
+ */
+export interface ClaimAndSupplyOrRepayParams {
+  /** Object ID of the position capability object */
+  positionCapId: string;
+  /** Address of the user claiming rewards */
+  address: string;
+  /** Map of borrowed coin types to their market info */
+  borrowedCoins: Map<string, MarketInfo>;
+  /** Map of coin types to their market IDs for supply operations */
+  supplyableMarkets: Map<string, string>;
+  /** Coin types for price updates */
+  priceUpdateCoinTypes?: string[];
+}
+
+/**
  * Parameters for liquidating an unhealthy position
  * Used with the `liquidate` method
  */
