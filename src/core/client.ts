@@ -20,6 +20,7 @@ import {
   BorrowParams,
   RepayParams,
   ClaimRewardsParams,
+  ClaimRepayAndSupplyAllParams,
   LiquidateParams,
   MarketData,
   UserPortfolio,
@@ -750,6 +751,159 @@ export class AlphalendClient {
       tx.mergeCoins(alphaCoin, coins);
     }
     return alphaCoin;
+  }
+
+  /**
+   * Merges multiple coins of the same type into a single coin
+   *
+   * @param tx Transaction to add merge operation to
+   * @param targetCoin Existing coin to merge into (or undefined)
+   * @param coins Array of coins to merge
+   * @returns Transaction argument representing the merged coin
+   */
+  private mergeCoins(
+    tx: Transaction,
+    targetCoin: TransactionObjectArgument | undefined,
+    coins: TransactionObjectArgument[],
+  ): TransactionObjectArgument {
+    if (targetCoin) {
+      tx.mergeCoins(targetCoin, coins);
+    } else {
+      targetCoin = tx.splitCoins(coins[0], [0]);
+      tx.mergeCoins(targetCoin, coins);
+    }
+    return targetCoin;
+  }
+
+  /**
+   * Claims rewards, repays borrowed coins, and supplies non-borrowed coins to their markets
+   * Coins without markets are transferred to wallet
+   *
+   * @param params ClaimRepayAndSupplyAllParams - includes positionCapId, address, borrowedCoins, supplyableMarkets
+   * @returns Transaction object ready for signing and execution
+   */
+  async claimRepayAndSupplyAll(
+    params: ClaimRepayAndSupplyAllParams,
+  ): Promise<Transaction | undefined> {
+    const tx = new Transaction();
+
+    // Update prices if specified
+    if (
+      this.network === "mainnet" &&
+      params.priceUpdateCoinTypes &&
+      params.priceUpdateCoinTypes.length > 0
+    ) {
+      await this.updateAllPrices(tx, params.priceUpdateCoinTypes);
+    }
+
+    // Get reward input data (markets and coin types)
+    const rewardInput = await getClaimRewardInput(
+      this.client,
+      this.network,
+      params.address,
+    );
+
+    // Collect rewards for each market and coin type
+    const rewardCoinsByType = new Map<string, TransactionObjectArgument[]>();
+
+    for (const data of rewardInput) {
+      for (let coinType of data.coinTypes) {
+        coinType = "0x" + coinType;
+
+        // Collect reward for this coin type
+        const [coin1, promise] = tx.moveCall({
+          target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::collect_reward`,
+          typeArguments: [coinType],
+          arguments: [
+            tx.object(this.constants.LENDING_PROTOCOL_ID),
+            tx.pure.u64(data.marketId),
+            tx.object(params.positionCapId),
+            tx.object(this.constants.SUI_CLOCK_OBJECT_ID),
+          ],
+        });
+
+        // Handle promise if present
+        if (promise) {
+          const coin2 = await this.handlePromise(tx, promise, coinType);
+          if (coin2) {
+            if (!rewardCoinsByType.has(coinType)) {
+              rewardCoinsByType.set(coinType, []);
+            }
+            rewardCoinsByType.get(coinType)!.push(coin2);
+          }
+        }
+
+        if (coin1) {
+          if (!rewardCoinsByType.has(coinType)) {
+            rewardCoinsByType.set(coinType, []);
+          }
+          rewardCoinsByType.get(coinType)!.push(coin1);
+        }
+      }
+    }
+
+    // Process each reward coin type
+    for (const [coinType, coins] of rewardCoinsByType.entries()) {
+      if (coins.length === 0) continue;
+
+      // Merge all coins of this type
+      let mergedCoin = this.mergeCoins(tx, undefined, coins);
+
+      // Check if this is a borrowed coin
+      const borrowInfo = params.borrowedCoins.get(coinType);
+      if (borrowInfo) {
+        // This coin is borrowed - repay it
+        let repayCoin: TransactionObjectArgument;
+        if (borrowInfo.debtAmount) {
+          repayCoin = tx.splitCoins(mergedCoin, [borrowInfo.debtAmount]);
+        } else {
+          repayCoin = mergedCoin;
+        }
+
+        // Repay the debt
+        const remainingCoin = tx.moveCall({
+          target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::repay`,
+          typeArguments: [coinType],
+          arguments: [
+            tx.object(this.constants.LENDING_PROTOCOL_ID),
+            tx.object(params.positionCapId),
+            tx.pure.u64(borrowInfo.marketId),
+            repayCoin,
+            tx.object(this.constants.SUI_CLOCK_OBJECT_ID),
+          ],
+        });
+
+        // Transfer remaining coins back to user
+        if (borrowInfo.debtAmount) {
+          tx.transferObjects([remainingCoin, mergedCoin], params.address);
+        } else {
+          tx.transferObjects([remainingCoin], params.address);
+        }
+      } else {
+        // Not borrowed - check if we can supply it
+        const supplyMarketId = params.supplyableMarkets.get(coinType);
+        if (supplyMarketId) {
+          // Supply to the market using add_collateral
+          tx.moveCall({
+            target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::add_collateral`,
+            typeArguments: [coinType],
+            arguments: [
+              tx.object(this.constants.LENDING_PROTOCOL_ID),
+              tx.object(params.positionCapId),
+              tx.pure.u64(supplyMarketId),
+              mergedCoin,
+              tx.object(this.constants.SUI_CLOCK_OBJECT_ID),
+            ],
+          });
+        } else {
+          // No market to supply - transfer to wallet
+          tx.transferObjects([mergedCoin], params.address);
+        }
+      }
+    }
+
+    tx.setGasBudget(1000000000);
+    return tx;
   }
 
   /**
