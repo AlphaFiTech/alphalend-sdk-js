@@ -20,7 +20,7 @@ import {
   BorrowParams,
   RepayParams,
   ClaimRewardsParams,
-  ClaimRepayAndSupplyAllParams,
+  ClaimAndSupplyOrRepayParams,
   LiquidateParams,
   MarketData,
   UserPortfolio,
@@ -779,11 +779,11 @@ export class AlphalendClient {
    * Claims rewards, repays borrowed coins, and supplies non-borrowed coins to their markets
    * Coins without markets are transferred to wallet
    *
-   * @param params ClaimRepayAndSupplyAllParams - includes positionCapId, address, borrowedCoins, supplyableMarkets
+   * @param params ClaimAndSupplyOrRepayParams - includes positionCapId, address, borrowedCoins, supplyableMarkets
    * @returns Transaction object ready for signing and execution
    */
-  async claimRepayAndSupplyAll(
-    params: ClaimRepayAndSupplyAllParams,
+  async claimAndSupplyOrRepay(
+    params: ClaimAndSupplyOrRepayParams,
   ): Promise<Transaction | undefined> {
     const tx = new Transaction();
 

@@ -203,9 +203,9 @@ export interface MarketInfo {
 
 /**
  * Parameters for claiming rewards, repaying borrowed coins, and supplying the rest
- * Used with the `claimRepayAndSupplyAll` method
+ * Used with the `claimAndSupplyOrRepay` method
  */
-export interface ClaimRepayAndSupplyAllParams {
+export interface ClaimAndSupplyOrRepayParams {
   /** Object ID of the position capability object */
   positionCapId: string;
   /** Address of the user claiming rewards */
