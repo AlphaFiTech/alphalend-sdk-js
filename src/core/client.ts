@@ -754,28 +754,6 @@ export class AlphalendClient {
   }
 
   /**
-   * Merges multiple coins of the same type into a single coin
-   *
-   * @param tx Transaction to add merge operation to
-   * @param targetCoin Existing coin to merge into (or undefined)
-   * @param coins Array of coins to merge
-   * @returns Transaction argument representing the merged coin
-   */
-  private mergeCoins(
-    tx: Transaction,
-    targetCoin: TransactionObjectArgument | undefined,
-    coins: TransactionObjectArgument[],
-  ): TransactionObjectArgument {
-    if (targetCoin) {
-      tx.mergeCoins(targetCoin, coins);
-    } else {
-      targetCoin = tx.splitCoins(coins[0], [0]);
-      tx.mergeCoins(targetCoin, coins);
-    }
-    return targetCoin;
-  }
-
-  /**
    * Claims rewards, repays borrowed coins, and supplies non-borrowed coins to their markets
    * Coins without markets are transferred to wallet
    *
@@ -793,7 +771,7 @@ export class AlphalendClient {
       params.priceUpdateCoinTypes &&
       params.priceUpdateCoinTypes.length > 0
     ) {
-      await this.updateAllPrices(tx, params.priceUpdateCoinTypes);
+      await this.updatePrices(tx, params.priceUpdateCoinTypes);
     }
 
     // Get reward input data (markets and coin types)
@@ -847,7 +825,7 @@ export class AlphalendClient {
       if (coins.length === 0) continue;
 
       // Merge all coins of this type
-      let mergedCoin = this.mergeCoins(tx, undefined, coins);
+      let mergedCoin = tx.mergeCoins(tx.splitCoins(coins[0], [0])[0], coins);
 
       // Check if this is a borrowed coin
       const borrowInfo = params.borrowedCoins.get(coinType);
@@ -901,8 +879,6 @@ export class AlphalendClient {
         }
       }
     }
-
-    tx.setGasBudget(1000000000);
     return tx;
   }
 
