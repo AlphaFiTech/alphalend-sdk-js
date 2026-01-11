@@ -825,7 +825,8 @@ export class AlphalendClient {
       if (coins.length === 0) continue;
 
       // Merge all coins of this type
-      let mergedCoin = tx.mergeCoins(tx.splitCoins(coins[0], [0])[0], coins);
+      const mergedCoin = tx.splitCoins(coins[0], [0])[0];
+      tx.mergeCoins(mergedCoin, coins);
 
       // Check if this is a borrowed coin
       const borrowInfo = params.borrowedCoins.get(coinType);
@@ -833,7 +834,7 @@ export class AlphalendClient {
         // This coin is borrowed - repay it
         let repayCoin: TransactionObjectArgument;
         if (borrowInfo.debtAmount) {
-          repayCoin = tx.splitCoins(mergedCoin, [borrowInfo.debtAmount]);
+          repayCoin = tx.splitCoins(mergedCoin, [borrowInfo.debtAmount])[0];
         } else {
           repayCoin = mergedCoin;
         }
