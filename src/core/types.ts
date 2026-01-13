@@ -192,6 +192,63 @@ export interface ClaimRewardsParams {
 }
 
 /**
+ * Parameters for claiming rewards with swap functionality
+ * Used with the `claimAndSwapRewards` method to swap multiple reward tokens to a single token
+ */
+export interface ClaimAndSwapRewardsParams {
+  /** Object ID of the position capability object */
+  positionCapId: string;
+  /** Address of the user claiming rewards */
+  address: string;
+  /** Target coin type to swap all rewards into (e.g., "0x2::sui::SUI") */
+  targetCoinType: string;
+  /** Slippage tolerance for swaps (e.g., 0.01 for 1%) */
+  slippage: number;
+  /** Whether to swap and supply/repay in market */
+  supplyOrRepay?: boolean;
+  /** Coin types of user's supplied assets (for price updates) */
+  priceUpdateCoinTypes?: string[];
+}
+
+/**
+ * Parameters for claiming rewards, swapping, and supplying to market
+ * Used with the `claimSwapAndSupply` method
+ */
+export interface ClaimSwapAndSupplyParams {
+  /** Object ID of the position capability object */
+  positionCapId: string;
+  /** Address of the user claiming rewards */
+  address: string;
+  /** Target coin type to swap all rewards into and supply */
+  targetCoinType: string;
+  /** Market ID to supply the swapped tokens to */
+  targetMarketId: string;
+  /** Slippage tolerance for swaps (e.g., 0.01 for 1%) */
+  slippage: number;
+  /** Coin types of user's supplied assets (for price updates) */
+  priceUpdateCoinTypes?: string[];
+}
+
+/**
+ * Parameters for claiming rewards, swapping, and repaying borrowed assets
+ * Used with the `claimSwapAndRepay` method
+ */
+export interface ClaimSwapAndRepayParams {
+  /** Object ID of the position capability object */
+  positionCapId: string;
+  /** Address of the user claiming rewards */
+  address: string;
+  /** Target coin type to swap all rewards into and repay */
+  targetCoinType: string;
+  /** Market ID to repay the debt */
+  targetMarketId: string;
+  /** Slippage tolerance for swaps (e.g., 0.01 for 1%) */
+  slippage: number;
+  /** Amount of debt to repay (in base units) - if not provided, will use all swapped amount */
+  debtAmount?: bigint;
+}
+
+/**
  * Market info for repay and supply operations
  */
 export interface MarketInfo {
