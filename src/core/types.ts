@@ -197,8 +197,6 @@ export interface ClaimRewardsParams {
 export interface MarketInfo {
   /** Market ID */
   marketId: string;
-  /** Debt amount to repay (only for borrowed coins) */
-  debtAmount?: bigint;
 }
 
 /**
