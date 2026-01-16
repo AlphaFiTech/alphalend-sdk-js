@@ -525,38 +525,6 @@ export class AlphalendClient {
       await setPrices(tx);
     }
 
-    const promise = tx.moveCall({
-      target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::remove_collateral`,
-      typeArguments: [params.marketCoinType],
-      arguments: [
-        tx.object(this.constants.LENDING_PROTOCOL_ID), // Protocol object
-        tx.object(params.positionCapId), // Position capability
-        tx.pure.u64(params.marketId), // Market ID
-        tx.pure.u64(params.amount), // Amount to withdraw
-        tx.object(this.constants.SUI_CLOCK_OBJECT_ID), // Clock object
-      ],
-    });
-    const isSui = params.marketCoinType === this.constants.SUI_COIN_TYPE;
-    let coin: string | TransactionObjectArgument | undefined;
-    if (isSui) {
-      coin = tx.moveCall({
-        target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::fulfill_promise_SUI`,
-        arguments: [
-          tx.object(this.constants.LENDING_PROTOCOL_ID),
-          promise,
-          tx.object(this.constants.SUI_SYSTEM_STATE_ID),
-          tx.object(this.constants.SUI_CLOCK_OBJECT_ID),
-        ],
-      });
-    } else {
-      coin = await this.handlePromise(tx, promise, params.marketCoinType);
-    }
-
-    // const quoteResponse = await this.sevenKGateway.getQuote(
-    //   params.marketCoinType,
-    //   params.outputCoinType,
-    //   swapInAmount,
-    // );
     const quoteResponse = await this.cetusSwap.getCetusSwapQuote(
       params.marketCoinType,
       params.outputCoinType,
@@ -566,17 +534,45 @@ export class AlphalendClient {
       console.error("Failed to get swap quote");
       return undefined;
     }
-    // const withdrawCoin = await this.sevenKGateway.getTransactionBlock(
-    //   tx,
-    //   params.address,
-    //   params.slippage,
-    //   quoteResponse,
-    //   coin,
-    // );
+    const isSui = params.marketCoinType === this.constants.SUI_COIN_TYPE;
+    // let coin: string | TransactionObjectArgument | undefined;
+    // if (isSui) {
+    //   coin = tx.moveCall({
+    //     target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::fulfill_promise_SUI`,
+    //     arguments: [
+    //       tx.object(this.constants.LENDING_PROTOCOL_ID),
+    //       // promise,
+    //       tx.object(this.constants.SUI_SYSTEM_STATE_ID),
+    //       tx.object(this.constants.SUI_CLOCK_OBJECT_ID),
+    //     ],
+    //   });
+    // } else {
+    //   coin = await this.handlePromise(tx, coin, params.marketCoinType);
+    // }
+    const coinObject = await this.getCoinObject(
+      tx,
+      params.marketCoinType,
+      params.address,
+    );
+
+    if (!coinObject) {
+      console.error("Failed to get input coin object");
+      return undefined;
+    }
+
+    // Split the exact amount needed for the swap from the coin object
+    const inputCoin = tx.splitCoins(coinObject, [
+      quoteResponse.amountIn.toString(),
+    ]);
+
+    // Transfer the remaining coin back to the user
+    if (coinObject !== tx.gas) {
+      tx.transferObjects([coinObject], params.address);
+    }
     const withdrawCoin = await this.cetusSwap.cetusSwapTokensTxb(
       quoteResponse as RouterDataV3,
       params.slippage,
-      coin,
+      inputCoin,
       params.address,
       tx,
     );
@@ -586,6 +582,80 @@ export class AlphalendClient {
         params.address,
       );
     }
+    /*
+const remainingCoin = tx.moveCall({
+          target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::repay`,
+          typeArguments: [coinType],
+          arguments: [
+            tx.object(this.constants.LENDING_PROTOCOL_ID),
+            tx.object(params.positionCapId),
+            tx.pure.u64(borrowInfo.marketId),
+            repayCoin,
+            tx.object(this.constants.SUI_CLOCK_OBJECT_ID),
+          ],
+        });
+*/
+    const promise = tx.moveCall({
+      target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::repay`,
+      typeArguments: [params.marketCoinType],
+      arguments: [
+        tx.object(this.constants.LENDING_PROTOCOL_ID), // Protocol object
+        tx.object(params.positionCapId), // Position capability
+        tx.pure.u64(params.marketId), // Market ID
+        tx.pure.u64(params.amount), // Amount to withdraw
+        tx.object(this.constants.SUI_CLOCK_OBJECT_ID), // Clock object
+      ],
+    });
+    // const isSui = params.marketCoinType === this.constants.SUI_COIN_TYPE;
+    // let coin: string | TransactionObjectArgument | undefined;
+    // if (isSui) {
+    //   coin = tx.moveCall({
+    //     target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::fulfill_promise_SUI`,
+    //     arguments: [
+    //       tx.object(this.constants.LENDING_PROTOCOL_ID),
+    //       promise,
+    //       tx.object(this.constants.SUI_SYSTEM_STATE_ID),
+    //       tx.object(this.constants.SUI_CLOCK_OBJECT_ID),
+    //     ],
+    //   });
+    // } else {
+    //   coin = await this.handlePromise(tx, promise, params.marketCoinType);
+    // }
+
+    // const quoteResponse = await this.sevenKGateway.getQuote(
+    //   params.marketCoinType,
+    //   params.outputCoinType,
+    //   swapInAmount,
+    // );
+    // const quoteResponse = await this.cetusSwap.getCetusSwapQuote(
+    //   params.marketCoinType,
+    //   params.outputCoinType,
+    //   swapInAmount,
+    // );
+    // if (!quoteResponse) {
+    //   console.error("Failed to get swap quote");
+    //   return undefined;
+    // }
+    // const withdrawCoin = await this.sevenKGateway.getTransactionBlock(
+    //   tx,
+    //   params.address,
+    //   params.slippage,
+    //   quoteResponse,
+    //   coin,
+    // );
+    // const withdrawCoin = await this.cetusSwap.cetusSwapTokensTxb(
+    //   quoteResponse as RouterDataV3,
+    //   params.slippage,
+    //   coin,
+    //   params.address,
+    //   tx,
+    // );
+    // if (withdrawCoin) {
+    //   tx.transferObjects(
+    //     [withdrawCoin] as [TransactionObjectArgument],
+    //     params.address,
+    //   );
+    // }
     tx.setGasBudget(1000000000);
     return tx;
   }
