@@ -535,20 +535,7 @@ export class AlphalendClient {
       return undefined;
     }
     const isSui = params.marketCoinType === this.constants.SUI_COIN_TYPE;
-    // let coin: string | TransactionObjectArgument | undefined;
-    // if (isSui) {
-    //   coin = tx.moveCall({
-    //     target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::fulfill_promise_SUI`,
-    //     arguments: [
-    //       tx.object(this.constants.LENDING_PROTOCOL_ID),
-    //       // promise,
-    //       tx.object(this.constants.SUI_SYSTEM_STATE_ID),
-    //       tx.object(this.constants.SUI_CLOCK_OBJECT_ID),
-    //     ],
-    //   });
-    // } else {
-    //   coin = await this.handlePromise(tx, coin, params.marketCoinType);
-    // }
+
     const coinObject = await this.getCoinObject(
       tx,
       params.marketCoinType,
@@ -569,94 +556,38 @@ export class AlphalendClient {
     if (coinObject !== tx.gas) {
       tx.transferObjects([coinObject], params.address);
     }
-    const withdrawCoin = await this.cetusSwap.cetusSwapTokensTxb(
+    const repayCoin = await this.cetusSwap.cetusSwapTokensTxb(
       quoteResponse as RouterDataV3,
       params.slippage,
       inputCoin,
       params.address,
       tx,
     );
-    if (withdrawCoin) {
-      tx.transferObjects(
-        [withdrawCoin] as [TransactionObjectArgument],
-        params.address,
-      );
-    }
-    /*
-const remainingCoin = tx.moveCall({
-          target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::repay`,
-          typeArguments: [coinType],
-          arguments: [
-            tx.object(this.constants.LENDING_PROTOCOL_ID),
-            tx.object(params.positionCapId),
-            tx.pure.u64(borrowInfo.marketId),
-            repayCoin,
-            tx.object(this.constants.SUI_CLOCK_OBJECT_ID),
-          ],
-        });
-*/
-    const promise = tx.moveCall({
+
+    console.log(
+      "repayCoin in zapOutWithdraw",
+      repayCoin,
+      [repayCoin],
+      quoteResponse,
+    );
+
+    const remainingCoin = tx.moveCall({
       target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::repay`,
-      typeArguments: [params.marketCoinType],
+      typeArguments: [params.outputCoinType],
       arguments: [
         tx.object(this.constants.LENDING_PROTOCOL_ID), // Protocol object
         tx.object(params.positionCapId), // Position capability
         tx.pure.u64(params.marketId), // Market ID
-        tx.pure.u64(params.amount), // Amount to withdraw
+        repayCoin as TransactionObjectArgument, // Coin to repay with
         tx.object(this.constants.SUI_CLOCK_OBJECT_ID), // Clock object
       ],
     });
-    // const isSui = params.marketCoinType === this.constants.SUI_COIN_TYPE;
-    // let coin: string | TransactionObjectArgument | undefined;
-    // if (isSui) {
-    //   coin = tx.moveCall({
-    //     target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::fulfill_promise_SUI`,
-    //     arguments: [
-    //       tx.object(this.constants.LENDING_PROTOCOL_ID),
-    //       promise,
-    //       tx.object(this.constants.SUI_SYSTEM_STATE_ID),
-    //       tx.object(this.constants.SUI_CLOCK_OBJECT_ID),
-    //     ],
-    //   });
-    // } else {
-    //   coin = await this.handlePromise(tx, promise, params.marketCoinType);
-    // }
+    console.log("remainingCoin in zapOutWithdraw", remainingCoin, [
+      remainingCoin,
+    ]);
+    tx.transferObjects([remainingCoin], params.address);
 
-    // const quoteResponse = await this.sevenKGateway.getQuote(
-    //   params.marketCoinType,
-    //   params.outputCoinType,
-    //   swapInAmount,
-    // );
-    // const quoteResponse = await this.cetusSwap.getCetusSwapQuote(
-    //   params.marketCoinType,
-    //   params.outputCoinType,
-    //   swapInAmount,
-    // );
-    // if (!quoteResponse) {
-    //   console.error("Failed to get swap quote");
-    //   return undefined;
-    // }
-    // const withdrawCoin = await this.sevenKGateway.getTransactionBlock(
-    //   tx,
-    //   params.address,
-    //   params.slippage,
-    //   quoteResponse,
-    //   coin,
-    // );
-    // const withdrawCoin = await this.cetusSwap.cetusSwapTokensTxb(
-    //   quoteResponse as RouterDataV3,
-    //   params.slippage,
-    //   coin,
-    //   params.address,
-    //   tx,
-    // );
-    // if (withdrawCoin) {
-    //   tx.transferObjects(
-    //     [withdrawCoin] as [TransactionObjectArgument],
-    //     params.address,
-    //   );
-    // }
-    tx.setGasBudget(1000000000);
+    tx.setGasBudget(100_000_000n);
     return tx;
   }
 
