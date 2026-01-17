@@ -525,38 +525,6 @@ export class AlphalendClient {
       await setPrices(tx);
     }
 
-    const promise = tx.moveCall({
-      target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::remove_collateral`,
-      typeArguments: [params.marketCoinType],
-      arguments: [
-        tx.object(this.constants.LENDING_PROTOCOL_ID), // Protocol object
-        tx.object(params.positionCapId), // Position capability
-        tx.pure.u64(params.marketId), // Market ID
-        tx.pure.u64(params.amount), // Amount to withdraw
-        tx.object(this.constants.SUI_CLOCK_OBJECT_ID), // Clock object
-      ],
-    });
-    const isSui = params.marketCoinType === this.constants.SUI_COIN_TYPE;
-    let coin: string | TransactionObjectArgument | undefined;
-    if (isSui) {
-      coin = tx.moveCall({
-        target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::fulfill_promise_SUI`,
-        arguments: [
-          tx.object(this.constants.LENDING_PROTOCOL_ID),
-          promise,
-          tx.object(this.constants.SUI_SYSTEM_STATE_ID),
-          tx.object(this.constants.SUI_CLOCK_OBJECT_ID),
-        ],
-      });
-    } else {
-      coin = await this.handlePromise(tx, promise, params.marketCoinType);
-    }
-
-    // const quoteResponse = await this.sevenKGateway.getQuote(
-    //   params.marketCoinType,
-    //   params.outputCoinType,
-    //   swapInAmount,
-    // );
     const quoteResponse = await this.cetusSwap.getCetusSwapQuote(
       params.marketCoinType,
       params.outputCoinType,
@@ -566,27 +534,60 @@ export class AlphalendClient {
       console.error("Failed to get swap quote");
       return undefined;
     }
-    // const withdrawCoin = await this.sevenKGateway.getTransactionBlock(
-    //   tx,
-    //   params.address,
-    //   params.slippage,
-    //   quoteResponse,
-    //   coin,
-    // );
-    const withdrawCoin = await this.cetusSwap.cetusSwapTokensTxb(
+    const isSui = params.marketCoinType === this.constants.SUI_COIN_TYPE;
+
+    const coinObject = await this.getCoinObject(
+      tx,
+      params.marketCoinType,
+      params.address,
+    );
+
+    if (!coinObject) {
+      console.error("Failed to get input coin object");
+      return undefined;
+    }
+
+    // Split the exact amount needed for the swap from the coin object
+    const inputCoin = tx.splitCoins(coinObject, [
+      quoteResponse.amountIn.toString(),
+    ]);
+
+    // Transfer the remaining coin back to the user
+    if (coinObject !== tx.gas) {
+      tx.transferObjects([coinObject], params.address);
+    }
+    const repayCoin = await this.cetusSwap.cetusSwapTokensTxb(
       quoteResponse as RouterDataV3,
       params.slippage,
-      coin,
+      inputCoin,
       params.address,
       tx,
     );
-    if (withdrawCoin) {
-      tx.transferObjects(
-        [withdrawCoin] as [TransactionObjectArgument],
-        params.address,
-      );
-    }
-    tx.setGasBudget(1000000000);
+
+    console.log(
+      "repayCoin in zapOutWithdraw",
+      repayCoin,
+      [repayCoin],
+      quoteResponse,
+    );
+
+    const remainingCoin = tx.moveCall({
+      target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::repay`,
+      typeArguments: [params.outputCoinType],
+      arguments: [
+        tx.object(this.constants.LENDING_PROTOCOL_ID), // Protocol object
+        tx.object(params.positionCapId), // Position capability
+        tx.pure.u64(params.marketId), // Market ID
+        repayCoin as TransactionObjectArgument, // Coin to repay with
+        tx.object(this.constants.SUI_CLOCK_OBJECT_ID), // Clock object
+      ],
+    });
+    console.log("remainingCoin in zapOutWithdraw", remainingCoin, [
+      remainingCoin,
+    ]);
+    tx.transferObjects([remainingCoin], params.address);
+
+    tx.setGasBudget(100_000_000n);
     return tx;
   }
 
@@ -826,7 +827,7 @@ export class AlphalendClient {
    * Claims rewards, repays borrowed coins, and supplies non-borrowed coins to their markets
    * Coins without markets are transferred to wallet
    *
-   * @param params ClaimAndSupplyOrRepayParams - includes positionCapId, address, borrowedCoins, supplyableMarkets
+   * @param params ClaimAndSupplyOrRepayParams - includes positionCapId, address, borrowedCoins
    * @returns Transaction object ready for signing and execution
    */
   async claimAndSupplyOrRepay(
@@ -859,7 +860,7 @@ export class AlphalendClient {
 
         // Collect reward for this coin type
         const [coin1, promise] = tx.moveCall({
-          target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::collect_reward`,
+          target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::collect_reward_and_deposit`,
           typeArguments: [coinType],
           arguments: [
             tx.object(this.constants.LENDING_PROTOCOL_ID),
@@ -900,14 +901,6 @@ export class AlphalendClient {
       // Check if this is a borrowed coin
       const borrowInfo = params.borrowedCoins.get(coinType);
       if (borrowInfo) {
-        // This coin is borrowed - repay it
-        let repayCoin: TransactionObjectArgument;
-        if (borrowInfo.debtAmount) {
-          repayCoin = tx.splitCoins(mergedCoin, [borrowInfo.debtAmount])[0];
-        } else {
-          repayCoin = mergedCoin;
-        }
-
         // Repay the debt
         const remainingCoin = tx.moveCall({
           target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::repay`,
@@ -916,37 +909,14 @@ export class AlphalendClient {
             tx.object(this.constants.LENDING_PROTOCOL_ID),
             tx.object(params.positionCapId),
             tx.pure.u64(borrowInfo.marketId),
-            repayCoin,
+            mergedCoin,
             tx.object(this.constants.SUI_CLOCK_OBJECT_ID),
           ],
         });
-
-        // Transfer remaining coins back to user
-        if (borrowInfo.debtAmount) {
-          tx.transferObjects([remainingCoin, mergedCoin], params.address);
-        } else {
-          tx.transferObjects([remainingCoin], params.address);
-        }
+        tx.transferObjects([remainingCoin], params.address);
       } else {
-        // Not borrowed - check if we can supply it
-        const supplyMarketId = params.supplyableMarkets.get(coinType);
-        if (supplyMarketId) {
-          // Supply to the market using add_collateral
-          tx.moveCall({
-            target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::add_collateral`,
-            typeArguments: [coinType],
-            arguments: [
-              tx.object(this.constants.LENDING_PROTOCOL_ID),
-              tx.object(params.positionCapId),
-              tx.pure.u64(supplyMarketId),
-              mergedCoin,
-              tx.object(this.constants.SUI_CLOCK_OBJECT_ID),
-            ],
-          });
-        } else {
-          // No market to supply - transfer to wallet
-          tx.transferObjects([mergedCoin], params.address);
-        }
+        // No market to supply - transfer to wallet
+        tx.transferObjects([mergedCoin], params.address);
       }
     }
     return tx;
