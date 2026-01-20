@@ -24,6 +24,7 @@ import {
   ClaimSwapAndRepayParams,
   LiquidateParams,
   MarketData,
+  MarketInfo,
   UserPortfolio,
   ProtocolStats,
   CoinMetadata,
@@ -761,6 +762,7 @@ export class AlphalendClient {
   }
 
   /**
+<<<<<<< HEAD
    * Merges multiple coins of the same type into a single coin
    *
    * @param tx Transaction to add merge operation to
@@ -1238,6 +1240,11 @@ export class AlphalendClient {
    * Claims rewards, repays borrowed coins, and optionally supplies leftover/non-borrowed coins to their markets
    * Coins without supply markets are transferred to wallet
    *
+=======
+   * Claims rewards, repays borrowed coins, and optionally supplies leftover/non-borrowed coins to their markets
+   * Coins without supply markets are transferred to wallet
+   *
+>>>>>>> 6e948f85f8c3539bef07a8e2fd71740d1a9ca68e
    * @param params ClaimAndSupplyOrRepayParams - includes positionCapId, address, borrowedCoins, supplyMarkets
    * @returns Transaction object ready for signing and execution
    */
