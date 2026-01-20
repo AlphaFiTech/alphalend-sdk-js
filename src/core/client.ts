@@ -34,6 +34,7 @@ import {
   AlphalendClientOptions,
   ClaimAndSwapRewardsParams,
   ClaimSwapAndSupplyParams,
+  MarketInfo,
 } from "./types.js";
 import {
   getAlphaReceipt,
@@ -1068,8 +1069,8 @@ export class AlphalendClient {
   }
 
   /**
-   * Claims rewards, swaps them to target token, and repays borrowed amount
-   * Any remaining amount after repayment goes to the user's wallet
+   * Claims rewards, swaps them to target token, repays borrowed amount, and supplies remaining to market
+   * Any remaining amount after repayment is supplied to the same market
    *
    * @param params ClaimSwapAndRepayParams - includes positionCapId, address, targetCoinType, targetMarketId, slippage, debtAmount
    * @returns Transaction object ready for signing and execution
@@ -1207,24 +1208,37 @@ export class AlphalendClient {
       ],
     });
 
-    // Transfer remaining coins back to user
+    // Supply remaining amount to the market (after repay)
+    // If debt amount was specified, merge the unsplit portion with remaining coin
+    let finalCoin = remainingCoin;
     if (params.debtAmount) {
-      // If we split coins, transfer both the remaining from repay and the unsplit portion
-      tx.transferObjects([remainingCoin, targetCoin], params.address);
-    } else {
-      // Transfer only the remaining coin from repay
-      tx.transferObjects([remainingCoin], params.address);
+      // Merge the remaining from repay with the unsplit portion
+      tx.mergeCoins(remainingCoin, [targetCoin]);
+      finalCoin = remainingCoin;
     }
+
+    // Supply the final coin to the market
+    tx.moveCall({
+      target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::add_collateral`,
+      typeArguments: [params.targetCoinType],
+      arguments: [
+        tx.object(this.constants.LENDING_PROTOCOL_ID),
+        tx.object(params.positionCapId),
+        tx.pure.u64(params.targetMarketId),
+        finalCoin,
+        tx.object(this.constants.SUI_CLOCK_OBJECT_ID),
+      ],
+    });
 
     tx.setGasBudget(1000000000);
     return tx;
   }
 
   /**
-   * Claims rewards, repays borrowed coins, and supplies non-borrowed coins to their markets
-   * Coins without markets are transferred to wallet
+   * Claims rewards, repays borrowed coins, and optionally supplies leftover/non-borrowed coins to their markets
+   * Coins without supply markets are transferred to wallet
    *
-   * @param params ClaimAndSupplyOrRepayParams - includes positionCapId, address, borrowedCoins
+   * @param params ClaimAndSupplyOrRepayParams - includes positionCapId, address, borrowedCoins, supplyMarkets
    * @returns Transaction object ready for signing and execution
    */
   async claimAndSupplyOrRepay(
@@ -1251,6 +1265,18 @@ export class AlphalendClient {
     // Collect rewards for each market and coin type
     const rewardCoinsByType = new Map<string, TransactionObjectArgument[]>();
 
+    const addCoinToMap = (
+      coinType: string,
+      coin: TransactionObjectArgument,
+    ) => {
+      const coins = rewardCoinsByType.get(coinType);
+      if (coins) {
+        coins.push(coin);
+      } else {
+        rewardCoinsByType.set(coinType, [coin]);
+      }
+    };
+
     for (const data of rewardInput) {
       for (let coinType of data.coinTypes) {
         coinType = "0x" + coinType;
@@ -1267,25 +1293,37 @@ export class AlphalendClient {
           ],
         });
 
-        // Handle promise if present
+        // Handle promise and add coins to map
         if (promise) {
           const coin2 = await this.handlePromise(tx, promise, coinType);
-          if (coin2) {
-            if (!rewardCoinsByType.has(coinType)) {
-              rewardCoinsByType.set(coinType, []);
-            }
-            rewardCoinsByType.get(coinType)!.push(coin2);
-          }
+          if (coin2) addCoinToMap(coinType, coin2);
         }
-
-        if (coin1) {
-          if (!rewardCoinsByType.has(coinType)) {
-            rewardCoinsByType.set(coinType, []);
-          }
-          rewardCoinsByType.get(coinType)!.push(coin1);
-        }
+        if (coin1) addCoinToMap(coinType, coin1);
       }
     }
+
+    // Function to supply coin to market or transfer to wallet
+    const handleCoin = (
+      coin: TransactionObjectArgument,
+      coinType: string,
+      supplyInfo?: MarketInfo,
+    ) => {
+      if (supplyInfo) {
+        tx.moveCall({
+          target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::add_collateral`,
+          typeArguments: [coinType],
+          arguments: [
+            tx.object(this.constants.LENDING_PROTOCOL_ID),
+            tx.object(params.positionCapId),
+            tx.pure.u64(supplyInfo.marketId),
+            coin,
+            tx.object(this.constants.SUI_CLOCK_OBJECT_ID),
+          ],
+        });
+      } else {
+        tx.transferObjects([coin], params.address);
+      }
+    };
 
     // Process each reward coin type
     for (const [coinType, coins] of rewardCoinsByType.entries()) {
@@ -1295,10 +1333,10 @@ export class AlphalendClient {
       const mergedCoin = tx.splitCoins(coins[0], [0])[0];
       tx.mergeCoins(mergedCoin, coins);
 
-      // Check if this is a borrowed coin
       const borrowInfo = params.borrowedCoins.get(coinType);
+
       if (borrowInfo) {
-        // Repay the debt
+        // Repay the debt and handle leftover
         const remainingCoin = tx.moveCall({
           target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::repay`,
           typeArguments: [coinType],
@@ -1310,10 +1348,14 @@ export class AlphalendClient {
             tx.object(this.constants.SUI_CLOCK_OBJECT_ID),
           ],
         });
-        tx.transferObjects([remainingCoin], params.address);
+        handleCoin(
+          remainingCoin,
+          coinType,
+          params.supplyMarkets?.get(coinType),
+        );
       } else {
-        // No market to supply - transfer to wallet
-        tx.transferObjects([mergedCoin], params.address);
+        // Not borrowed - supply or transfer
+        handleCoin(mergedCoin, coinType, params.supplyMarkets?.get(coinType));
       }
     }
     return tx;
