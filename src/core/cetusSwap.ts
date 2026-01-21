@@ -75,17 +75,17 @@ export class CetusSwap {
       const txb = existingTx || new Transaction();
 
       if (inputCoin && address) {
-        // Use routerSwapWithMaxAmountIn when explicit coin control is needed
-        const coinOut = await this.client.routerSwapWithMaxAmountIn({
+        // Use routerSwap to completely consume the input coin
+        // Now using accurate quotes, so we can use the actual slippage parameter
+        const coinOut = await this.client.routerSwap({
           router,
           txb,
           inputCoin: inputCoin as TransactionObjectArgument,
-          slippage: slippage || 0.01,
-          maxAmountIn: new BN(router.amountIn.toString()), //new BN(router.amountIn.toString()),
+          slippage: slippage || 0.01, // Use provided slippage or 1% default
         });
 
-        // Return both transaction and target coin for use in zap deposits
-        return coinOut; //{ tx: txb, coinOut };
+        // Return target coin for use in subsequent operations
+        return coinOut;
       } else {
         // Use fastRouterSwap for simple swaps
         await this.client.fastRouterSwap({
@@ -98,6 +98,51 @@ export class CetusSwap {
       }
     } catch (error) {
       console.error("Error swapping tokens in cetus swap", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Build swap transaction using routerSwap method (BuildRouterSwapParamsV3)
+   * This method will completely consume the input coin amount and return target coin object.
+   * 
+   * @param router - RouterData Object returned by findRouters method
+   * @param txb - The programmable transaction builder
+   * @param inputCoin - The input coin object to be swapped (will be completely consumed)
+   * @param slippage - A value between 0 and 1, representing the maximum allowed price slippage
+   *                   (e.g., 0.01 = 1%, 0.20 = 20%)
+   * @returns TransactionObjectArgument - The target coin object that can be used in PTB
+   */
+  async routerSwapWithInputCoin(
+    router: RouterDataV3,
+    txb: Transaction,
+    inputCoin: TransactionObjectArgument,
+    slippage: number,
+  ): Promise<TransactionObjectArgument> {
+    try {
+      if (!router) {
+        throw new Error("No router data provided");
+      }
+
+      console.log("Cetus routerSwap - completely consuming input coin", {
+        amountIn: router.amountIn.toString(),
+        amountOut: router.amountOut.toString(),
+        slippage,
+      });
+
+      // Use routerSwap method which completely consumes the input coin
+      // BuildRouterSwapParamsV3 requires: router, txb, inputCoin, slippage
+      const targetCoin = await this.client.routerSwap({
+        router,
+        txb,
+        inputCoin,
+        slippage,
+      });
+
+      console.log("Swap completed, target coin object returned");
+      return targetCoin;
+    } catch (error) {
+      console.error("Error in routerSwap:", error);
       throw error;
     }
   }
