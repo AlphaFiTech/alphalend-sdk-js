@@ -76,7 +76,6 @@ export class CetusSwap {
 
       if (inputCoin && address) {
         // Use routerSwap to completely consume the input coin
-        // Now using accurate quotes, so we can use the actual slippage parameter
         const coinOut = await this.client.routerSwap({
           router,
           txb,
@@ -94,7 +93,7 @@ export class CetusSwap {
           slippage: slippage || 0.01,
         });
 
-        return txb; //{ tx: txb };
+        return txb;
       }
     } catch (error) {
       console.error("Error swapping tokens in cetus swap", error);
@@ -110,7 +109,6 @@ export class CetusSwap {
    * @param txb - The programmable transaction builder
    * @param inputCoin - The input coin object to be swapped (will be completely consumed)
    * @param slippage - A value between 0 and 1, representing the maximum allowed price slippage
-   *                   (e.g., 0.01 = 1%, 0.20 = 20%)
    * @returns TransactionObjectArgument - The target coin object that can be used in PTB
    */
   async routerSwapWithInputCoin(
@@ -130,8 +128,6 @@ export class CetusSwap {
         slippage,
       });
 
-      // Use routerSwap method which completely consumes the input coin
-      // BuildRouterSwapParamsV3 requires: router, txb, inputCoin, slippage
       const targetCoin = await this.client.routerSwap({
         router,
         txb,

@@ -21,7 +21,7 @@ import {
   RepayParams,
   ClaimRewardsParams,
   ClaimAndSupplyOrRepayParams,
-  ClaimSwapAndRepayParams,
+  ClaimSwapAndSupplyOrRepayParams,
   LiquidateParams,
   MarketData,
   MarketInfo,
@@ -34,7 +34,6 @@ import {
   quoteObject,
   AlphalendClientOptions,
   ClaimAndSwapRewardsParams,
-  ClaimSwapAndSupplyParams,
 } from "./types.js";
 import {
   getAlphaReceipt,
@@ -862,13 +861,11 @@ export class AlphalendClient {
           targetCoin = mergedCoin;
         }
       } else {
-        // Get the actual reward amount for this coin type to get accurate quote
         // Normalize coin types for comparison (both with and without 0x prefix)
         const normalizedCoinType = coinType.toLowerCase().replace(/^0x/, '');
         let quoteAmount: string;
         
         if (params.rewardAmounts) {
-          // Try to find the reward amount with various coin type formats
           let foundAmount: string | undefined;
           for (const [rewardCoinType, amount] of params.rewardAmounts.entries()) {
             const normalizedRewardType = rewardCoinType.toLowerCase().replace(/^0x/, '');
@@ -882,9 +879,6 @@ export class AlphalendClient {
           quoteAmount = "1000000000"; // Fallback to placeholder if rewardAmounts not provided
         }
 
-        console.log(`Getting quote for ${coinType} with amount: ${quoteAmount}`);
-
-        // Get swap quote with actual or placeholder amount
         const quoteResponse = await this.cetusSwap.getCetusSwapQuote(
           coinType,
           params.targetCoinType,
@@ -895,8 +889,6 @@ export class AlphalendClient {
           console.error(
             `Failed to get swap quote for ${coinType} to ${params.targetCoinType}`,
           );
-          // For claimAndSwapRewards, we should NOT fall back to transferring original tokens
-          // The user expects ONLY the target token, so fail if swap cannot happen
           throw new Error(
             `Cannot swap ${coinType} to ${params.targetCoinType}: No swap route available`,
           );
@@ -905,7 +897,6 @@ export class AlphalendClient {
         // Perform swap with the actual coin object
         let swappedCoin: TransactionObjectArgument | Transaction;
         try {
-          // Use provided slippage since we now have accurate quotes
           swappedCoin = await this.cetusSwap.cetusSwapTokensTxb(
             quoteResponse as RouterDataV3,
             params.slippage || 0.01, // Use provided slippage or 1% default
@@ -915,7 +906,6 @@ export class AlphalendClient {
           );
         } catch (error) {
           console.error(`Error swapping ${coinType} to ${params.targetCoinType}:`, error);
-          // For claimAndSwapRewards, the user expects ONLY the target token
           throw new Error(
             `Swap failed for ${coinType} to ${params.targetCoinType}: ${error}`,
           );
@@ -925,7 +915,6 @@ export class AlphalendClient {
           console.error(
             `Failed to swap ${coinType} to ${params.targetCoinType}`,
           );
-          // For claimAndSwapRewards, we should NOT fall back to transferring original tokens
           throw new Error(
             `Swap failed for ${coinType} to ${params.targetCoinType}`,
           );
@@ -944,20 +933,19 @@ export class AlphalendClient {
     if (targetCoin) {
       tx.transferObjects([targetCoin], params.address);
     }
-
-    tx.setGasBudget(1000000000);
     return tx;
   }
 
   /**
-   * Claims rewards, swaps them to target token, and supplies to a market
-   * If the same coin exists in borrows, it repays first and supplies the remaining amount
+   * Claims rewards, swaps them to target token, repays borrowed amount, and supplies remaining to market
+   * The entire swapped amount is passed to the repay function, which automatically deducts what's needed
+   * for repayment and returns the excess. The excess is then supplied to the same market.
    *
-   * @param params ClaimSwapAndSupplyParams - includes positionCapId, address, targetCoinType, targetMarketId, slippage
+   * @param params ClaimSwapAndSupplyOrRepayParams - includes positionCapId, address, targetCoinType, targetMarketId, slippage
    * @returns Transaction object ready for signing and execution
    */
-  async claimSwapAndSupply(
-    params: ClaimSwapAndSupplyParams,
+  async claimSwapAndSupplyOrRepay(
+    params: ClaimSwapAndSupplyOrRepayParams,
   ): Promise<Transaction | undefined> {
     const tx = new Transaction();
 
@@ -969,11 +957,9 @@ export class AlphalendClient {
     );
 
     if (!rewardInput || rewardInput.length === 0) {
-      console.log("No rewards to claim");
       return undefined;
     }
 
-    // Update prices if provided
     if (
       this.network === "mainnet" &&
       params.priceUpdateCoinTypes &&
@@ -1035,13 +1021,11 @@ export class AlphalendClient {
           targetCoin = mergedCoin;
         }
       } else {
-        // Get the actual reward amount for this coin type to get accurate quote
         // Normalize coin types for comparison (both with and without 0x prefix)
         const normalizedCoinType = coinType.toLowerCase().replace(/^0x/, '');
         let quoteAmount: string;
         
         if (params.rewardAmounts) {
-          // Try to find the reward amount with various coin type formats
           let foundAmount: string | undefined;
           for (const [rewardCoinType, amount] of params.rewardAmounts.entries()) {
             const normalizedRewardType = rewardCoinType.toLowerCase().replace(/^0x/, '');
@@ -1055,8 +1039,6 @@ export class AlphalendClient {
           quoteAmount = "1000000000"; // Fallback to placeholder if rewardAmounts not provided
         }
 
-        console.log(`Getting quote for ${coinType} with amount: ${quoteAmount}`);
-
         const quoteResponse = await this.cetusSwap.getCetusSwapQuote(
           coinType,
           params.targetCoinType,
@@ -1065,14 +1047,12 @@ export class AlphalendClient {
 
         if (!quoteResponse) {
           console.error(`Failed to get swap quote for ${coinType} to ${params.targetCoinType}`);
-          // Transfer the merged coin to user since swap isn't possible
           tx.transferObjects([mergedCoin], params.address);
           continue;
         }
 
         let swappedCoin: TransactionObjectArgument | Transaction;
         try {
-          // Use provided slippage since we now have accurate quotes
           swappedCoin = await this.cetusSwap.cetusSwapTokensTxb(
             quoteResponse as RouterDataV3,
             params.slippage || 0.01, // Use provided slippage or 1% default
@@ -1082,180 +1062,11 @@ export class AlphalendClient {
           );
         } catch (error) {
           console.error(`Error swapping ${coinType} to ${params.targetCoinType}:`, error);
-          // Don't try to transfer mergedCoin - it's already consumed
-          // Just skip this coin and continue
           continue;
         }
 
         if (!swappedCoin || swappedCoin instanceof Transaction) {
           console.error(`Failed to swap ${coinType} to ${params.targetCoinType}`);
-          // Don't try to transfer mergedCoin - it's already consumed by the swap attempt
-          continue;
-        }
-
-        if (targetCoin) {
-          tx.mergeCoins(targetCoin, [swappedCoin as TransactionObjectArgument]);
-        } else {
-          targetCoin = swappedCoin as TransactionObjectArgument;
-        }
-      }
-    }
-
-    if (!targetCoin) {
-      console.error("No target coin available for supply");
-      return undefined;
-    }
-
-    // Supply the target coin to the market
-    tx.moveCall({
-      target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::add_collateral`,
-      typeArguments: [params.targetCoinType],
-      arguments: [
-        tx.object(this.constants.LENDING_PROTOCOL_ID),
-        tx.object(params.positionCapId),
-        tx.pure.u64(params.targetMarketId),
-        targetCoin,
-        tx.object(this.constants.SUI_CLOCK_OBJECT_ID),
-      ],
-    });
-
-    tx.setGasBudget(1000000000);
-    return tx;
-  }
-
-  /**
-   * Claims rewards, swaps them to target token, repays borrowed amount, and supplies remaining to market
-   * The entire swapped amount is passed to the repay function, which automatically deducts what's needed
-   * for repayment and returns the excess. The excess is then supplied to the same market.
-   *
-   * @param params ClaimSwapAndRepayParams - includes positionCapId, address, targetCoinType, targetMarketId, slippage
-   * @returns Transaction object ready for signing and execution
-   */
-  async claimSwapAndRepay(
-    params: ClaimSwapAndRepayParams,
-  ): Promise<Transaction | undefined> {
-    const tx = new Transaction();
-
-    // Get all claimable rewards
-    const rewardInput = await getClaimRewardInput(
-      this.client,
-      this.network,
-      params.address,
-    );
-
-    if (!rewardInput || rewardInput.length === 0) {
-      console.log("No rewards to claim");
-      return undefined;
-    }
-
-    // Collect all reward coins by coin type
-    const rewardCoinsByType: Map<string, TransactionObjectArgument[]> =
-      new Map();
-
-    // Claim all rewards
-    for (const data of rewardInput) {
-      for (let coinType of data.coinTypes) {
-        coinType = "0x" + coinType;
-        const [coin1, promise] = tx.moveCall({
-          target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::collect_reward`,
-          typeArguments: [coinType],
-          arguments: [
-            tx.object(this.constants.LENDING_PROTOCOL_ID),
-            tx.pure.u64(data.marketId),
-            tx.object(params.positionCapId),
-            tx.object(this.constants.SUI_CLOCK_OBJECT_ID),
-          ],
-        });
-
-        if (promise) {
-          const coin2 = await this.handlePromise(tx, promise, coinType);
-          if (coin2) {
-            if (!rewardCoinsByType.has(coinType)) {
-              rewardCoinsByType.set(coinType, []);
-            }
-            rewardCoinsByType.get(coinType)!.push(coin2);
-          }
-        }
-
-        if (coin1) {
-          if (!rewardCoinsByType.has(coinType)) {
-            rewardCoinsByType.set(coinType, []);
-          }
-          rewardCoinsByType.get(coinType)!.push(coin1);
-        }
-      }
-    }
-
-    // Merge coins and swap to target coin
-    let targetCoin: TransactionObjectArgument | undefined = undefined;
-
-    for (const [coinType, coins] of rewardCoinsByType.entries()) {
-      if (coins.length === 0) continue;
-
-      let mergedCoin = this.mergeCoins(tx, undefined, coins);
-
-      if (coinType.toLowerCase() === params.targetCoinType.toLowerCase()) {
-        if (targetCoin) {
-          tx.mergeCoins(targetCoin, [mergedCoin]);
-        } else {
-          targetCoin = mergedCoin;
-        }
-      } else {
-        // Get the actual reward amount for this coin type to get accurate quote
-        // Normalize coin types for comparison (both with and without 0x prefix)
-        const normalizedCoinType = coinType.toLowerCase().replace(/^0x/, '');
-        let quoteAmount: string;
-        
-        if (params.rewardAmounts) {
-          // Try to find the reward amount with various coin type formats
-          let foundAmount: string | undefined;
-          for (const [rewardCoinType, amount] of params.rewardAmounts.entries()) {
-            const normalizedRewardType = rewardCoinType.toLowerCase().replace(/^0x/, '');
-            if (normalizedRewardType === normalizedCoinType) {
-              foundAmount = amount;
-              break;
-            }
-          }
-          quoteAmount = foundAmount || "1000000000"; // Fallback to placeholder if not found
-        } else {
-          quoteAmount = "1000000000"; // Fallback to placeholder if rewardAmounts not provided
-        }
-
-        console.log(`Getting quote for ${coinType} with amount: ${quoteAmount}`);
-
-        const quoteResponse = await this.cetusSwap.getCetusSwapQuote(
-          coinType,
-          params.targetCoinType,
-          quoteAmount,
-        );
-
-        if (!quoteResponse) {
-          console.error(`Failed to get swap quote for ${coinType} to ${params.targetCoinType}`);
-          // Transfer the merged coin to user since swap isn't possible
-          tx.transferObjects([mergedCoin], params.address);
-          continue;
-        }
-
-        let swappedCoin: TransactionObjectArgument | Transaction;
-        try {
-          // Use provided slippage since we now have accurate quotes
-          swappedCoin = await this.cetusSwap.cetusSwapTokensTxb(
-            quoteResponse as RouterDataV3,
-            params.slippage || 0.01, // Use provided slippage or 1% default
-            mergedCoin,
-            params.address,
-            tx,
-          );
-        } catch (error) {
-          console.error(`Error swapping ${coinType} to ${params.targetCoinType}:`, error);
-          // Don't try to transfer mergedCoin - it's already consumed
-          // Just skip this coin and continue
-          continue;
-        }
-
-        if (!swappedCoin || swappedCoin instanceof Transaction) {
-          console.error(`Failed to swap ${coinType} to ${params.targetCoinType}`);
-          // Don't try to transfer mergedCoin - it's already consumed by the swap attempt
           continue;
         }
 
@@ -1273,7 +1084,6 @@ export class AlphalendClient {
     }
 
     // Repay the debt using the entire targetCoin
-    // The repay function will return any excess amount
     const remainingCoin = tx.moveCall({
       target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::repay`,
       typeArguments: [params.targetCoinType],
@@ -1287,7 +1097,6 @@ export class AlphalendClient {
     });
 
     // Supply the remaining amount to the market (after repay)
-    // The remainingCoin contains whatever is left after repayment
     tx.moveCall({
       target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::add_collateral`,
       typeArguments: [params.targetCoinType],
@@ -1299,8 +1108,6 @@ export class AlphalendClient {
         tx.object(this.constants.SUI_CLOCK_OBJECT_ID),
       ],
     });
-
-    tx.setGasBudget(1000000000);
     return tx;
   }
 

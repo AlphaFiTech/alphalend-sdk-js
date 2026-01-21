@@ -194,7 +194,6 @@ export interface ClaimRewardsParams {
 /**
  * Parameters for claiming rewards with swap functionality
  * Used with the `claimAndSwapRewards` method to swap multiple reward tokens to a single token
- * Note: Slippage is internally set to 99% to handle placeholder quote mismatches
  */
 export interface ClaimAndSwapRewardsParams {
   /** Object ID of the position capability object */
@@ -203,70 +202,40 @@ export interface ClaimAndSwapRewardsParams {
   address: string;
   /** Target coin type to swap all rewards into (e.g., "0x2::sui::SUI") */
   targetCoinType: string;
-  /** @deprecated Slippage is hardcoded to 99% internally. Parameter kept for backward compatibility. */
+  /** Slippage tolerance */
   slippage: number;
   /** Whether to swap and supply/repay in market */
   supplyOrRepay?: boolean;
   /** Coin types of user's supplied assets (for price updates) */
   priceUpdateCoinTypes?: string[];
-  /**
-   * Map of coin types to their actual reward amounts (in base units as strings)
-   * Used to get accurate swap quotes instead of placeholder amounts
-   */
+  /** Map of coin types to their actual reward amounts */
   rewardAmounts?: Map<string, string>;
 }
 
 /**
- * Parameters for claiming rewards, swapping, and supplying to market
- * Used with the `claimSwapAndSupply` method
- * Note: Slippage is internally set to 99% to handle placeholder quote mismatches
+ * Parameters for claiming rewards, swapping, and repaying borrowed assets (or supplying if no debt)
+ * Used with the `claimSwapAndSupplyOrRepay` method
+ * 
+ * Note: This method handles both repay and supply scenarios. If there's no debt, the entire amount
+ * will be supplied to the market.
  */
-export interface ClaimSwapAndSupplyParams {
-  /** Object ID of the position capability object */
-  positionCapId: string;
-  /** Address of the user claiming rewards */
-  address: string;
-  /** Target coin type to swap all rewards into and supply */
-  targetCoinType: string;
-  /** Market ID to supply the swapped tokens to */
-  targetMarketId: string;
-  /** @deprecated Slippage is hardcoded to 99% internally. Parameter kept for backward compatibility. */
-  slippage: number;
-  /** Coin types of user's supplied assets (for price updates) */
-  priceUpdateCoinTypes?: string[];
-  /**
-   * Map of coin types to their actual reward amounts (in base units as strings)
-   * Used to get accurate swap quotes instead of placeholder amounts
-   */
-  rewardAmounts?: Map<string, string>;
-}
-
-/**
- * Parameters for claiming rewards, swapping, and repaying borrowed assets
- * Used with the `claimSwapAndRepay` method
- * Note: Slippage is internally set to 99% to handle placeholder quote mismatches
- */
-export interface ClaimSwapAndRepayParams {
+export interface ClaimSwapAndSupplyOrRepayParams {
   /** Object ID of the position capability object */
   positionCapId: string;
   /** Address of the user claiming rewards */
   address: string;
   /** Target coin type to swap all rewards into and repay */
   targetCoinType: string;
-  /** Market ID to repay the debt */
+  /** Market ID to repay the debt (or supply if no debt) */
   targetMarketId: string;
-  /** @deprecated Slippage is hardcoded to 99% internally. Parameter kept for backward compatibility. */
+  /** Slippage tolerance */
   slippage: number;
-  /** 
-   * @deprecated This parameter is no longer used. The repay function automatically handles the debt amount.
-   * The entire swapped coin is passed to repay, which takes what's needed and returns the excess.
-   */
+  /** Amount of debt to repay */
   debtAmount?: bigint;
-  /**
-   * Map of coin types to their actual reward amounts (in base units as strings)
-   * Used to get accurate swap quotes instead of placeholder amounts
-   */
+  /** Map of coin types to their actual reward amounts */
   rewardAmounts?: Map<string, string>;
+  /** Coin types of user's supplied assets (for price updates) */
+  priceUpdateCoinTypes?: string[];
 }
 
 /**
