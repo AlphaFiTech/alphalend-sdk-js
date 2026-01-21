@@ -211,6 +211,8 @@ export interface ClaimAndSupplyOrRepayParams {
   address: string;
   /** Map of borrowed coin types to their market info */
   borrowedCoins: Map<string, MarketInfo>;
+  /** Map of coin types to supply markets for leftover coins after repay */
+  supplyMarkets?: Map<string, MarketInfo>;
   /** Coin types for price updates */
   priceUpdateCoinTypes?: string[];
 }
