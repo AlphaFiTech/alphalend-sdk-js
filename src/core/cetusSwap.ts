@@ -8,7 +8,6 @@ import {
   Transaction,
   TransactionObjectArgument,
 } from "@mysten/sui/transactions";
-import BN from "bn.js";
 
 // Re-export RouterDataV3 type for external use
 export type { RouterDataV3 } from "@cetusprotocol/aggregator-sdk";
