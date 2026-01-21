@@ -32,6 +32,7 @@ import {
   MAX_U64,
   quoteObject,
   AlphalendClientOptions,
+  SwapAndRepayParams,
 } from "./types.js";
 import {
   getAlphaReceipt,
@@ -573,7 +574,7 @@ export class AlphalendClient {
   }
 
   async swapAndRepay(
-    params: ZapOutWithdrawParams,
+    params: SwapAndRepayParams,
   ): Promise<Transaction | undefined> {
     const tx = new Transaction();
 
@@ -587,8 +588,8 @@ export class AlphalendClient {
     }
 
     const quoteResponse = await this.cetusSwap.getCetusSwapQuote(
-      params.marketCoinType,
-      params.outputCoinType,
+      params.swapFromCoinType,
+      params.swapToCoinType,
       swapInAmount,
     );
     if (!quoteResponse) {
@@ -599,7 +600,7 @@ export class AlphalendClient {
 
     const coinObject = await this.getCoinObject(
       tx,
-      params.marketCoinType,
+      params.swapFromCoinType,
       params.address,
     );
 
@@ -623,7 +624,7 @@ export class AlphalendClient {
 
     const remainingCoin = tx.moveCall({
       target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::repay`,
-      typeArguments: [params.outputCoinType],
+      typeArguments: [params.swapToCoinType],
       arguments: [
         tx.object(this.constants.LENDING_PROTOCOL_ID), // Protocol object
         tx.object(params.positionCapId), // Position capability
