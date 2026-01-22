@@ -295,14 +295,8 @@ export class AlphalendClient {
   async zapInSupply(
     params: ZapInSupplyParams,
   ): Promise<Transaction | undefined> {
-    console.log("swap and supply params in alphalend sdk", params);
     const tx = new Transaction();
 
-    // const quoteResponse = await this.sevenKGateway.getQuote(
-    //   params.inputCoinType,
-    //   params.marketCoinType,
-    //   params.inputAmount.toString(),
-    // );
     const quoteResponse = await this.cetusSwap.getCetusSwapQuote(
       params.inputCoinType,
       params.marketCoinType,
@@ -314,22 +308,11 @@ export class AlphalendClient {
       return undefined;
     }
 
-    console.log(
-      "quoteResponse in zapInSupply",
-      quoteResponse,
-      quoteResponse.amountIn.toString(),
-      quoteResponse.amountOut.toString(),
-    );
-    // const supplyCoin = await this.sevenKGateway.getTransactionBlock(
-    //   tx,
-    //   params.address,
-    //   params.slippage,
-    //   quoteResponse,
-    // );
     const coinObject = await this.getCoinObject(
       tx,
       params.inputCoinType,
       params.address,
+      BigInt(quoteResponse.amountIn.toString()),
     );
 
     if (!coinObject) {
@@ -354,9 +337,8 @@ export class AlphalendClient {
       params.address,
       tx,
     );
-    console.log("supplyCoin in zapInSupply", supplyCoin);
     if (!supplyCoin) {
-      console.error("Failed to get coin out");
+      console.error("Failed to get coin out from swap");
       return undefined;
     }
 
@@ -535,7 +517,6 @@ export class AlphalendClient {
       console.error("Failed to get swap quote");
       return undefined;
     }
-    const isSui = params.marketCoinType === this.constants.SUI_COIN_TYPE;
 
     const coinObject = await this.getCoinObject(
       tx,
@@ -1295,17 +1276,21 @@ export class AlphalendClient {
         }
       }
 
-      const [coin] = tx.splitCoins(coinsToMerge[0], [0]);
-      tx.mergeCoins(coin, coinsToMerge);
+      // Convert first coin to TransactionObjectArgument to avoid duplicate reference
+      const firstCoin = tx.object(coinsToMerge[0]);
+      const [coin] = tx.splitCoins(firstCoin, [0]);
+      // Merge the remainder (firstCoin) and other coins into the split coin
+      const otherCoins = coinsToMerge.slice(1).map(id => tx.object(id));
+      tx.mergeCoins(coin, [firstCoin, ...otherCoins]);
       return coin;
     }
 
-    //coin1
-    const [coin] = tx.splitCoins(coins[0].coinObjectId, [0]);
-    tx.mergeCoins(
-      coin,
-      coins.map((c) => c.coinObjectId),
-    );
+    // Convert first coin to TransactionObjectArgument to avoid duplicate reference
+    const firstCoin = tx.object(coins[0].coinObjectId);
+    const [coin] = tx.splitCoins(firstCoin, [0]);
+    // Merge the remainder (firstCoin) and other coins into the split coin
+    const otherCoins = coins.slice(1).map((c) => tx.object(c.coinObjectId));
+    tx.mergeCoins(coin, [firstCoin, ...otherCoins]);
     return coin;
   }
 
