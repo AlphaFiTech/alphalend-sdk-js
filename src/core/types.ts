@@ -192,34 +192,13 @@ export interface ClaimRewardsParams {
 }
 
 /**
- * Parameters for claiming rewards with swap functionality
- * Used with the `claimAndSwapRewards` method to swap multiple reward tokens to a single token
- */
-export interface ClaimAndSwapRewardsParams {
-  /** Object ID of the position capability object */
-  positionCapId: string;
-  /** Address of the user claiming rewards */
-  address: string;
-  /** Target coin type to swap all rewards into (e.g., "0x2::sui::SUI") */
-  targetCoinType: string;
-  /** Slippage tolerance */
-  slippage: number;
-  /** Whether to swap and supply/repay in market */
-  supplyOrRepay?: boolean;
-  /** Coin types of user's supplied assets (for price updates) */
-  priceUpdateCoinTypes?: string[];
-  /** Map of coin types to their actual reward amounts */
-  rewardAmounts?: Map<string, string>;
-}
-
-/**
  * Parameters for claiming rewards, swapping, and repaying borrowed assets (or supplying if no debt)
  * Used with the `claimSwapAndSupplyOrRepay` method
  * 
  * Note: This method handles both repay and supply scenarios. If there's no debt, the entire amount
  * will be supplied to the market.
  */
-export interface ClaimSwapAndSupplyOrRepayParams {
+export interface ClaimSwapAndSupplyOrRepayOrTransferParams {
   /** Object ID of the position capability object */
   positionCapId: string;
   /** Address of the user claiming rewards */
@@ -228,14 +207,14 @@ export interface ClaimSwapAndSupplyOrRepayParams {
   targetCoinType: string;
   /** Market ID to repay the debt (or supply if no debt) */
   targetMarketId: string;
+  /** Whether the target coin is borrowed */
+  isTargetBorrowed: boolean;
+  /** Whether to transfer the target coin to the wallet */
+  transferTargetCoin: boolean;
   /** Slippage tolerance */
   slippage: number;
-  /** Amount of debt to repay */
-  debtAmount?: bigint;
-  /** Map of coin types to their actual reward amounts */
-  rewardAmounts?: Map<string, string>;
   /** Coin types of user's supplied assets (for price updates) */
-  priceUpdateCoinTypes?: string[];
+  priceUpdateCoinTypes: string[];
 }
 
 /**
@@ -257,10 +236,8 @@ export interface ClaimAndSupplyOrRepayParams {
   address: string;
   /** Map of borrowed coin types to their market info */
   borrowedCoins: Map<string, MarketInfo>;
-  /** Map of coin types to supply markets for leftover coins after repay */
-  supplyMarkets?: Map<string, MarketInfo>;
   /** Coin types for price updates */
-  priceUpdateCoinTypes?: string[];
+  priceUpdateCoinTypes: string[];
 }
 
 /**

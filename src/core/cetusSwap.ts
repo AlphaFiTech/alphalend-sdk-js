@@ -27,7 +27,7 @@ export class CetusSwap {
     from: string,
     target: string,
     amount: string,
-  ): Promise<RouterDataV3 | undefined> {
+  ): Promise<RouterDataV3> {
     try {
       const providersExcept = getProvidersExcluding([
         "STEAMM_OMM_V2",
@@ -44,7 +44,11 @@ export class CetusSwap {
         byAmountIn: true, // `true` means fix input amount, `false` means fix output amount
         providers: providersExcept,
       });
-      return router || undefined;
+      if (!router) {
+        throw new Error(`No router found for ${from} to ${target} with amount ${amount} in cetus swap`);
+      }
+
+      return router;
     } catch (error) {
       console.error("Error getting cetus swap quote", error);
       throw error;
