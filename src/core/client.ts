@@ -32,6 +32,7 @@ import {
   MAX_U64,
   quoteObject,
   AlphalendClientOptions,
+  SwapAndRepayParams,
 } from "./types.js";
 import {
   getAlphaReceipt,
@@ -526,20 +527,80 @@ export class AlphalendClient {
       await setPrices(tx);
     }
 
-    const quoteResponse = await this.cetusSwap.getCetusSwapQuote(
+    const promise = tx.moveCall({
+      target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::remove_collateral`,
+      typeArguments: [params.marketCoinType],
+      arguments: [
+        tx.object(this.constants.LENDING_PROTOCOL_ID), // Protocol object
+        tx.object(params.positionCapId), // Position capability
+        tx.pure.u64(params.marketId), // Market ID
+        tx.pure.u64(params.amount), // Amount to withdraw
+        tx.object(this.constants.SUI_CLOCK_OBJECT_ID), // Clock object
+      ],
+    });
+    const isSui = params.marketCoinType === this.constants.SUI_COIN_TYPE;
+    let coin: string | TransactionObjectArgument | undefined;
+    if (isSui) {
+      coin = tx.moveCall({
+        target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::fulfill_promise_SUI`,
+        arguments: [
+          tx.object(this.constants.LENDING_PROTOCOL_ID),
+          promise,
+          tx.object(this.constants.SUI_SYSTEM_STATE_ID),
+          tx.object(this.constants.SUI_CLOCK_OBJECT_ID),
+        ],
+      });
+    } else {
+      coin = await this.handlePromise(tx, promise, params.marketCoinType);
+    }
+
+    const quoteResponse = await this.sevenKGateway.getQuote(
       params.marketCoinType,
       params.outputCoinType,
+      swapInAmount,
+    );
+    const withdrawCoin = await this.sevenKGateway.getTransactionBlock(
+      tx,
+      params.address,
+      params.slippage,
+      quoteResponse,
+      coin,
+    );
+    if (withdrawCoin) {
+      tx.transferObjects([withdrawCoin], params.address);
+    }
+
+    return tx;
+  }
+
+  async swapAndRepay(
+    params: SwapAndRepayParams,
+  ): Promise<Transaction | undefined> {
+    const tx = new Transaction();
+
+    let swapInAmount = (params.amount - 1n).toString();
+
+    // First update prices to ensure latest oracle values
+    if (this.network === "mainnet") {
+      await this.updatePrices(tx, params.priceUpdateCoinTypes);
+    } else {
+      await setPrices(tx);
+    }
+
+    const quoteResponse = await this.cetusSwap.getCetusSwapQuote(
+      params.swapFromCoinType,
+      params.swapToCoinType,
       swapInAmount,
     );
     if (!quoteResponse) {
       console.error("Failed to get swap quote");
       return undefined;
     }
-    const isSui = params.marketCoinType === this.constants.SUI_COIN_TYPE;
+    // const isSui = params.marketCoinType === this.constants.SUI_COIN_TYPE;
 
     const coinObject = await this.getCoinObject(
       tx,
-      params.marketCoinType,
+      params.swapFromCoinType,
       params.address,
     );
 
@@ -549,14 +610,10 @@ export class AlphalendClient {
     }
 
     // Split the exact amount needed for the swap from the coin object
-    const inputCoin = tx.splitCoins(coinObject, [
+    const [inputCoin] = tx.splitCoins(coinObject, [
       quoteResponse.amountIn.toString(),
     ]);
 
-    // Transfer the remaining coin back to the user
-    if (coinObject !== tx.gas) {
-      tx.transferObjects([coinObject], params.address);
-    }
     const repayCoin = await this.cetusSwap.cetusSwapTokensTxb(
       quoteResponse as RouterDataV3,
       params.slippage,
@@ -565,16 +622,9 @@ export class AlphalendClient {
       tx,
     );
 
-    console.log(
-      "repayCoin in zapOutWithdraw",
-      repayCoin,
-      [repayCoin],
-      quoteResponse,
-    );
-
     const remainingCoin = tx.moveCall({
       target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::repay`,
-      typeArguments: [params.outputCoinType],
+      typeArguments: [params.swapToCoinType],
       arguments: [
         tx.object(this.constants.LENDING_PROTOCOL_ID), // Protocol object
         tx.object(params.positionCapId), // Position capability
@@ -583,10 +633,12 @@ export class AlphalendClient {
         tx.object(this.constants.SUI_CLOCK_OBJECT_ID), // Clock object
       ],
     });
-    console.log("remainingCoin in zapOutWithdraw", remainingCoin, [
-      remainingCoin,
-    ]);
+
+    // Transfer coins back to the user at the end
     tx.transferObjects([remainingCoin], params.address);
+    if (coinObject !== tx.gas) {
+      tx.transferObjects([coinObject], params.address);
+    }
 
     tx.setGasBudget(100_000_000n);
     return tx;
