@@ -546,13 +546,6 @@ export class AlphalendClient {
       tx,
     );
 
-    console.log(
-      "repayCoin in zapOutWithdraw",
-      repayCoin,
-      [repayCoin],
-      quoteResponse,
-    );
-
     const remainingCoin = tx.moveCall({
       target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::repay`,
       typeArguments: [params.outputCoinType],
@@ -564,9 +557,7 @@ export class AlphalendClient {
         tx.object(this.constants.SUI_CLOCK_OBJECT_ID), // Clock object
       ],
     });
-    console.log("remainingCoin in zapOutWithdraw", remainingCoin, [
-      remainingCoin,
-    ]);
+
     tx.transferObjects([remainingCoin], params.address);
 
     tx.setGasBudget(100_000_000n);
@@ -1280,7 +1271,7 @@ export class AlphalendClient {
       const firstCoin = tx.object(coinsToMerge[0]);
       const [coin] = tx.splitCoins(firstCoin, [0]);
       // Merge the remainder (firstCoin) and other coins into the split coin
-      const otherCoins = coinsToMerge.slice(1).map(id => tx.object(id));
+      const otherCoins = coinsToMerge.slice(1).map((id) => tx.object(id));
       tx.mergeCoins(coin, [firstCoin, ...otherCoins]);
       return coin;
     }
