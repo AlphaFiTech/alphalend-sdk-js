@@ -578,50 +578,91 @@ export class AlphalendClient {
   ): Promise<Transaction | undefined> {
     const tx = new Transaction();
 
-    let swapInAmount = (params.amount - 1n).toString();
+    const swapInAmount = (params.amount - 1n).toString();
 
-    // First update prices to ensure latest oracle values
+    // Get swap quote (no price update needed for swap itself)
+    let quoteResponse;
+    try {
+      quoteResponse = await this.cetusSwap.getCetusSwapQuote(
+        params.swapFromCoinType,
+        params.swapToCoinType,
+        swapInAmount,
+      );
+    } catch (error) {
+      console.error("[AlphaLend SDK] Error fetching Cetus quote:", error);
+      throw new Error(
+        `Failed to get swap quote: ${error instanceof Error ? error.message : "Unknown error"}`,
+      );
+    }
+
+    if (!quoteResponse) {
+      console.error("[AlphaLend SDK] Cetus returned empty quote");
+      throw new Error("Failed to get swap quote: Empty response from Cetus");
+    }
+    // Check if the input coin is SUI
+    const isInputSui = params.swapFromCoinType === this.constants.SUI_COIN_TYPE;
+    let coinObject: string | TransactionObjectArgument | undefined;
+    let inputCoin;
+
+    if (isInputSui) {
+      // For SUI, split directly from gas
+      inputCoin = tx.splitCoins(tx.gas, [quoteResponse.amountIn.toString()]);
+    } else {
+      // For other coins, get the coin object
+      coinObject = await this.getCoinObject(
+        tx,
+        params.swapFromCoinType,
+        params.address,
+      );
+
+      if (!coinObject) {
+        console.error("Failed to get input coin object");
+        return undefined;
+      }
+
+      // Split the exact amount needed for the swap from the coin object
+      inputCoin = tx.splitCoins(coinObject, [
+        quoteResponse.amountIn.toString(),
+      ]);
+
+      // CRITICAL: Transfer the remaining coin back IMMEDIATELY after split
+      // If we wait until after swap/repay, the result reference becomes stale
+      if (coinObject !== tx.gas) {
+        tx.transferObjects([coinObject], params.address);
+      }
+    }
+
+    // Perform the swap to get the coin for repayment
+    let repayCoin;
+    try {
+      repayCoin = await this.cetusSwap.cetusSwapTokensTxb(
+        quoteResponse as RouterDataV3,
+        params.slippage,
+        inputCoin,
+        params.address,
+        tx,
+      );
+    } catch (error) {
+      console.error("[AlphaLend SDK] Error building Cetus swap:", error);
+      throw new Error(
+        `Failed to build swap transaction: ${error instanceof Error ? error.message : "Unknown error"}`,
+      );
+    }
+
+    if (!repayCoin) {
+      console.error("[AlphaLend SDK] Cetus swap returned no coin");
+      throw new Error("Failed to perform swap: No coin returned");
+    }
+
+    // Only update the repay coin price to minimize transaction complexity
     if (this.network === "mainnet") {
-      await this.updatePrices(tx, params.priceUpdateCoinTypes);
+      // Only update the price for the coin we're repaying (not all user positions)
+      await this.updatePrices(tx, [params.swapToCoinType]);
     } else {
       await setPrices(tx);
     }
 
-    const quoteResponse = await this.cetusSwap.getCetusSwapQuote(
-      params.swapFromCoinType,
-      params.swapToCoinType,
-      swapInAmount,
-    );
-    if (!quoteResponse) {
-      console.error("Failed to get swap quote");
-      return undefined;
-    }
-    // const isSui = params.marketCoinType === this.constants.SUI_COIN_TYPE;
-
-    const coinObject = await this.getCoinObject(
-      tx,
-      params.swapFromCoinType,
-      params.address,
-    );
-
-    if (!coinObject) {
-      console.error("Failed to get input coin object");
-      return undefined;
-    }
-
-    // Split the exact amount needed for the swap from the coin object
-    const [inputCoin] = tx.splitCoins(coinObject, [
-      quoteResponse.amountIn.toString(),
-    ]);
-
-    const repayCoin = await this.cetusSwap.cetusSwapTokensTxb(
-      quoteResponse as RouterDataV3,
-      params.slippage,
-      inputCoin,
-      params.address,
-      tx,
-    );
-
+    // Repay the debt with the swapped coin
     const remainingCoin = tx.moveCall({
       target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::repay`,
       typeArguments: [params.swapToCoinType],
@@ -634,11 +675,8 @@ export class AlphalendClient {
       ],
     });
 
-    // Transfer coins back to the user at the end
+    // Transfer remaining coin from repayment back to user
     tx.transferObjects([remainingCoin], params.address);
-    if (coinObject !== tx.gas) {
-      tx.transferObjects([coinObject], params.address);
-    }
 
     tx.setGasBudget(100_000_000n);
     return tx;
