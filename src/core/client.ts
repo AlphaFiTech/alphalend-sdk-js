@@ -1385,17 +1385,21 @@ export class AlphalendClient {
         }
       }
 
-      const [coin] = tx.splitCoins(coinsToMerge[0], [0]);
-      tx.mergeCoins(coin, coinsToMerge);
+      // Convert first coin to TransactionObjectArgument to avoid duplicate reference
+      const firstCoin = tx.object(coinsToMerge[0]);
+      const [coin] = tx.splitCoins(firstCoin, [0]);
+      // Merge the remainder (firstCoin) and other coins into the split coin
+      const otherCoins = coinsToMerge.slice(1).map((id) => tx.object(id));
+      tx.mergeCoins(coin, [firstCoin, ...otherCoins]);
       return coin;
     }
 
-    //coin1
-    const [coin] = tx.splitCoins(coins[0].coinObjectId, [0]);
-    tx.mergeCoins(
-      coin,
-      coins.map((c) => c.coinObjectId),
-    );
+    // Convert first coin to TransactionObjectArgument to avoid duplicate reference
+    const firstCoin = tx.object(coins[0].coinObjectId);
+    const [coin] = tx.splitCoins(firstCoin, [0]);
+    // Merge the remainder (firstCoin) and other coins into the split coin
+    const otherCoins = coins.slice(1).map((c) => tx.object(c.coinObjectId));
+    tx.mergeCoins(coin, [firstCoin, ...otherCoins]);
     return coin;
   }
 
