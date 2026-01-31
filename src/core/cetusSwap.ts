@@ -64,13 +64,6 @@ export class CetusSwap {
       if (!router) {
         throw new Error("No routers found");
       }
-      console.log("cetus swap tokens txb", {
-        router,
-        slippage,
-        inputCoin,
-        address,
-        existingTx,
-      });
       // Use existing transaction if provided, otherwise create new one
       const txb = existingTx || new Transaction();
 
@@ -81,11 +74,10 @@ export class CetusSwap {
           txb,
           inputCoin: inputCoin as TransactionObjectArgument,
           slippage: slippage || 0.01,
-          maxAmountIn: new BN(router.amountIn.toString()), //new BN(router.amountIn.toString()),
+          maxAmountIn: new BN(router.amountIn.toString()),
         });
 
-        // Return both transaction and target coin for use in zap deposits
-        return coinOut; //{ tx: txb, coinOut };
+        return coinOut;
       } else {
         // Use fastRouterSwap for simple swaps
         await this.client.fastRouterSwap({
@@ -94,7 +86,7 @@ export class CetusSwap {
           slippage: slippage || 0.01,
         });
 
-        return txb; //{ tx: txb };
+        return txb;
       }
     } catch (error) {
       console.error("Error swapping tokens in cetus swap", error);

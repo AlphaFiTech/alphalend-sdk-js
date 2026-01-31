@@ -296,14 +296,8 @@ export class AlphalendClient {
   async zapInSupply(
     params: ZapInSupplyParams,
   ): Promise<Transaction | undefined> {
-    console.log("swap and supply params in alphalend sdk", params);
     const tx = new Transaction();
 
-    // const quoteResponse = await this.sevenKGateway.getQuote(
-    //   params.inputCoinType,
-    //   params.marketCoinType,
-    //   params.inputAmount.toString(),
-    // );
     const quoteResponse = await this.cetusSwap.getCetusSwapQuote(
       params.inputCoinType,
       params.marketCoinType,
@@ -315,22 +309,11 @@ export class AlphalendClient {
       return undefined;
     }
 
-    console.log(
-      "quoteResponse in zapInSupply",
-      quoteResponse,
-      quoteResponse.amountIn.toString(),
-      quoteResponse.amountOut.toString(),
-    );
-    // const supplyCoin = await this.sevenKGateway.getTransactionBlock(
-    //   tx,
-    //   params.address,
-    //   params.slippage,
-    //   quoteResponse,
-    // );
     const coinObject = await this.getCoinObject(
       tx,
       params.inputCoinType,
       params.address,
+      BigInt(quoteResponse.amountIn.toString()),
     );
 
     if (!coinObject) {
@@ -355,9 +338,8 @@ export class AlphalendClient {
       params.address,
       tx,
     );
-    console.log("supplyCoin in zapInSupply", supplyCoin);
     if (!supplyCoin) {
-      console.error("Failed to get coin out");
+      console.error("Failed to get coin out from swap");
       return undefined;
     }
 
@@ -400,7 +382,6 @@ export class AlphalendClient {
       });
       tx.transferObjects([positionCap], params.address);
     }
-    tx.setGasBudget(1000000000);
     return tx;
   }
 
@@ -670,7 +651,7 @@ export class AlphalendClient {
         tx.object(this.constants.LENDING_PROTOCOL_ID), // Protocol object
         tx.object(params.positionCapId), // Position capability
         tx.pure.u64(params.marketId), // Market ID
-        repayCoin as TransactionObjectArgument, // Coin to repay with
+        tx.pure.u64(params.amount), // Amount to withdraw
         tx.object(this.constants.SUI_CLOCK_OBJECT_ID), // Clock object
       ],
     });
@@ -678,7 +659,6 @@ export class AlphalendClient {
     // Transfer remaining coin from repayment back to user
     tx.transferObjects([remainingCoin], params.address);
 
-    tx.setGasBudget(100_000_000n);
     return tx;
   }
 
