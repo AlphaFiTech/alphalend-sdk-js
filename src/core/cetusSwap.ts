@@ -8,6 +8,7 @@ import {
   Transaction,
   TransactionObjectArgument,
 } from "@mysten/sui/transactions";
+import BN from "bn.js";
 
 // Re-export RouterDataV3 type for external use
 export type { RouterDataV3 } from "@cetusprotocol/aggregator-sdk";
@@ -27,7 +28,7 @@ export class CetusSwap {
     from: string,
     target: string,
     amount: string,
-  ): Promise<RouterDataV3> {
+  ): Promise<RouterDataV3 | undefined> {
     try {
       const providersExcept = getProvidersExcluding([
         "STEAMM_OMM_V2",
@@ -44,11 +45,7 @@ export class CetusSwap {
         byAmountIn: true, // `true` means fix input amount, `false` means fix output amount
         providers: providersExcept,
       });
-      if (!router) {
-        throw new Error(`No router found for ${from} to ${target} with amount ${amount} in cetus swap`);
-      }
-
-      return router;
+      return router || undefined;
     } catch (error) {
       console.error("Error getting cetus swap quote", error);
       throw error;
@@ -67,26 +64,19 @@ export class CetusSwap {
       if (!router) {
         throw new Error("No routers found");
       }
-      console.log("cetus swap tokens txb", {
-        router,
-        slippage,
-        inputCoin,
-        address,
-        existingTx,
-      });
       // Use existing transaction if provided, otherwise create new one
       const txb = existingTx || new Transaction();
 
       if (inputCoin && address) {
-        // Use routerSwap to completely consume the input coin
-        const coinOut = await this.client.routerSwap({
+        // Use routerSwapWithMaxAmountIn when explicit coin control is needed
+        const coinOut = await this.client.routerSwapWithMaxAmountIn({
           router,
           txb,
           inputCoin: inputCoin as TransactionObjectArgument,
-          slippage: slippage || 0.01, // Use provided slippage or 1% default
+          slippage: slippage || 0.01,
+          maxAmountIn: new BN(router.amountIn.toString()),
         });
 
-        // Return target coin for use in subsequent operations
         return coinOut;
       } else {
         // Use fastRouterSwap for simple swaps
@@ -107,7 +97,7 @@ export class CetusSwap {
   /**
    * Build swap transaction using routerSwap method (BuildRouterSwapParamsV3)
    * This method will completely consume the input coin amount and return target coin object.
-   * 
+   *
    * @param router - RouterData Object returned by findRouters method
    * @param txb - The programmable transaction builder
    * @param inputCoin - The input coin object to be swapped (will be completely consumed)

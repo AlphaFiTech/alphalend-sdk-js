@@ -48,7 +48,7 @@ import { SevenKGateway } from "./sevenKSwap.js";
 import { Decimal } from "decimal.js";
 import { QuoteResponse } from "@7kprotocol/sdk-ts";
 import { blockchainCache } from "../utils/blockchainCache.js";
-import { CetusSwap } from "./cetusSwap.js";
+import { CetusSwap, RouterDataV3 } from "./cetusSwap.js";
 
 /**
  * AlphaLend Client
@@ -298,19 +298,48 @@ export class AlphalendClient {
   ): Promise<Transaction | undefined> {
     const tx = new Transaction();
 
-    const quoteResponse = await this.sevenKGateway.getQuote(
+    const quoteResponse = await this.cetusSwap.getCetusSwapQuote(
       params.inputCoinType,
       params.marketCoinType,
       params.inputAmount.toString(),
     );
-    const supplyCoin = await this.sevenKGateway.getTransactionBlock(
+
+    if (!quoteResponse) {
+      console.error("Failed to get swap quote");
+      return undefined;
+    }
+
+    const coinObject = await this.getCoinObject(
       tx,
+      params.inputCoinType,
       params.address,
+      BigInt(quoteResponse.amountIn.toString()),
+    );
+
+    if (!coinObject) {
+      console.error("Failed to get input coin object");
+      return undefined;
+    }
+
+    // Split the exact amount needed for the swap from the coin object
+    const inputCoin = tx.splitCoins(coinObject, [
+      quoteResponse.amountIn.toString(),
+    ]);
+
+    // Transfer the remaining coin back to the user
+    if (coinObject !== tx.gas) {
+      tx.transferObjects([coinObject], params.address);
+    }
+
+    const supplyCoin = await this.cetusSwap.cetusSwapTokensTxb(
+      quoteResponse as RouterDataV3,
       params.slippage,
-      quoteResponse,
+      inputCoin,
+      params.address,
+      tx,
     );
     if (!supplyCoin) {
-      console.error("Failed to get coin out");
+      console.error("Failed to get coin out from swap");
       return undefined;
     }
 
@@ -323,7 +352,7 @@ export class AlphalendClient {
           tx.object(this.constants.LENDING_PROTOCOL_ID), // Protocol object
           tx.object(params.positionCapId), // Position capability
           tx.pure.u64(params.marketId), // Market ID
-          supplyCoin, // Coin to supply as collateral
+          supplyCoin as TransactionObjectArgument, // Coin to supply as collateral
           tx.object(this.constants.SUI_CLOCK_OBJECT_ID), // Clock object
         ],
       });
@@ -347,13 +376,12 @@ export class AlphalendClient {
           tx.object(this.constants.LENDING_PROTOCOL_ID), // Protocol object
           positionCap, // Position capability
           tx.pure.u64(params.marketId), // Market ID
-          supplyCoin, // Coin to supply as collateral
+          supplyCoin as TransactionObjectArgument, // Coin to supply as collateral
           tx.object(this.constants.SUI_CLOCK_OBJECT_ID), // Clock object
         ],
       });
       tx.transferObjects([positionCap], params.address);
     }
-
     return tx;
   }
 
@@ -837,7 +865,7 @@ export class AlphalendClient {
     for (const [coinType, coins] of rewardCoinsByType.entries()) {
       if (coins.length === 0) continue;
 
-      let mergedCoin = this.mergeCoins(tx, undefined, coins);
+      const mergedCoin = this.mergeCoins(tx, undefined, coins);
 
       if (coinType === params.targetCoinType) {
         if (targetCoin) {
@@ -854,7 +882,7 @@ export class AlphalendClient {
           quoteAmount,
         );
         const swappedCoin = await this.cetusSwap.routerSwapWithInputCoin(
-          router,
+          router as RouterDataV3,
           tx,
           mergedCoin,
           params.slippage,
@@ -1321,6 +1349,13 @@ export class AlphalendClient {
     address: string,
     amount?: bigint,
   ): Promise<string | TransactionObjectArgument | undefined> {
+    if (
+      type === "0x2::sui::SUI" ||
+      type ===
+        "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI"
+    ) {
+      return tx.gas;
+    }
     let coins: CoinStruct[] = [];
     let currentCursor: string | null | undefined = null;
 
@@ -1378,17 +1413,21 @@ export class AlphalendClient {
         }
       }
 
-      const [coin] = tx.splitCoins(coinsToMerge[0], [0]);
-      tx.mergeCoins(coin, coinsToMerge);
+      // Convert first coin to TransactionObjectArgument to avoid duplicate reference
+      const firstCoin = tx.object(coinsToMerge[0]);
+      const [coin] = tx.splitCoins(firstCoin, [0]);
+      // Merge the remainder (firstCoin) and other coins into the split coin
+      const otherCoins = coinsToMerge.slice(1).map((id) => tx.object(id));
+      tx.mergeCoins(coin, [firstCoin, ...otherCoins]);
       return coin;
     }
 
-    //coin1
-    const [coin] = tx.splitCoins(coins[0].coinObjectId, [0]);
-    tx.mergeCoins(
-      coin,
-      coins.map((c) => c.coinObjectId),
-    );
+    // Convert first coin to TransactionObjectArgument to avoid duplicate reference
+    const firstCoin = tx.object(coins[0].coinObjectId);
+    const [coin] = tx.splitCoins(firstCoin, [0]);
+    // Merge the remainder (firstCoin) and other coins into the split coin
+    const otherCoins = coins.slice(1).map((c) => tx.object(c.coinObjectId));
+    tx.mergeCoins(coin, [firstCoin, ...otherCoins]);
     return coin;
   }
 
@@ -1498,7 +1537,12 @@ export class AlphalendClient {
   async getSwapQuote(tokenIn: string, tokenOut: string, amountIn: string) {
     await this.ensureInitialized();
 
-    const quoteResponse = await this.sevenKGateway.getQuote(
+    // const quoteResponse = await this.sevenKGateway.getQuote(
+    //   tokenIn,
+    //   tokenOut,
+    //   amountIn,
+    // );
+    const quoteResponse = await this.cetusSwap.getCetusSwapQuote(
       tokenIn,
       tokenOut,
       amountIn,
@@ -1506,23 +1550,82 @@ export class AlphalendClient {
 
     const coinIn = this.coinMetadataMap.get(tokenIn);
     const coinOut = this.coinMetadataMap.get(tokenOut);
-    const sevenKEstimatedAmountOut = BigInt(
-      quoteResponse ? quoteResponse.returnAmountWithDecimal.toString() : 0,
+    // const sevenKEstimatedAmountOut = BigInt(
+    //   quoteResponse ? quoteResponse.returnAmountWithDecimal.toString() : 0,
+    // );
+
+    // const sevenKEstimatedAmountOutWithoutFee = BigInt(
+    //   quoteResponse
+    //     ? quoteResponse.returnAmountWithoutSwapFees
+    //       ? quoteResponse.returnAmountWithoutSwapFees.toString()
+    //       : sevenKEstimatedAmountOut.toString()
+    //     : sevenKEstimatedAmountOut.toString(),
+    // );
+
+    // const sevenKEstimatedFeeAmount =
+    //   sevenKEstimatedAmountOut - sevenKEstimatedAmountOutWithoutFee;
+
+    // const amount = BigInt(
+    //   quoteResponse ? quoteResponse.swapAmountWithDecimal : 0,
+    // );
+
+    // let quote: quoteObject;
+    // const priceA = coinIn?.pythPrice || coinIn?.coingeckoPrice;
+    // const priceB = coinOut?.pythPrice || coinOut?.coingeckoPrice;
+    // const coinAExpo = coinIn?.decimals;
+    // const coinBExpo = coinOut?.decimals;
+    // if (priceA && priceB && coinAExpo && coinBExpo) {
+    //   const inputAmountInUSD =
+    //     (Number(amount) / Math.pow(10, coinAExpo)) * parseFloat(priceA);
+    //   const outputAmountInUSD =
+    //     (Number(sevenKEstimatedAmountOut) / Math.pow(10, coinBExpo)) *
+    //     parseFloat(priceB);
+
+    //   const slippage =
+    //     (inputAmountInUSD - outputAmountInUSD) / inputAmountInUSD;
+
+    //   quote = {
+    //     gateway: "7k",
+    //     estimatedAmountOut: sevenKEstimatedAmountOut,
+    //     estimatedFeeAmount: sevenKEstimatedFeeAmount,
+    //     inputAmount: amount,
+    //     inputAmountInUSD: inputAmountInUSD,
+    //     estimatedAmountOutInUSD: outputAmountInUSD,
+    //     slippage: slippage,
+    //     rawQuote: quoteResponse,
+    //   };
+    // } else {
+    //   console.warn(
+    //     "Could not get prices from Pyth Network, using fallback pricing.",
+    //   );
+    //   quote = {
+    //     gateway: "7k",
+    //     estimatedAmountOut: sevenKEstimatedAmountOut,
+    //     estimatedFeeAmount: sevenKEstimatedFeeAmount,
+    //     inputAmount: amount,
+    //     inputAmountInUSD: 0,
+    //     estimatedAmountOutInUSD: 0,
+    //     slippage: 0,
+    //     rawQuote: quoteResponse,
+    //   };
+    // }
+    const cetusEstimatedAmountOut = BigInt(
+      quoteResponse ? quoteResponse.amountOut.toString() : 0,
     );
 
-    const sevenKEstimatedAmountOutWithoutFee = BigInt(
-      quoteResponse
-        ? quoteResponse.returnAmountWithoutSwapFees
-          ? quoteResponse.returnAmountWithoutSwapFees.toString()
-          : sevenKEstimatedAmountOut.toString()
-        : sevenKEstimatedAmountOut.toString(),
-    );
+    // const sevenKEstimatedAmountOutWithoutFee = BigInt(
+    //   quoteResponse
+    //     ? quoteResponse.amountOut.toString()
+    //       ? quoteResponse.amountOut.toString()
+    //       : cetusEstimatedAmountOut.toString()
+    //     : cetusEstimatedAmountOut.toString(),
+    // );
 
-    const sevenKEstimatedFeeAmount =
-      sevenKEstimatedAmountOut - sevenKEstimatedAmountOutWithoutFee;
+    // const cetusEstimatedFeeAmount =
+    //   sevenKEstimatedAmountOut - sevenKEstimatedAmountOutWithoutFee;
 
     const amount = BigInt(
-      quoteResponse ? quoteResponse.swapAmountWithDecimal : 0,
+      quoteResponse ? quoteResponse.amountIn.toString() : 0,
     );
 
     let quote: quoteObject;
@@ -1534,35 +1637,35 @@ export class AlphalendClient {
       const inputAmountInUSD =
         (Number(amount) / Math.pow(10, coinAExpo)) * parseFloat(priceA);
       const outputAmountInUSD =
-        (Number(sevenKEstimatedAmountOut) / Math.pow(10, coinBExpo)) *
+        (Number(cetusEstimatedAmountOut) / Math.pow(10, coinBExpo)) *
         parseFloat(priceB);
 
       const slippage =
         (inputAmountInUSD - outputAmountInUSD) / inputAmountInUSD;
 
       quote = {
-        gateway: "7k",
-        estimatedAmountOut: sevenKEstimatedAmountOut,
-        estimatedFeeAmount: sevenKEstimatedFeeAmount,
+        gateway: "cetus",
+        estimatedAmountOut: cetusEstimatedAmountOut,
+        estimatedFeeAmount: 0n,
         inputAmount: amount,
         inputAmountInUSD: inputAmountInUSD,
         estimatedAmountOutInUSD: outputAmountInUSD,
         slippage: slippage,
-        rawQuote: quoteResponse,
+        rawQuote: quoteResponse as RouterDataV3,
       };
     } else {
       console.warn(
         "Could not get prices from Pyth Network, using fallback pricing.",
       );
       quote = {
-        gateway: "7k",
-        estimatedAmountOut: sevenKEstimatedAmountOut,
-        estimatedFeeAmount: sevenKEstimatedFeeAmount,
+        gateway: "cetus",
+        estimatedAmountOut: cetusEstimatedAmountOut,
+        estimatedFeeAmount: 0n,
         inputAmount: amount,
         inputAmountInUSD: 0,
         estimatedAmountOutInUSD: 0,
         slippage: 0,
-        rawQuote: quoteResponse,
+        rawQuote: quoteResponse as RouterDataV3,
       };
     }
 
