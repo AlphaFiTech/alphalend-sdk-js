@@ -52,6 +52,6 @@
     "typescript-eslint": "^8.14.0"
   },
   "peerDependencies": {
-    "@mysten/sui": "1.45.0"
+    "@mysten/sui": "^1.44.0"
   }
 }
