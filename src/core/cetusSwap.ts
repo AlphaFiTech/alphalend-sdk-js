@@ -93,4 +93,39 @@ export class CetusSwap {
       throw error;
     }
   }
+
+  /**
+   * Build swap transaction using routerSwap method (BuildRouterSwapParamsV3)
+   * This method will completely consume the input coin amount and return target coin object.
+   *
+   * @param router - RouterData Object returned by findRouters method
+   * @param txb - The programmable transaction builder
+   * @param inputCoin - The input coin object to be swapped (will be completely consumed)
+   * @param slippage - A value between 0 and 1, representing the maximum allowed price slippage
+   * @returns TransactionObjectArgument - The target coin object that can be used in PTB
+   */
+  async routerSwapWithInputCoin(
+    router: RouterDataV3,
+    txb: Transaction,
+    inputCoin: TransactionObjectArgument,
+    slippage: number,
+  ): Promise<TransactionObjectArgument> {
+    try {
+      if (!router) {
+        throw new Error("No router data provided");
+      }
+
+      const targetCoin = await this.client.routerSwap({
+        router,
+        txb,
+        inputCoin,
+        slippage,
+      });
+
+      return targetCoin;
+    } catch (error) {
+      console.error("Error in routerSwap:", error);
+      throw error;
+    }
+  }
 }

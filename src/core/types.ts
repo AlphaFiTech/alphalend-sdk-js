@@ -193,6 +193,34 @@ export interface ClaimRewardsParams {
 }
 
 /**
+ * Parameters for claiming rewards, swapping, and repaying borrowed assets (or supplying if no debt)
+ * Used with the `claimSwapAndSupplyOrRepay` method
+ *
+ * Note: This method handles both repay and supply scenarios. If there's no debt, the entire amount
+ * will be supplied to the market.
+ */
+export interface ClaimSwapAndSupplyOrRepayOrTransferParams {
+  /** Object ID of the position capability object */
+  positionCapId: string;
+  /** Address of the user claiming rewards */
+  address: string;
+  /** Target coin type to swap all rewards into and repay */
+  targetCoinType: string;
+  /** Market ID to repay the debt (or supply if no debt) */
+  targetMarketId?: string;
+  /** Whether the target coin is borrowed */
+  isTargetBorrowed?: boolean;
+  /** Whether to transfer the target coin to the wallet */
+  transferTargetCoin?: boolean;
+  /** Slippage tolerance */
+  slippage: number;
+  /** Coin types of user's supplied assets (for price updates) */
+  priceUpdateCoinTypes: string[];
+  /** Optional map of reward coin types to their amounts in base units (for accurate quotes) */
+  rewardAmounts?: Map<string, string>;
+}
+
+/**
  * Market info for repay and supply operations
  */
 export interface MarketInfo {
@@ -214,7 +242,7 @@ export interface ClaimAndSupplyOrRepayParams {
   /** Map of coin types to supply markets for leftover coins after repay */
   supplyMarkets?: Map<string, MarketInfo>;
   /** Coin types for price updates */
-  priceUpdateCoinTypes?: string[];
+  priceUpdateCoinTypes: string[];
 }
 
 /**
