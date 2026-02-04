@@ -324,4 +324,10 @@ export const coinsList: { [key in CoinName]: Coin } = {
     icon: "",
     expo: 8,
   },
+  EXBTC: {
+    name: "EXBTC",
+    type: "0x56589f5381303a763a62e79ac118e5242f83652f4c5a9448af75162d8cb7140c::exbtc::EXBTC",
+    expo: 8,
+    icon: "",
+  },
 };

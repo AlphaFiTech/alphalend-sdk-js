@@ -56,7 +56,8 @@ export type CoinName =
   | "SDEUSD"
   | "EWAL"
   | "WBTC_Layer0"
-  | "BTCVC";
+  | "BTCVC"
+  | "EXBTC";
 
 /**
  * Type definition for coin type identifiers on the Sui blockchain
@@ -118,7 +119,8 @@ export type CoinType =
   | "0xf6b468748dced8435f4407d0ecb0457b921a2e89266a60862e36dbf243c71841::sdeusd::SDEUSD"
   | "0x8a398f65f8635be31c181632bf730aea25074505d70c77d9b287e7d4f063ef70::ewal::EWAL"
   | "0x0041f9f9344cac094454cd574e333c4fdb132d7bcc9379bcd4aab485b2a63942::wbtc::WBTC"
-  | "0xd8fe9619ff2bcef53e0330b83b31ab380a04ee787dafecc19aac365a9824517f::btcvc::BTCVC";
+  | "0xd8fe9619ff2bcef53e0330b83b31ab380a04ee787dafecc19aac365a9824517f::btcvc::BTCVC"
+  | "0x56589f5381303a763a62e79ac118e5242f83652f4c5a9448af75162d8cb7140c::exbtc::EXBTC";
 
 /**
  * Type definition for coin icon URLs
