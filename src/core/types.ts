@@ -216,8 +216,10 @@ export interface ClaimSwapAndSupplyOrRepayOrTransferParams {
   slippage: number;
   /** Coin types of user's supplied assets (for price updates) */
   priceUpdateCoinTypes: string[];
-  /** Optional map of reward coin types to their amounts in base units (for accurate quotes) */
+  /** Optional map of reward coin types to their amounts in base units (for accurate quotes and USD calculations) */
   rewardAmounts?: Map<string, string>;
+  /** If true, claims rewards < $0.01 directly to wallet (only swap checkbox case) */
+  claimSmallRewardsToWallet?: boolean;
 }
 
 /**
