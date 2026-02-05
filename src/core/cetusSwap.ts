@@ -115,12 +115,6 @@ export class CetusSwap {
         throw new Error("No router data provided");
       }
 
-      console.log("Cetus routerSwap - completely consuming input coin", {
-        amountIn: router.amountIn.toString(),
-        amountOut: router.amountOut.toString(),
-        slippage,
-      });
-
       const targetCoin = await this.client.routerSwap({
         router,
         txb,
@@ -128,7 +122,6 @@ export class CetusSwap {
         slippage,
       });
 
-      console.log("Swap completed, target coin object returned");
       return targetCoin;
     } catch (error) {
       console.error("Error in routerSwap:", error);
