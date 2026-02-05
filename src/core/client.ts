@@ -33,6 +33,7 @@ import {
   AlphalendClientOptions,
   ClaimSwapAndSupplyOrRepayOrTransferParams,
   MarketInfo,
+  FlashRepayParams,
 } from "./types.js";
 import {
   getAlphaReceipt,
@@ -49,6 +50,7 @@ import { Decimal } from "decimal.js";
 import { QuoteResponse } from "@7kprotocol/sdk-ts";
 import { blockchainCache } from "../utils/blockchainCache.js";
 import { CetusSwap, RouterDataV3 } from "./cetusSwap.js";
+import { buildFlashRepayTransaction } from "./flashRepay.js";
 
 /**
  * AlphaLend Client
@@ -1110,6 +1112,23 @@ export class AlphalendClient {
     }
 
     return [coin1, coin2];
+  }
+
+  /**
+   * Breaks out of a leveraged looping position using a Navi flash loan.
+   * Use like withdraw/repay: same client method + params pattern; returns Transaction for signing.
+   *
+   * @param params.withdrawCoinType Coin type to withdraw from collateral (e.g. stSUI)
+   * @param params.withdrawMarketId Market ID of the withdraw coin
+   * @param params.repayCoinType Coin type to repay debt (e.g. SUI)
+   * @param params.repayMarketId Market ID of the repay coin
+   * @param params.positionCapId Position capability object ID
+   * @param params.address User wallet address
+   * @param params.slippage Slippage for swap (e.g. 0.01 for 1%)
+   * @returns Transaction ready for signing and execution
+   */
+  async flashRepay(params: FlashRepayParams): Promise<Transaction> {
+    return await buildFlashRepayTransaction(this, params);
   }
 
   /**
