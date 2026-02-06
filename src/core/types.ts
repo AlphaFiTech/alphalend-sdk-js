@@ -431,4 +431,10 @@ export interface FlashRepayParams {
   address: string;
   /** Slippage for the swap (e.g. 0.01 for 1%) */
   slippage: number;
+  /**
+   * Optional partial repay amount in base units (smallest unit of repay coin).
+   * If not set, repays full debt (full exit). If set, only this amount is flash-borrowed and repaid;
+   * position remains open with (debt - amount) and proportional collateral is withdrawn.
+   */
+  repayAmountBaseUnits?: string;
 }
