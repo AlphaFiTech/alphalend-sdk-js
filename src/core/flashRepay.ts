@@ -2,10 +2,38 @@ import {
   Transaction,
   TransactionObjectArgument,
 } from "@mysten/sui/transactions";
-import { flashloanPTB, repayFlashLoanPTB } from "@naviprotocol/lending";
+import {
+  flashloanPTB,
+  repayFlashLoanPTB,
+  getAllFlashLoanAssets,
+} from "@naviprotocol/lending";
 import { Decimal } from "decimal.js";
 import { FlashRepayParams } from "./types.js";
 import type { AlphalendClient } from "./client.js";
+
+/**
+ * Returns whether Navi supports flash loan for the given coin type.
+ * Use this in the UI to show/hide Flash Repay or to filter repay-asset options and prevent transaction failure.
+ *
+ * @param coinType - Full coin type (e.g. repay asset coin type)
+ * @param options - Optional: env 'prod' | 'dev' (default 'prod'), cacheTime in ms
+ * @returns true if the asset is in Navi's flash loan list, false otherwise
+ */
+export async function isNaviFlashLoanSupported(
+  coinType: string,
+  options?: { env?: "prod"; cacheTime?: number },
+): Promise<boolean> {
+  const cacheTime = options?.cacheTime ?? 60_000;
+  const flashLoanAssets = await getAllFlashLoanAssets({
+    env: "prod",
+    cacheTime,
+  });
+  const normalized = coinType.replace(/^0x0+/, "0x").toLowerCase();
+  return flashLoanAssets.some(
+    (asset) =>
+      asset.coinType.replace(/^0x0+/, "0x").toLowerCase() === normalized,
+  );
+}
 
 /**
  * Builds a flash repay transaction (break out of looping position via Navi flash loan).
@@ -91,9 +119,7 @@ export async function buildFlashRepayTransaction(
     throw new Error("Repay amount must be positive");
   }
   if (effectiveRepayBaseUnits.gt(borrowedBaseUnits)) {
-    throw new Error(
-      "Repay amount cannot exceed current debt in this market",
-    );
+    throw new Error("Repay amount cannot exceed current debt in this market");
   }
 
   const flashLoanAmount = effectiveRepayBaseUnits.mul(1.005).ceil().toFixed(0);
