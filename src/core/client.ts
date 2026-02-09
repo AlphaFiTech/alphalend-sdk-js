@@ -652,7 +652,7 @@ export class AlphalendClient {
         tx.object(this.constants.LENDING_PROTOCOL_ID), // Protocol object
         tx.object(params.positionCapId), // Position capability
         tx.pure.u64(params.marketId), // Market ID
-        tx.pure.u64(params.amount), // Amount to withdraw
+        repayCoin as TransactionObjectArgument, // Coin to repay with
         tx.object(this.constants.SUI_CLOCK_OBJECT_ID), // Clock object
       ],
     });
@@ -660,6 +660,7 @@ export class AlphalendClient {
     // Transfer remaining coin from repayment back to user
     tx.transferObjects([remainingCoin], params.address);
 
+    tx.setGasBudget(100_000_000n);
     return tx;
   }
 
