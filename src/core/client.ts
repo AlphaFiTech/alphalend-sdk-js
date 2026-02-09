@@ -912,6 +912,9 @@ export class AlphalendClient {
   ): Promise<Transaction | undefined> {
     const tx = new Transaction();
 
+    // Ensure SDK is initialized to have access to coin metadata (including prices)
+    await this.ensureInitialized();
+
     // Get all claimable rewards
     const rewardInput = await getClaimRewardInput(
       this.client,
@@ -931,14 +934,63 @@ export class AlphalendClient {
       await this.updatePrices(tx, params.priceUpdateCoinTypes);
     }
 
+    // Helper function to calculate USD value for a coin type
+    const calculateUsdValue = (coinType: string): number | null => {
+      const rewardAmount = params.rewardAmounts?.get(coinType);
+      if (!rewardAmount) return 0;
+
+      const coinMetadata = this.coinMetadataMap.get(coinType);
+
+      // If metadata is missing, log warning and return null to indicate invalid calculation
+      if (!coinMetadata || coinMetadata.decimals === undefined) {
+        console.warn(`Missing coin metadata or decimals for ${coinType}.`);
+        return null;
+      }
+
+      const decimals = coinMetadata.decimals;
+      const tokenAmount = Number(rewardAmount) / Math.pow(10, decimals);
+
+      const priceStr = coinMetadata.pythPrice || coinMetadata.coingeckoPrice;
+      const price = priceStr ? parseFloat(priceStr) : 0;
+
+      return tokenAmount * price;
+    };
+
+    // Pre-calculate USD values for all coin types
+    const usdValuesByCoinType = new Map<string, number | null>();
+    for (const data of rewardInput) {
+      for (let coinType of data.coinTypes) {
+        coinType = "0x" + coinType;
+        if (!usdValuesByCoinType.has(coinType)) {
+          const usdValue = calculateUsdValue(coinType);
+          usdValuesByCoinType.set(coinType, usdValue);
+        }
+      }
+    }
+
     // Collect all reward coins by coin type
     const rewardCoinsByType: Map<string, TransactionObjectArgument[]> =
       new Map();
 
-    // Claim all rewards
+    // Claim rewards (skip small rewards if claimSmallRewardsToWallet is false)
     for (const data of rewardInput) {
       for (let coinType of data.coinTypes) {
         coinType = "0x" + coinType;
+
+        const usdValue = usdValuesByCoinType.get(coinType);
+
+        // Skip coins with missing metadata (null usdValue)
+        if (usdValue === null || usdValue === undefined) {
+          continue;
+        }
+
+        // Skip claiming small rewards if both checkboxes are checked (claimSmallRewardsToWallet = false)
+        const shouldSkipSmallReward =
+          !params.claimSmallRewardsToWallet && usdValue > 0 && usdValue < 0.01;
+        if (shouldSkipSmallReward) {
+          continue; // Skip this reward entirely
+        }
+
         const [coin1, promise] = tx.moveCall({
           target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::collect_reward`,
           typeArguments: [coinType],
@@ -969,14 +1021,40 @@ export class AlphalendClient {
       }
     }
 
-    // Merge coins and swap to target coin
-    let targetCoin: TransactionObjectArgument | undefined = undefined;
+    // Separate coins into those that should be swapped vs those that should be claimed directly
+    const coinsToSwap: Map<string, TransactionObjectArgument> = new Map();
+    const coinsToClaimDirectly: Map<string, TransactionObjectArgument> =
+      new Map();
 
     for (const [coinType, coins] of rewardCoinsByType.entries()) {
       if (coins.length === 0) continue;
 
       const mergedCoin = this.mergeCoins(tx, undefined, coins);
+      const usdValue = usdValuesByCoinType.get(coinType);
 
+      // Skip coins with missing metadata (should not happen as they're filtered earlier, but safety check)
+      if (usdValue === null || usdValue === undefined) {
+        console.warn(
+          `[claimSwapAndSupplyOrRepayOrTransfer] Skipping coin ${coinType} - missing USD value calculation`,
+        );
+        continue;
+      }
+
+      // Check if this coin is above the $0.01 threshold
+      const shouldSwap = usdValue >= 0.01;
+
+      if (shouldSwap) {
+        coinsToSwap.set(coinType, mergedCoin);
+      } else {
+        // Small rewards to be claimed directly to wallet
+        coinsToClaimDirectly.set(coinType, mergedCoin);
+      }
+    }
+
+    // Swap eligible coins to target coin
+    let targetCoin: TransactionObjectArgument | undefined = undefined;
+
+    for (const [coinType, mergedCoin] of coinsToSwap.entries()) {
       if (coinType === params.targetCoinType) {
         if (targetCoin) {
           tx.mergeCoins(targetCoin, [mergedCoin]);
@@ -1006,8 +1084,20 @@ export class AlphalendClient {
       }
     }
 
+    // Handle coins that should be claimed directly to wallet
+    if (coinsToClaimDirectly.size > 0) {
+      const coinsToTransfer = Array.from(coinsToClaimDirectly.values());
+      tx.transferObjects(coinsToTransfer, params.address);
+    }
+
+    // If no target coin, all rewards were either too small or claimed directly
     if (!targetCoin) {
-      console.error("No target coin available for repay");
+      // If we have coins claimed directly, return the transaction
+      if (coinsToClaimDirectly.size > 0) {
+        return tx;
+      }
+      // Otherwise, nothing to do
+      console.error("No target coin available and no small rewards to claim");
       return undefined;
     }
 
