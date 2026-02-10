@@ -260,15 +260,15 @@ async function run() {
   // Other tests (commented out)
   // const { suiClient, keypair, address } = getExecStuff();
   // const tx = new Transaction();
-  // const constants = getConstants("mainnet");
-  // const pythClient = new SuiPythClient(
-  //   suiClient,
-  //   constants.PYTH_STATE_ID,
-  //   constants.WORMHOLE_STATE_ID,
-  // );
-  // const pythConnection = new SuiPriceServiceConnection(
-  //   "https://hermes.pyth.network",
-  // );
+  const constants = getConstants("mainnet");
+  const pythClient = new SuiPythClient(
+    suiClient,
+    constants.PYTH_STATE_ID,
+    constants.WORMHOLE_STATE_ID,
+  );
+  const pythConnection = new SuiPriceServiceConnection(
+    "https://hermes.pyth.network",
+  );
   // const positionCapId =
   // "0xf9ca35f404dd3c1ea10c381dd3e1fe8a0c4586adf5e186f4eb52307462a5af7d";
   // await getPriceInfoObjectIdsWithUpdate(
@@ -278,9 +278,9 @@ async function run() {
   //   pythConnection,
   // );
   // console.log(pythPriceFeedIdMap[coinType]);
-  // const priceInfoObjectIds = await pythClient.getPriceFeedObjectId(
-  //   "93da3352f9f1d105fdfe4971cfa80e9dd777bfc5d0f683ebb6e1294b92137bb7",
-  // );
+  const priceInfoObjectIds = await pythClient.getPriceFeedObjectId(
+    "93da3352f9f1d105fdfe4971cfa80e9dd777bfc5d0f683ebb6e1294b92137bb7",
+  );
   // const priceFeedUpdateData = await pythConnection.getPriceFeedsUpdateData([
   //   "14890ba9c221092cba3d6ce86846d61f8606cefaf3dfc20bf3e2ab99de2644c0",
   // ]);
@@ -288,7 +288,7 @@ async function run() {
   //   tx,
   //   priceFeedUpdateData,
   // );
-  // console.log(priceInfoObjectIds);
+  console.log(priceInfoObjectIds);
   // const tx = await updatePricesCaller();
   // const tx = await alc.supply({
   //   marketId: "1",
