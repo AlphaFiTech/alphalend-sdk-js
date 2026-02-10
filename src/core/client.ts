@@ -632,14 +632,6 @@ export class AlphalendClient {
       throw new Error("Failed to perform swap: No coin returned");
     }
 
-    // Only update the repay coin price to minimize transaction complexity
-    if (this.network === "mainnet") {
-      // Only update the price for the coin we're repaying (not all user positions)
-      await this.updatePrices(tx, [params.swapToCoinType]);
-    } else {
-      await setPrices(tx);
-    }
-
     // Repay the debt with the swapped coin
     const remainingCoin = tx.moveCall({
       target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::repay`,
