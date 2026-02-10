@@ -413,3 +413,18 @@ export interface quoteObject {
   slippage: number;
   rawQuote: RouterDataV3;
 }
+
+/**
+ * Parameters for flash repay (break out of looping position via Navi flash loan).
+ * Used with the `flashRepay` method.
+ */
+export interface FlashRepayParams {
+  withdrawCoinType: string;
+  withdrawMarketId: string;
+  repayCoinType: string;
+  repayMarketId: string;
+  positionCapId: string;
+  address: string;
+  slippage: number;
+  repayAmountBaseUnits?: string;
+}
