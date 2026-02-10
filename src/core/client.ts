@@ -606,12 +606,6 @@ export class AlphalendClient {
       inputCoin = tx.splitCoins(coinObject, [
         quoteResponse.amountIn.toString(),
       ]);
-
-      // CRITICAL: Transfer the remaining coin back IMMEDIATELY after split
-      // If we wait until after swap/repay, the result reference becomes stale
-      if (coinObject !== tx.gas) {
-        tx.transferObjects([coinObject], params.address);
-      }
     }
 
     // Perform the swap to get the coin for repayment
@@ -660,7 +654,6 @@ export class AlphalendClient {
     // Transfer remaining coin from repayment back to user
     tx.transferObjects([remainingCoin], params.address);
 
-    tx.setGasBudget(100_000_000n);
     return tx;
   }
 
