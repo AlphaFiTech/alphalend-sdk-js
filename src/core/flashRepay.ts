@@ -59,6 +59,16 @@ export async function buildFlashRepayTransaction(
   params: FlashRepayParams,
 ): Promise<Transaction> {
   // -------------------------------------------------------------------------
+  // PARAMS VALIDATION
+  // -------------------------------------------------------------------------
+  if (params.repayAmountBaseUnits != null) {
+    const repayAmount = new Decimal(params.repayAmountBaseUnits);
+    if (!repayAmount.gt(0)) {
+      throw new Error("Repay amount must be positive");
+    }
+  }
+
+  // -------------------------------------------------------------------------
   // QUERY PHASE - Get position and market data
   // -------------------------------------------------------------------------
 
@@ -110,17 +120,13 @@ export async function buildFlashRepayTransaction(
     new Decimal(10).pow(repayDecimals),
   );
 
-  // Partial repay: use provided amount; otherwise full debt
-  const effectiveRepayBaseUnits = params.repayAmountBaseUnits
-    ? new Decimal(params.repayAmountBaseUnits)
-    : borrowedBaseUnits;
-
-  if (effectiveRepayBaseUnits.lte(0)) {
-    throw new Error("Repay amount must be positive");
-  }
-  if (effectiveRepayBaseUnits.gt(borrowedBaseUnits)) {
-    throw new Error("Repay amount cannot exceed current debt in this market");
-  }
+  // Partial repay: use provided amount (capped to debt); otherwise full debt
+  const effectiveRepayBaseUnits = Decimal.min(
+    params.repayAmountBaseUnits
+      ? new Decimal(params.repayAmountBaseUnits)
+      : borrowedBaseUnits,
+    borrowedBaseUnits,
+  );
 
   const flashLoanAmount = effectiveRepayBaseUnits.mul(1.005).ceil().toFixed(0);
 
