@@ -249,6 +249,7 @@ async function withdraw() {
 // withdraw();
 
 async function run() {
+  const { suiClient, keypair, address } = getExecStuff();
   // 🔥 TEST FLASH REPAY
   // Choose which test to run:
   // Basic flash repay test (with default 1% slippage)
