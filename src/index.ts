@@ -1,6 +1,5 @@
 // Main exports
 export * from "./constants/index.js";
-export * from "./coin/index.js";
 export * from "./core/types.js";
 
 // Re-export key types for easier access
