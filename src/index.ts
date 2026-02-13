@@ -14,4 +14,4 @@ export {
 // Export caching utilities for advanced users
 export { httpCache } from "./utils/httpCache.js";
 export { blockchainCache } from "./utils/blockchainCache.js";
-export { isNaviFlashLoanSupported } from "./core/flashRepay.js";
+export { getNaviFlashLoanSupportedCoinTypes } from "./core/flashRepay.js";

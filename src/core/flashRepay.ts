@@ -12,27 +12,25 @@ import { FlashRepayParams } from "./types.js";
 import type { AlphalendClient } from "./client.js";
 
 /**
- * Returns whether Navi supports flash loan for the given coin type.
- * Use this in the UI to show/hide Flash Repay or to filter repay-asset options and prevent transaction failure.
+ * Returns the Set of normalized coin types that Navi supports for flash loans.
+ * Fetch once, then use supportedSet.has(normalize(coinType)) for O(1) lookups.
  *
- * @param coinType - Full coin type (e.g. repay asset coin type)
  * @param options - Optional: env 'prod' | 'dev' (default 'prod'), cacheTime in ms
- * @returns true if the asset is in Navi's flash loan list, false otherwise
+ * @returns Set of normalized (lowercase, 0x-prefixed) coin types
  */
-export async function isNaviFlashLoanSupported(
-  coinType: string,
+export async function getNaviFlashLoanSupportedCoinTypes(
   options?: { env?: "prod"; cacheTime?: number },
-): Promise<boolean> {
+): Promise<Set<string>> {
   const cacheTime = options?.cacheTime ?? 60_000;
-  const flashLoanAssets = await getAllFlashLoanAssets({
+  const assets = await getAllFlashLoanAssets({
     env: "prod",
     cacheTime,
   });
-  const normalized = coinType.replace(/^0x0+/, "0x").toLowerCase();
-  return flashLoanAssets.some(
-    (asset) =>
-      asset.coinType.replace(/^0x0+/, "0x").toLowerCase() === normalized,
-  );
+  const set = new Set<string>();
+  for (const a of assets) {
+    set.add(a.coinType.replace(/^0x0+/, "0x").toLowerCase());
+  }
+  return set;
 }
 
 /**
