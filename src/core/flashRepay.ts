@@ -18,9 +18,10 @@ import type { AlphalendClient } from "./client.js";
  * @param options - Optional: env 'prod' | 'dev' (default 'prod'), cacheTime in ms
  * @returns Set of normalized (lowercase, 0x-prefixed) coin types
  */
-export async function getNaviFlashLoanSupportedCoinTypes(
-  options?: { env?: "prod"; cacheTime?: number },
-): Promise<Set<string>> {
+export async function getNaviFlashLoanSupportedCoinTypes(options?: {
+  env?: "prod";
+  cacheTime?: number;
+}): Promise<Set<string>> {
   const cacheTime = options?.cacheTime ?? 60_000;
   const assets = await getAllFlashLoanAssets({
     env: "prod",
@@ -177,13 +178,13 @@ export async function buildFlashRepayTransaction(
     return coinTypes;
   })();
 
-  const isPartial = params.repayAmountBaseUnits != null;
-  console.log(
-    `Repay mode: ${isPartial ? "partial" : "full"}; borrowed (tokens): ${borrowedTokens.toFixed(6)}`,
-  );
-  console.log(`Flash loan amount: ${flashLoanAmount} base units`);
-  console.log(`Withdraw amount: ${withdrawAmount} base units`);
-  console.log(`Price update coins: ${priceUpdateCoinTypes.join(", ")}`);
+  // const isPartial = params.repayAmountBaseUnits != null;
+  // console.log(
+  //   `Repay mode: ${isPartial ? "partial" : "full"}; borrowed (tokens): ${borrowedTokens.toFixed(6)}`,
+  // );
+  // console.log(`Flash loan amount: ${flashLoanAmount} base units`);
+  // console.log(`Withdraw amount: ${withdrawAmount} base units`);
+  // console.log(`Price update coins: ${priceUpdateCoinTypes.join(", ")}`);
 
   // -------------------------------------------------------------------------
   // TRANSACTION BUILDING PHASE
@@ -192,7 +193,7 @@ export async function buildFlashRepayTransaction(
   const tx = new Transaction();
 
   // Step 1: Flash borrow from Navi — borrow repay-coin from Navi’s flash loan pool (amount = debt + 0.5% buffer). Returns a Balance and a receipt used later to repay.
-  console.log("Step 1: Flash borrow from Navi");
+  // console.log("Step 1: Flash borrow from Navi");
   const [flashBalance, receipt] = await flashloanPTB(
     tx,
     params.repayCoinType,
@@ -201,7 +202,7 @@ export async function buildFlashRepayTransaction(
   );
 
   // Step 2: Balance → Coin — convert the flash-loan Balance into a Coin<T> so it can be passed to AlphaLend’s repay.
-  console.log("Step 2: Balance → Coin");
+  // console.log("Step 2: Balance → Coin");
   const flashCoin = tx.moveCall({
     target: "0x2::coin::from_balance",
     typeArguments: [params.repayCoinType],
@@ -209,7 +210,7 @@ export async function buildFlashRepayTransaction(
   });
 
   // Step 3: Repay debt on AlphaLend — call AlphaLend repay with the flash coin; debt is fully paid. Returns the leftover repay-coin (if any) after repaying.
-  console.log("Step 3: Repay debt on AlphaLend");
+  // console.log("Step 3: Repay debt on AlphaLend");
   const remainingCoin = tx.moveCall({
     target: `${client.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::repay`,
     typeArguments: [params.repayCoinType],
@@ -223,13 +224,13 @@ export async function buildFlashRepayTransaction(
   });
 
   // Step 4: Update oracle prices — refresh on-chain oracle prices for all coins in the position so withdraw/collateral math is correct (mainnet only).
-  console.log("Step 4: Update oracle prices");
+  // console.log("Step 4: Update oracle prices");
   if (client.network === "mainnet") {
     await client.updatePrices(tx, priceUpdateCoinTypes);
   }
 
   // Step 5: Withdraw collateral — remove collateral in withdraw-coin from the AlphaLend position (amount computed to cover flash loan value + 10% buffer). Uses promise so the withdrawn coin can be used in the next step.
-  console.log("Step 5: Withdraw collateral");
+  // console.log("Step 5: Withdraw collateral");
   const promise = tx.moveCall({
     target: `${client.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::remove_collateral`,
     typeArguments: [params.withdrawCoinType],
@@ -258,10 +259,10 @@ export async function buildFlashRepayTransaction(
   // Step 6: Same coin or swap — if withdraw coin equals repay coin, use withdrawn coin as-is; otherwise swap withdrawn collateral to repay coin via Cetus so we can repay the flash loan.
   let coinToMerge: TransactionObjectArgument;
   if (params.withdrawCoinType === params.repayCoinType) {
-    console.log("Step 6: Same coin — skip swap");
+    // console.log("Step 6: Same coin — skip swap");
     coinToMerge = withdrawnCoin;
   } else {
-    console.log("Step 6: Swap withdrawn collateral → repay coin via Cetus");
+    // console.log("Step 6: Swap withdrawn collateral → repay coin via Cetus");
     const router = await client.cetusSwap.getCetusSwapQuote(
       params.withdrawCoinType,
       params.repayCoinType,
@@ -270,9 +271,9 @@ export async function buildFlashRepayTransaction(
     if (!router) {
       throw new Error("Failed to get swap quote from Cetus. No route found.");
     }
-    console.log(
-      `  Cetus quote: ${router.amountIn.toString()} → ${router.amountOut.toString()}`,
-    );
+    // console.log(
+    //   `  Cetus quote: ${router.amountIn.toString()} → ${router.amountOut.toString()}`,
+    // );
     coinToMerge = await client.cetusSwap.routerSwapWithInputCoin(
       router,
       tx,
@@ -282,11 +283,11 @@ export async function buildFlashRepayTransaction(
   }
 
   // Step 7: Merge coins — combine the coin used for swap/same-coin (coinToMerge) with any leftover from AlphaLend repay (remainingCoin) into one repay-coin balance for Navi.
-  console.log("Step 7: Merge coins");
+  // console.log("Step 7: Merge coins");
   tx.mergeCoins(coinToMerge, [remainingCoin]);
 
   // Step 8–9: Repay flash loan — convert merged coin to Balance and call Navi’s repayFlashLoanPTB with the receipt; Navi takes what it’s owed and returns the remaining balance as user profit.
-  console.log("Step 8-9: Repay flash loan");
+  // console.log("Step 8-9: Repay flash loan");
   const repayBalance = tx.moveCall({
     target: "0x2::coin::into_balance",
     typeArguments: [params.repayCoinType],
@@ -302,7 +303,7 @@ export async function buildFlashRepayTransaction(
   );
 
   // Step 10: Transfer profit to user — turn the remaining balance (after repaying Navi) into a coin and transfer it to the user’s address.
-  console.log("Step 10: Transfer profit to user");
+  // console.log("Step 10: Transfer profit to user");
   const profitCoin = tx.moveCall({
     target: "0x2::coin::from_balance",
     typeArguments: [params.repayCoinType],
