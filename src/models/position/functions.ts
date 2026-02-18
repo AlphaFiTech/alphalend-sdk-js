@@ -123,7 +123,7 @@ export const getUserPositionIds = async (
       (obj) => obj.data as unknown as PositionCapQueryType,
     );
 
-    const ids = positionCapObjects.map((obj) => obj.content.fields.position_id);
+    const ids = positionCapObjects.map((obj) => obj.objectId);
     return ids;
   } catch (error) {
     console.error("Error fetching user position IDs:", error);
