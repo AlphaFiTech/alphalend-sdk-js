@@ -608,6 +608,8 @@ export class AlphalendClient {
       inputCoin = tx.splitCoins(coinObject, [
         quoteResponse.amountIn.toString(),
       ]);
+
+      tx.transferObjects([coinObject], params.address);
     }
 
     // Perform the swap to get the coin for repayment
