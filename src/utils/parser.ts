@@ -32,7 +32,7 @@ import {
  * Handles generic types like `DEEPBOOK_STAKED<USDC>` where inner type addresses also need the prefix.
  */
 export function normalizeCoinType(coinType: string): string {
-  if (coinType.includes("sui::SUI")) {
+  if (coinType.endsWith("2::sui::SUI")) {
     return "0x2::sui::SUI";
   }
   return coinType
