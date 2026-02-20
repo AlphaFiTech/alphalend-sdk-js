@@ -38,8 +38,7 @@ export function normalizeCoinType(coinType: string): string {
   return coinType
     .split("<")
     .map((segment) => {
-      const trimmed = segment.replaceAll(">", "");
-      if (trimmed.length > 0 && !trimmed.startsWith("0x")) {
+      if (segment.length > 0 && !segment.startsWith("0x")) {
         return "0x" + segment;
       }
       return segment;
