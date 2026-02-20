@@ -1,6 +1,5 @@
 // Main exports
 export * from "./constants/index.js";
-export * from "./coin/index.js";
 export * from "./core/types.js";
 
 // Re-export key types for easier access
@@ -15,3 +14,4 @@ export {
 // Export caching utilities for advanced users
 export { httpCache } from "./utils/httpCache.js";
 export { blockchainCache } from "./utils/blockchainCache.js";
+export { isNaviFlashLoanSupported } from "./core/flashRepay.js";

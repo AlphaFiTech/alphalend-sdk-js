@@ -23,7 +23,6 @@ import {
   ClaimAndSupplyOrRepayParams,
   LiquidateParams,
   MarketData,
-  MarketInfo,
   UserPortfolio,
   ProtocolStats,
   CoinMetadata,
@@ -32,6 +31,10 @@ import {
   MAX_U64,
   quoteObject,
   AlphalendClientOptions,
+  SwapAndRepayParams,
+  ClaimSwapAndSupplyOrRepayOrTransferParams,
+  MarketInfo,
+  FlashRepayParams,
 } from "./types.js";
 import {
   getAlphaReceipt,
@@ -48,6 +51,8 @@ import { SevenKGateway } from "./sevenKSwap.js";
 import { Decimal } from "decimal.js";
 import { QuoteResponse } from "@7kprotocol/sdk-ts";
 import { blockchainCache } from "../utils/blockchainCache.js";
+import { CetusSwap, RouterDataV3 } from "./cetusSwap.js";
+import { buildFlashRepayTransaction } from "./flashRepay.js";
 
 /**
  * AlphaLend Client
@@ -69,6 +74,7 @@ export class AlphalendClient {
   constants: Constants;
   lendingProtocol: LendingProtocol;
   sevenKGateway: SevenKGateway;
+  cetusSwap: CetusSwap;
 
   // Dynamic coin metadata properties
   private coinMetadataMap: Map<string, CoinMetadata> = new Map();
@@ -101,6 +107,7 @@ export class AlphalendClient {
     );
     this.lendingProtocol = new LendingProtocol(network, client);
     this.sevenKGateway = new SevenKGateway();
+    this.cetusSwap = new CetusSwap("mainnet");
 
     // If a coin metadata map is provided, use it and mark as initialized
     if (options?.coinMetadataMap) {
@@ -295,19 +302,48 @@ export class AlphalendClient {
   ): Promise<Transaction | undefined> {
     const tx = new Transaction();
 
-    const quoteResponse = await this.sevenKGateway.getQuote(
+    const quoteResponse = await this.cetusSwap.getCetusSwapQuote(
       params.inputCoinType,
       params.marketCoinType,
       params.inputAmount.toString(),
     );
-    const supplyCoin = await this.sevenKGateway.getTransactionBlock(
+
+    if (!quoteResponse) {
+      console.error("Failed to get swap quote");
+      return undefined;
+    }
+
+    const coinObject = await this.getCoinObject(
       tx,
+      params.inputCoinType,
       params.address,
+      BigInt(quoteResponse.amountIn.toString()),
+    );
+
+    if (!coinObject) {
+      console.error("Failed to get input coin object");
+      return undefined;
+    }
+
+    // Split the exact amount needed for the swap from the coin object
+    const inputCoin = tx.splitCoins(coinObject, [
+      quoteResponse.amountIn.toString(),
+    ]);
+
+    // Transfer the remaining coin back to the user
+    if (coinObject !== tx.gas) {
+      tx.transferObjects([coinObject], params.address);
+    }
+
+    const supplyCoin = await this.cetusSwap.cetusSwapTokensTxb(
+      quoteResponse as RouterDataV3,
       params.slippage,
-      quoteResponse,
+      inputCoin,
+      params.address,
+      tx,
     );
     if (!supplyCoin) {
-      console.error("Failed to get coin out");
+      console.error("Failed to get coin out from swap");
       return undefined;
     }
 
@@ -320,7 +356,7 @@ export class AlphalendClient {
           tx.object(this.constants.LENDING_PROTOCOL_ID), // Protocol object
           tx.object(params.positionCapId), // Position capability
           tx.pure.u64(params.marketId), // Market ID
-          supplyCoin, // Coin to supply as collateral
+          supplyCoin as TransactionObjectArgument, // Coin to supply as collateral
           tx.object(this.constants.SUI_CLOCK_OBJECT_ID), // Clock object
         ],
       });
@@ -344,13 +380,12 @@ export class AlphalendClient {
           tx.object(this.constants.LENDING_PROTOCOL_ID), // Protocol object
           positionCap, // Position capability
           tx.pure.u64(params.marketId), // Market ID
-          supplyCoin, // Coin to supply as collateral
+          supplyCoin as TransactionObjectArgument, // Coin to supply as collateral
           tx.object(this.constants.SUI_CLOCK_OBJECT_ID), // Clock object
         ],
       });
       tx.transferObjects([positionCap], params.address);
     }
-
     return tx;
   }
 
@@ -519,6 +554,100 @@ export class AlphalendClient {
     if (withdrawCoin) {
       tx.transferObjects([withdrawCoin], params.address);
     }
+
+    return tx;
+  }
+
+  async swapAndRepay(
+    params: SwapAndRepayParams,
+  ): Promise<Transaction | undefined> {
+    const tx = new Transaction();
+
+    const swapInAmount = (params.amount - 1n).toString();
+
+    // Get swap quote (no price update needed for swap itself)
+    let quoteResponse;
+    try {
+      quoteResponse = await this.cetusSwap.getCetusSwapQuote(
+        params.swapFromCoinType,
+        params.swapToCoinType,
+        swapInAmount,
+      );
+    } catch (error) {
+      console.error("[AlphaLend SDK] Error fetching Cetus quote:", error);
+      throw new Error(
+        `Failed to get swap quote: ${error instanceof Error ? error.message : "Unknown error"}`,
+      );
+    }
+
+    if (!quoteResponse) {
+      console.error("[AlphaLend SDK] Cetus returned empty quote");
+      throw new Error("Failed to get swap quote: Empty response from Cetus");
+    }
+    // Check if the input coin is SUI
+    const isInputSui = params.swapFromCoinType === this.constants.SUI_COIN_TYPE;
+    let coinObject: string | TransactionObjectArgument | undefined;
+    let inputCoin;
+
+    if (isInputSui) {
+      // For SUI, split directly from gas
+      inputCoin = tx.splitCoins(tx.gas, [quoteResponse.amountIn.toString()]);
+    } else {
+      // For other coins, get the coin object
+      coinObject = await this.getCoinObject(
+        tx,
+        params.swapFromCoinType,
+        params.address,
+      );
+
+      if (!coinObject) {
+        console.error("Failed to get input coin object");
+        return undefined;
+      }
+
+      // Split the exact amount needed for the swap from the coin object
+      inputCoin = tx.splitCoins(coinObject, [
+        quoteResponse.amountIn.toString(),
+      ]);
+    }
+
+    // Perform the swap to get the coin for repayment
+    let repayCoin;
+    try {
+      repayCoin = await this.cetusSwap.cetusSwapTokensTxb(
+        quoteResponse as RouterDataV3,
+        params.slippage,
+        inputCoin,
+        params.address,
+        tx,
+      );
+    } catch (error) {
+      console.error("[AlphaLend SDK] Error building Cetus swap:", error);
+      throw new Error(
+        `Failed to build swap transaction: ${error instanceof Error ? error.message : "Unknown error"}`,
+      );
+    }
+
+    if (!repayCoin) {
+      console.error("[AlphaLend SDK] Cetus swap returned no coin");
+      throw new Error("Failed to perform swap: No coin returned");
+    }
+
+    // Repay the debt with the swapped coin
+    const remainingCoin = tx.moveCall({
+      target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::repay`,
+      typeArguments: [params.swapToCoinType],
+      arguments: [
+        tx.object(this.constants.LENDING_PROTOCOL_ID), // Protocol object
+        tx.object(params.positionCapId), // Position capability
+        tx.pure.u64(params.marketId), // Market ID
+        repayCoin as TransactionObjectArgument, // Coin to repay with
+        tx.object(this.constants.SUI_CLOCK_OBJECT_ID), // Clock object
+      ],
+    });
+
+    // Transfer remaining coin from repayment back to user
+    tx.transferObjects([remainingCoin], params.address);
 
     return tx;
   }
@@ -701,10 +830,10 @@ export class AlphalendClient {
             coinType === this.constants.ALPHA_COIN_TYPE
           ) {
             if (coin2) {
-              alphaCoin = this.mergeAlphaCoins(tx, alphaCoin, [coin2]);
+              alphaCoin = this.mergeCoins(tx, alphaCoin, [coin2]);
             }
             if (coin1) {
-              alphaCoin = this.mergeAlphaCoins(tx, alphaCoin, [coin1]);
+              alphaCoin = this.mergeCoins(tx, alphaCoin, [coin1]);
             }
           } else {
             if (coin2) {
@@ -719,7 +848,7 @@ export class AlphalendClient {
             params.claimAndDepositAlpha &&
             coinType === this.constants.ALPHA_COIN_TYPE
           ) {
-            alphaCoin = this.mergeAlphaCoins(tx, alphaCoin, [coin1]);
+            alphaCoin = this.mergeCoins(tx, alphaCoin, [coin1]);
           } else {
             tx.transferObjects([coin1], params.address);
           }
@@ -734,32 +863,279 @@ export class AlphalendClient {
   }
 
   /**
-   * Merges multiple Alpha token coins into a single coin
+   * Merges multiple coins of the same type into a single coin
    *
    * @param tx Transaction to add merge operation to
-   * @param alphaCoin Existing Alpha coin to merge into (or undefined)
-   * @param coins Array of Alpha coins to merge
+   * @param targetCoin Existing coin to merge into (or undefined)
+   * @param coins Array of coins to merge
    * @returns Transaction argument representing the merged coin
    */
-  private mergeAlphaCoins(
+  private mergeCoins(
     tx: Transaction,
-    alphaCoin: TransactionObjectArgument | undefined,
+    targetCoin: TransactionObjectArgument | undefined,
     coins: TransactionObjectArgument[],
   ): TransactionObjectArgument {
-    if (alphaCoin) {
-      tx.mergeCoins(alphaCoin, coins);
+    if (targetCoin) {
+      tx.mergeCoins(targetCoin, coins);
     } else {
-      alphaCoin = tx.splitCoins(coins[0], [0]);
-      tx.mergeCoins(alphaCoin, coins);
+      targetCoin = tx.splitCoins(coins[0], [0]);
+      tx.mergeCoins(targetCoin, coins);
     }
-    return alphaCoin;
+    return targetCoin;
   }
 
   /**
-   * Claims rewards, repays borrowed coins, and optionally supplies leftover/non-borrowed coins to their markets
-   * Coins without supply markets are transferred to wallet
+   * Claims all available rewards, swaps them into a single `targetCoinType`, then:
+   * - transfers the swapped coin to the wallet if `transferTargetCoin` is true, otherwise
+   * - repays `targetMarketId` if `isTargetBorrowed` is true (and transfers any remainder), otherwise
+   * - supplies the swapped coin as collateral to `targetMarketId`.
    *
-   * @param params ClaimAndSupplyOrRepayParams - includes positionCapId, address, borrowedCoins, supplyMarkets
+   * On mainnet, optionally updates prices before repay/supply if `priceUpdateCoinTypes` is provided.
+   *
+   * @param params ClaimSwapAndSupplyOrRepayOrTransferParams - swap/repay/supply configuration
+   * @returns Transaction ready for signing and execution, or undefined if nothing is claimable
+   */
+  async claimSwapAndSupplyOrRepayOrTransfer(
+    params: ClaimSwapAndSupplyOrRepayOrTransferParams,
+  ): Promise<Transaction | undefined> {
+    const tx = new Transaction();
+
+    // Ensure SDK is initialized to have access to coin metadata (including prices)
+    await this.ensureInitialized();
+
+    // Get all claimable rewards
+    const rewardInput = await getClaimRewardInput(
+      this.client,
+      this.network,
+      params.address,
+    );
+
+    if (!rewardInput || rewardInput.length === 0) {
+      return undefined;
+    }
+
+    if (
+      this.network === "mainnet" &&
+      params.priceUpdateCoinTypes &&
+      params.priceUpdateCoinTypes.length > 0
+    ) {
+      await this.updatePrices(tx, params.priceUpdateCoinTypes);
+    }
+
+    // Helper function to calculate USD value for a coin type
+    const calculateUsdValue = (coinType: string): number | null => {
+      const rewardAmount = params.rewardAmounts?.get(coinType);
+      if (!rewardAmount) return 0;
+
+      const coinMetadata = this.coinMetadataMap.get(coinType);
+
+      // If metadata is missing, log warning and return null to indicate invalid calculation
+      if (!coinMetadata || coinMetadata.decimals === undefined) {
+        console.warn(`Missing coin metadata or decimals for ${coinType}.`);
+        return null;
+      }
+
+      const decimals = coinMetadata.decimals;
+      const tokenAmount = Number(rewardAmount) / Math.pow(10, decimals);
+
+      const priceStr = coinMetadata.pythPrice || coinMetadata.coingeckoPrice;
+      const price = priceStr ? parseFloat(priceStr) : 0;
+
+      return tokenAmount * price;
+    };
+
+    // Pre-calculate USD values for all coin types
+    const usdValuesByCoinType = new Map<string, number | null>();
+    for (const data of rewardInput) {
+      for (let coinType of data.coinTypes) {
+        coinType = "0x" + coinType;
+        if (!usdValuesByCoinType.has(coinType)) {
+          const usdValue = calculateUsdValue(coinType);
+          usdValuesByCoinType.set(coinType, usdValue);
+        }
+      }
+    }
+
+    // Collect all reward coins by coin type
+    const rewardCoinsByType: Map<string, TransactionObjectArgument[]> =
+      new Map();
+
+    // Claim rewards (skip small rewards if claimSmallRewardsToWallet is false)
+    for (const data of rewardInput) {
+      for (let coinType of data.coinTypes) {
+        coinType = "0x" + coinType;
+
+        const usdValue = usdValuesByCoinType.get(coinType);
+
+        // Skip coins with missing metadata (null usdValue)
+        if (usdValue === null || usdValue === undefined) {
+          continue;
+        }
+
+        // Skip claiming small rewards if both checkboxes are checked (claimSmallRewardsToWallet = false)
+        const shouldSkipSmallReward =
+          !params.claimSmallRewardsToWallet && usdValue > 0 && usdValue < 0.01;
+        if (shouldSkipSmallReward) {
+          continue; // Skip this reward entirely
+        }
+
+        const [coin1, promise] = tx.moveCall({
+          target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::collect_reward`,
+          typeArguments: [coinType],
+          arguments: [
+            tx.object(this.constants.LENDING_PROTOCOL_ID),
+            tx.pure.u64(data.marketId),
+            tx.object(params.positionCapId),
+            tx.object(this.constants.SUI_CLOCK_OBJECT_ID),
+          ],
+        });
+
+        if (promise) {
+          const coin2 = await this.handlePromise(tx, promise, coinType);
+          if (coin2) {
+            if (!rewardCoinsByType.has(coinType)) {
+              rewardCoinsByType.set(coinType, []);
+            }
+            rewardCoinsByType.get(coinType)!.push(coin2);
+          }
+        }
+
+        if (coin1) {
+          if (!rewardCoinsByType.has(coinType)) {
+            rewardCoinsByType.set(coinType, []);
+          }
+          rewardCoinsByType.get(coinType)!.push(coin1);
+        }
+      }
+    }
+
+    // Separate coins into those that should be swapped vs those that should be claimed directly
+    const coinsToSwap: Map<string, TransactionObjectArgument> = new Map();
+    const coinsToClaimDirectly: Map<string, TransactionObjectArgument> =
+      new Map();
+
+    for (const [coinType, coins] of rewardCoinsByType.entries()) {
+      if (coins.length === 0) continue;
+
+      const mergedCoin = this.mergeCoins(tx, undefined, coins);
+      const usdValue = usdValuesByCoinType.get(coinType);
+
+      // Skip coins with missing metadata (should not happen as they're filtered earlier, but safety check)
+      if (usdValue === null || usdValue === undefined) {
+        console.warn(
+          `[claimSwapAndSupplyOrRepayOrTransfer] Skipping coin ${coinType} - missing USD value calculation`,
+        );
+        continue;
+      }
+
+      // Check if this coin is above the $0.01 threshold
+      const shouldSwap = usdValue >= 0.01;
+
+      if (shouldSwap) {
+        coinsToSwap.set(coinType, mergedCoin);
+      } else {
+        // Small rewards to be claimed directly to wallet
+        coinsToClaimDirectly.set(coinType, mergedCoin);
+      }
+    }
+
+    // Swap eligible coins to target coin
+    let targetCoin: TransactionObjectArgument | undefined = undefined;
+
+    for (const [coinType, mergedCoin] of coinsToSwap.entries()) {
+      if (coinType === params.targetCoinType) {
+        if (targetCoin) {
+          tx.mergeCoins(targetCoin, [mergedCoin]);
+        } else {
+          targetCoin = mergedCoin;
+        }
+      } else {
+        // Use provided reward amount for quote, or fallback to 1 token
+        const quoteAmount = params.rewardAmounts?.get(coinType) || "1000000000";
+        const router = await this.cetusSwap.getCetusSwapQuote(
+          coinType,
+          params.targetCoinType,
+          quoteAmount,
+        );
+        const swappedCoin = await this.cetusSwap.routerSwapWithInputCoin(
+          router as RouterDataV3,
+          tx,
+          mergedCoin,
+          params.slippage,
+        );
+
+        if (targetCoin) {
+          tx.mergeCoins(targetCoin, [swappedCoin]);
+        } else {
+          targetCoin = swappedCoin;
+        }
+      }
+    }
+
+    // Handle coins that should be claimed directly to wallet
+    if (coinsToClaimDirectly.size > 0) {
+      const coinsToTransfer = Array.from(coinsToClaimDirectly.values());
+      tx.transferObjects(coinsToTransfer, params.address);
+    }
+
+    // If no target coin, all rewards were either too small or claimed directly
+    if (!targetCoin) {
+      // If we have coins claimed directly, return the transaction
+      if (coinsToClaimDirectly.size > 0) {
+        return tx;
+      }
+      // Otherwise, nothing to do
+      console.error("No target coin available and no small rewards to claim");
+      return undefined;
+    }
+
+    if (params.transferTargetCoin) {
+      tx.transferObjects([targetCoin], params.address);
+      return tx;
+    }
+
+    if (params.isTargetBorrowed) {
+      // Repay the debt using the entire targetCoin
+      const remainingCoin = tx.moveCall({
+        target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::repay`,
+        typeArguments: [params.targetCoinType],
+        arguments: [
+          tx.object(this.constants.LENDING_PROTOCOL_ID),
+          tx.object(params.positionCapId),
+          tx.pure.u64(params.targetMarketId || 0),
+          targetCoin,
+          tx.object(this.constants.SUI_CLOCK_OBJECT_ID),
+        ],
+      });
+
+      // todo - check if remainingCoin is zero and destroy it if it is
+      tx.transferObjects([remainingCoin], params.address);
+    } else {
+      // Supply the remaining reward coin to the target market
+      tx.moveCall({
+        target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::add_collateral`,
+        typeArguments: [params.targetCoinType],
+        arguments: [
+          tx.object(this.constants.LENDING_PROTOCOL_ID),
+          tx.object(params.positionCapId),
+          tx.pure.u64(params.targetMarketId || 0),
+          targetCoin,
+          tx.object(this.constants.SUI_CLOCK_OBJECT_ID),
+        ],
+      });
+    }
+    return tx;
+  }
+
+  /**
+   * Claims all available rewards, then repays debts for reward coin types present in `borrowedCoins`.
+   * Any remainder returned by `repay` is transferred to the wallet.
+   *
+   * Note: reward coin types that are not present in `borrowedCoins` are currently not processed.
+   *
+   * On mainnet, optionally updates prices first if `priceUpdateCoinTypes` is provided.
+   *
+   * @param params ClaimAndSupplyOrRepayParams - claim + repay configuration
    * @returns Transaction object ready for signing and execution
    */
   async claimAndSupplyOrRepay(
@@ -842,6 +1218,7 @@ export class AlphalendClient {
           ],
         });
       } else {
+        // todo - check if remainingCoin is zero and destroy it if it is
         tx.transferObjects([coin], params.address);
       }
     };
@@ -869,11 +1246,9 @@ export class AlphalendClient {
             tx.object(this.constants.SUI_CLOCK_OBJECT_ID),
           ],
         });
-        handleCoin(
-          remainingCoin,
-          coinType,
-          params.supplyMarkets?.get(coinType),
-        );
+
+        // todo - check if remainingCoin is zero and destroy it if it is
+        tx.transferObjects([remainingCoin], params.address);
       } else {
         // Not borrowed - supply or transfer
         handleCoin(mergedCoin, coinType, params.supplyMarkets?.get(coinType));
@@ -923,6 +1298,17 @@ export class AlphalendClient {
     }
 
     return [coin1, coin2];
+  }
+
+  /**
+   * Breaks out of a leveraged looping position using a Navi flash loan.
+   * Use like withdraw/repay: same client method + params pattern; returns Transaction for signing.
+   *
+   * @param params FlashRepayParams - flash repay parameters
+   * @returns Transaction ready for signing and execution
+   */
+  async flashRepay(params: FlashRepayParams): Promise<Transaction> {
+    return await buildFlashRepayTransaction(this, params);
   }
 
   /**
@@ -1162,6 +1548,13 @@ export class AlphalendClient {
     address: string,
     amount?: bigint,
   ): Promise<string | TransactionObjectArgument | undefined> {
+    if (
+      type === "0x2::sui::SUI" ||
+      type ===
+        "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI"
+    ) {
+      return tx.gas;
+    }
     let coins: CoinStruct[] = [];
     let currentCursor: string | null | undefined = null;
 
@@ -1219,17 +1612,21 @@ export class AlphalendClient {
         }
       }
 
-      const [coin] = tx.splitCoins(coinsToMerge[0], [0]);
-      tx.mergeCoins(coin, coinsToMerge);
+      // Convert first coin to TransactionObjectArgument to avoid duplicate reference
+      const firstCoin = tx.object(coinsToMerge[0]);
+      const [coin] = tx.splitCoins(firstCoin, [0]);
+      // Merge the remainder (firstCoin) and other coins into the split coin
+      const otherCoins = coinsToMerge.slice(1).map((id) => tx.object(id));
+      tx.mergeCoins(coin, [firstCoin, ...otherCoins]);
       return coin;
     }
 
-    //coin1
-    const [coin] = tx.splitCoins(coins[0].coinObjectId, [0]);
-    tx.mergeCoins(
-      coin,
-      coins.map((c) => c.coinObjectId),
-    );
+    // Convert first coin to TransactionObjectArgument to avoid duplicate reference
+    const firstCoin = tx.object(coins[0].coinObjectId);
+    const [coin] = tx.splitCoins(firstCoin, [0]);
+    // Merge the remainder (firstCoin) and other coins into the split coin
+    const otherCoins = coins.slice(1).map((c) => tx.object(c.coinObjectId));
+    tx.mergeCoins(coin, [firstCoin, ...otherCoins]);
     return coin;
   }
 
@@ -1339,7 +1736,12 @@ export class AlphalendClient {
   async getSwapQuote(tokenIn: string, tokenOut: string, amountIn: string) {
     await this.ensureInitialized();
 
-    const quoteResponse = await this.sevenKGateway.getQuote(
+    // const quoteResponse = await this.sevenKGateway.getQuote(
+    //   tokenIn,
+    //   tokenOut,
+    //   amountIn,
+    // );
+    const quoteResponse = await this.cetusSwap.getCetusSwapQuote(
       tokenIn,
       tokenOut,
       amountIn,
@@ -1347,23 +1749,82 @@ export class AlphalendClient {
 
     const coinIn = this.coinMetadataMap.get(tokenIn);
     const coinOut = this.coinMetadataMap.get(tokenOut);
-    const sevenKEstimatedAmountOut = BigInt(
-      quoteResponse ? quoteResponse.returnAmountWithDecimal.toString() : 0,
+    // const sevenKEstimatedAmountOut = BigInt(
+    //   quoteResponse ? quoteResponse.returnAmountWithDecimal.toString() : 0,
+    // );
+
+    // const sevenKEstimatedAmountOutWithoutFee = BigInt(
+    //   quoteResponse
+    //     ? quoteResponse.returnAmountWithoutSwapFees
+    //       ? quoteResponse.returnAmountWithoutSwapFees.toString()
+    //       : sevenKEstimatedAmountOut.toString()
+    //     : sevenKEstimatedAmountOut.toString(),
+    // );
+
+    // const sevenKEstimatedFeeAmount =
+    //   sevenKEstimatedAmountOut - sevenKEstimatedAmountOutWithoutFee;
+
+    // const amount = BigInt(
+    //   quoteResponse ? quoteResponse.swapAmountWithDecimal : 0,
+    // );
+
+    // let quote: quoteObject;
+    // const priceA = coinIn?.pythPrice || coinIn?.coingeckoPrice;
+    // const priceB = coinOut?.pythPrice || coinOut?.coingeckoPrice;
+    // const coinAExpo = coinIn?.decimals;
+    // const coinBExpo = coinOut?.decimals;
+    // if (priceA && priceB && coinAExpo && coinBExpo) {
+    //   const inputAmountInUSD =
+    //     (Number(amount) / Math.pow(10, coinAExpo)) * parseFloat(priceA);
+    //   const outputAmountInUSD =
+    //     (Number(sevenKEstimatedAmountOut) / Math.pow(10, coinBExpo)) *
+    //     parseFloat(priceB);
+
+    //   const slippage =
+    //     (inputAmountInUSD - outputAmountInUSD) / inputAmountInUSD;
+
+    //   quote = {
+    //     gateway: "7k",
+    //     estimatedAmountOut: sevenKEstimatedAmountOut,
+    //     estimatedFeeAmount: sevenKEstimatedFeeAmount,
+    //     inputAmount: amount,
+    //     inputAmountInUSD: inputAmountInUSD,
+    //     estimatedAmountOutInUSD: outputAmountInUSD,
+    //     slippage: slippage,
+    //     rawQuote: quoteResponse,
+    //   };
+    // } else {
+    //   console.warn(
+    //     "Could not get prices from Pyth Network, using fallback pricing.",
+    //   );
+    //   quote = {
+    //     gateway: "7k",
+    //     estimatedAmountOut: sevenKEstimatedAmountOut,
+    //     estimatedFeeAmount: sevenKEstimatedFeeAmount,
+    //     inputAmount: amount,
+    //     inputAmountInUSD: 0,
+    //     estimatedAmountOutInUSD: 0,
+    //     slippage: 0,
+    //     rawQuote: quoteResponse,
+    //   };
+    // }
+    const cetusEstimatedAmountOut = BigInt(
+      quoteResponse ? quoteResponse.amountOut.toString() : 0,
     );
 
-    const sevenKEstimatedAmountOutWithoutFee = BigInt(
-      quoteResponse
-        ? quoteResponse.returnAmountWithoutSwapFees
-          ? quoteResponse.returnAmountWithoutSwapFees.toString()
-          : sevenKEstimatedAmountOut.toString()
-        : sevenKEstimatedAmountOut.toString(),
-    );
+    // const sevenKEstimatedAmountOutWithoutFee = BigInt(
+    //   quoteResponse
+    //     ? quoteResponse.amountOut.toString()
+    //       ? quoteResponse.amountOut.toString()
+    //       : cetusEstimatedAmountOut.toString()
+    //     : cetusEstimatedAmountOut.toString(),
+    // );
 
-    const sevenKEstimatedFeeAmount =
-      sevenKEstimatedAmountOut - sevenKEstimatedAmountOutWithoutFee;
+    // const cetusEstimatedFeeAmount =
+    //   sevenKEstimatedAmountOut - sevenKEstimatedAmountOutWithoutFee;
 
     const amount = BigInt(
-      quoteResponse ? quoteResponse.swapAmountWithDecimal : 0,
+      quoteResponse ? quoteResponse.amountIn.toString() : 0,
     );
 
     let quote: quoteObject;
@@ -1375,35 +1836,35 @@ export class AlphalendClient {
       const inputAmountInUSD =
         (Number(amount) / Math.pow(10, coinAExpo)) * parseFloat(priceA);
       const outputAmountInUSD =
-        (Number(sevenKEstimatedAmountOut) / Math.pow(10, coinBExpo)) *
+        (Number(cetusEstimatedAmountOut) / Math.pow(10, coinBExpo)) *
         parseFloat(priceB);
 
       const slippage =
         (inputAmountInUSD - outputAmountInUSD) / inputAmountInUSD;
 
       quote = {
-        gateway: "7k",
-        estimatedAmountOut: sevenKEstimatedAmountOut,
-        estimatedFeeAmount: sevenKEstimatedFeeAmount,
+        gateway: "cetus",
+        estimatedAmountOut: cetusEstimatedAmountOut,
+        estimatedFeeAmount: 0n,
         inputAmount: amount,
         inputAmountInUSD: inputAmountInUSD,
         estimatedAmountOutInUSD: outputAmountInUSD,
         slippage: slippage,
-        rawQuote: quoteResponse,
+        rawQuote: quoteResponse as RouterDataV3,
       };
     } else {
       console.warn(
         "Could not get prices from Pyth Network, using fallback pricing.",
       );
       quote = {
-        gateway: "7k",
-        estimatedAmountOut: sevenKEstimatedAmountOut,
-        estimatedFeeAmount: sevenKEstimatedFeeAmount,
+        gateway: "cetus",
+        estimatedAmountOut: cetusEstimatedAmountOut,
+        estimatedFeeAmount: 0n,
         inputAmount: amount,
         inputAmountInUSD: 0,
         estimatedAmountOutInUSD: 0,
         slippage: 0,
-        rawQuote: quoteResponse,
+        rawQuote: quoteResponse as RouterDataV3,
       };
     }
 

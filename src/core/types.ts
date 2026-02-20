@@ -10,7 +10,8 @@
  * - Blockchain-specific type mappings
  */
 
-import { QuoteResponse } from "@7kprotocol/sdk-ts";
+// import { QuoteResponse } from "@7kprotocol/sdk-ts";
+import { RouterDataV3 } from "@cetusprotocol/aggregator-sdk";
 import { Transaction, TransactionArgument } from "@mysten/sui/transactions";
 import { Decimal } from "decimal.js";
 
@@ -130,6 +131,27 @@ export interface ZapOutWithdrawParams {
 }
 
 /**
+ * Parameters for zap-out withdraw operation to a lending market
+ * Used with the `zapOutWithdraw` method to swap input tokens and withdraw them from a single market in a single transaction
+ */
+export interface SwapAndRepayParams {
+  /** Market ID from which to withdraw */
+  marketId: string;
+  /** Amount to withdraw (in mists, use MAX_U64 constant to withdraw all) */
+  amount: bigint;
+  /** Withdraw coin type (e.g., "0x2::sui::SUI") */
+  swapFromCoinType: string;
+  /** Object ID of the position capability object */
+  positionCapId: string;
+  /** Address of the user withdrawing collateral */
+  address: string;
+  /** Slippage for the swap (e.g., 0.01 for 1%) */
+  slippage: number;
+  /** Withdraw coin type (e.g., "0x2::sui::SUI") */
+  swapToCoinType: string;
+}
+
+/**
  * Parameters for borrowing assets from a lending market
  * Used with the `borrow` method
  */
@@ -192,6 +214,36 @@ export interface ClaimRewardsParams {
 }
 
 /**
+ * Parameters for claiming rewards, swapping, and repaying borrowed assets (or supplying if no debt)
+ * Used with the `claimSwapAndSupplyOrRepay` method
+ *
+ * Note: This method handles both repay and supply scenarios. If there's no debt, the entire amount
+ * will be supplied to the market.
+ */
+export interface ClaimSwapAndSupplyOrRepayOrTransferParams {
+  /** Object ID of the position capability object */
+  positionCapId: string;
+  /** Address of the user claiming rewards */
+  address: string;
+  /** Target coin type to swap all rewards into and repay */
+  targetCoinType: string;
+  /** Market ID to repay the debt (or supply if no debt) */
+  targetMarketId?: string;
+  /** Whether the target coin is borrowed */
+  isTargetBorrowed?: boolean;
+  /** Whether to transfer the target coin to the wallet */
+  transferTargetCoin?: boolean;
+  /** Slippage tolerance */
+  slippage: number;
+  /** Coin types of user's supplied assets (for price updates) */
+  priceUpdateCoinTypes: string[];
+  /** Optional map of reward coin types to their amounts in base units (for accurate quotes and USD calculations) */
+  rewardAmounts?: Map<string, string>;
+  /** If true, claims rewards < $0.01 directly to wallet (only swap checkbox case) */
+  claimSmallRewardsToWallet?: boolean;
+}
+
+/**
  * Market info for repay and supply operations
  */
 export interface MarketInfo {
@@ -213,7 +265,7 @@ export interface ClaimAndSupplyOrRepayParams {
   /** Map of coin types to supply markets for leftover coins after repay */
   supplyMarkets?: Map<string, MarketInfo>;
   /** Coin types for price updates */
-  priceUpdateCoinTypes?: string[];
+  priceUpdateCoinTypes: string[];
 }
 
 /**
@@ -380,5 +432,20 @@ export interface quoteObject {
   inputAmountInUSD: number;
   estimatedAmountOutInUSD: number;
   slippage: number;
-  rawQuote: QuoteResponse;
+  rawQuote: RouterDataV3;
+}
+
+/**
+ * Parameters for flash repay (break out of looping position via Navi flash loan).
+ * Used with the `flashRepay` method.
+ */
+export interface FlashRepayParams {
+  withdrawCoinType: string;
+  withdrawMarketId: string;
+  repayCoinType: string;
+  repayMarketId: string;
+  positionCapId: string;
+  address: string;
+  slippage: number;
+  repayAmountBaseUnits?: string;
 }
