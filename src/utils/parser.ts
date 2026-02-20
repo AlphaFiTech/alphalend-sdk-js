@@ -28,6 +28,26 @@ import {
 } from "./parsedTypes.js";
 
 /**
+ * Normalizes a Sui coin type string by ensuring all hex addresses have the `0x` prefix.
+ * Handles generic types like `DEEPBOOK_STAKED<USDC>` where inner type addresses also need the prefix.
+ */
+export function normalizeCoinType(coinType: string): string {
+  if (coinType.includes("sui::SUI")) {
+    return "0x2::sui::SUI";
+  }
+  return coinType
+    .split("<")
+    .map((segment) => {
+      const trimmed = segment.replaceAll(">", "");
+      if (trimmed.length > 0 && !trimmed.startsWith("0x")) {
+        return "0x" + segment;
+      }
+      return segment;
+    })
+    .join("<");
+}
+
+/**
  * Parse a FlowLimiterQueryType from the raw query type
  */
 export function parseFlowLimiter(flowLimiter: {
@@ -48,12 +68,9 @@ export function parseFlowLimiter(flowLimiter: {
  */
 export function parseReward(reward: RewardQueryType | null): RewardType | null {
   if (!reward) return null;
-  if (reward.fields.coin_type.fields.name.includes("sui::SUI")) {
-    reward.fields.coin_type.fields.name = "0x2::sui::SUI";
-  } else {
-    reward.fields.coin_type.fields.name =
-      "0x" + reward.fields.coin_type.fields.name;
-  }
+  reward.fields.coin_type.fields.name = normalizeCoinType(
+    reward.fields.coin_type.fields.name,
+  );
 
   return {
     id: reward.fields.id.id,
@@ -140,24 +157,13 @@ export function parseMarket(marketRaw: MarketQueryType): MarketType {
   }
 
   const marketFields = marketRaw.content.fields.value.fields;
-  if (marketFields.coin_type.fields.name.includes("sui::SUI")) {
-    marketFields.coin_type.fields.name = "0x2::sui::SUI";
-  } else {
-    marketFields.coin_type.fields.name =
-      "0x" + marketFields.coin_type.fields.name;
-  }
-
-  if (
-    marketFields.price_identifier.fields.coin_type.fields.name.includes(
-      "sui::SUI",
-    )
-  ) {
-    marketFields.price_identifier.fields.coin_type.fields.name =
-      "0x2::sui::SUI";
-  } else {
-    marketFields.price_identifier.fields.coin_type.fields.name =
-      "0x" + marketFields.price_identifier.fields.coin_type.fields.name;
-  }
+  marketFields.coin_type.fields.name = normalizeCoinType(
+    marketFields.coin_type.fields.name,
+  );
+  marketFields.price_identifier.fields.coin_type.fields.name =
+    normalizeCoinType(
+      marketFields.price_identifier.fields.coin_type.fields.name,
+    );
 
   return {
     marketDynamicFieldId: marketRaw.content.fields.id.id,
@@ -228,11 +234,9 @@ export function parseBorrow(borrow: {
   type: string;
 }): BorrowType {
   const fields = borrow.fields;
-  if (fields.coin_type.fields.name.includes("sui::SUI")) {
-    fields.coin_type.fields.name = "0x2::sui::SUI";
-  } else {
-    fields.coin_type.fields.name = "0x" + fields.coin_type.fields.name;
-  }
+  fields.coin_type.fields.name = normalizeCoinType(
+    fields.coin_type.fields.name,
+  );
 
   return {
     amount: fields.amount,
@@ -298,11 +302,9 @@ export function parseUserReward(userReward: {
   if (!userReward.fields) return null;
 
   const fields = userReward.fields;
-  if (fields.coin_type.fields.name.includes("sui::SUI")) {
-    fields.coin_type.fields.name = "0x2::sui::SUI";
-  } else {
-    fields.coin_type.fields.name = "0x" + fields.coin_type.fields.name;
-  }
+  fields.coin_type.fields.name = normalizeCoinType(
+    fields.coin_type.fields.name,
+  );
 
   return {
     rewardId: fields.reward_id,
