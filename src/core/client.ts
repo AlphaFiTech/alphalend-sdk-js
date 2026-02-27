@@ -41,6 +41,7 @@ import {
   getClaimRewardInput,
   setPrices,
 } from "../utils/helper.js";
+import { normalizeCoinType } from "../utils/parser.js";
 import { Receipt } from "../utils/queryTypes.js";
 import { Constants } from "../constants/types.js";
 import { getUserPositionCapId } from "../models/position/functions.js";
@@ -608,6 +609,8 @@ export class AlphalendClient {
       inputCoin = tx.splitCoins(coinObject, [
         quoteResponse.amountIn.toString(),
       ]);
+
+      tx.transferObjects([coinObject], params.address);
     }
 
     // Perform the swap to get the coin for repayment
@@ -792,7 +795,7 @@ export class AlphalendClient {
     let alphaCoin: TransactionObjectArgument | undefined = undefined;
     for (const data of rewardInput) {
       for (let coinType of data.coinTypes) {
-        coinType = "0x" + coinType;
+        coinType = normalizeCoinType(coinType);
         let coin1: TransactionObjectArgument | undefined;
         let promise: TransactionObjectArgument | undefined;
         if (
@@ -1175,7 +1178,7 @@ export class AlphalendClient {
 
     for (const data of rewardInput) {
       for (let coinType of data.coinTypes) {
-        coinType = "0x" + coinType;
+        coinType = normalizeCoinType(coinType);
 
         // Collect reward for this coin type
         const [coin1, promise] = tx.moveCall({
