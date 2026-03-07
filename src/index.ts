@@ -8,6 +8,7 @@ export { Market } from "./models/market.js";
 export { Position } from "./models/position.js";
 export {
   getUserPositionCapId,
+  getUserPositionCapIds,
   getUserPositionIds,
 } from "./models/position/functions.js";
 

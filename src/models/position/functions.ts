@@ -49,6 +49,41 @@ export const getUserPositionCapId = async (
 };
 
 /**
+ * Fetches a user's position capability IDs
+ *
+ * @param suiClient - SuiClient instance
+ * @param network - Network name ("mainnet", "testnet", or "devnet")
+ * @param userAddress - Address of the user
+ * @returns Promise resolving to the position capability IDs or undefined if not found
+ */
+export const getUserPositionCapIds = async (
+  suiClient: SuiClient,
+  network: string,
+  userAddress: string,
+): Promise<(string | undefined)[] | undefined> => {
+  try {
+    const constants = getConstants(network);
+    // Fetch owned objects for the user
+    const response = await suiClient.getOwnedObjects({
+      owner: userAddress,
+      options: {
+        showContent: true, // Include object content to access fields
+      },
+      filter: {
+        StructType: constants.POSITION_CAP_TYPE,
+      },
+    });
+
+    if (!response || !response.data || response.data.length === 0) {
+      return undefined;
+    }
+    return response.data.map((obj) => obj.data?.objectId);
+  } catch (error) {
+    console.error("Error fetching user positionCap IDs:", error);
+  }
+};
+
+/**
  * Fetches a user's position ID from their position capability
  *
  * @param suiClient - SuiClient instance
@@ -123,7 +158,7 @@ export const getUserPositionIds = async (
       (obj) => obj.data as unknown as PositionCapQueryType,
     );
 
-    const ids = positionCapObjects.map((obj) => obj.objectId);
+    const ids = positionCapObjects.map((obj) => obj.content.fields.position_id);
     return ids;
   } catch (error) {
     console.error("Error fetching user position IDs:", error);
