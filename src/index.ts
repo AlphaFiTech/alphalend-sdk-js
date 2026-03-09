@@ -9,6 +9,7 @@ export { Position } from "./models/position.js";
 export {
   getUserPositionCapId,
   getUserPositionIds,
+  getUserPositionCapIds,
 } from "./models/position/functions.js";
 
 // Export caching utilities for advanced users
