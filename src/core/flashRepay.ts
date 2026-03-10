@@ -11,13 +11,10 @@ import { Decimal } from "decimal.js";
 import { FlashRepayParams } from "./types.js";
 import type { AlphalendClient } from "./client.js";
 
-/**
- * Returns the Set of normalized coin types that Navi supports for flash loans.
- * Fetch once, then use supportedSet.has(normalize(coinType)) for O(1) lookups.
- *
- * @param options - Optional: env 'prod' | 'dev' (default 'prod'), cacheTime in ms
- * @returns Set of normalized (lowercase, 0x-prefixed) coin types
- */
+function normalizeCoinType(coinType: string): string {
+  return coinType.replace(/^0x0+/, "0x").toLowerCase();
+}
+
 export async function getNaviFlashLoanSupportedCoinTypes(options?: {
   env?: "prod";
   cacheTime?: number;
@@ -29,9 +26,33 @@ export async function getNaviFlashLoanSupportedCoinTypes(options?: {
   });
   const set = new Set<string>();
   for (const a of assets) {
-    set.add(a.coinType.replace(/^0x0+/, "0x").toLowerCase());
+    set.add(normalizeCoinType(a.coinType));
   }
   return set;
+}
+
+export async function getNaviFlashLoanFeeForCoinType(
+  coinType: string,
+  options?: { cacheTime?: number },
+): Promise<number | null> {
+  const cacheTime = options?.cacheTime ?? 60_000;
+  const assets = await getAllFlashLoanAssets({
+    env: "prod",
+    cacheTime,
+  });
+  const normalized = normalizeCoinType(coinType);
+  const asset = assets.find(
+    (a) => normalizeCoinType(a.coinType) === normalized,
+  );
+  if (!asset || asset.flashloanFee == null) {
+    return null;
+  }
+  const fee = Number(asset.flashloanFee);
+  // Navi flashloanFee: if <= 1 treat as decimal (0.005), else as percentage (0.5)
+  if (fee <= 1) {
+    return fee;
+  }
+  return fee / 100;
 }
 
 /**
@@ -39,15 +60,16 @@ export async function getNaviFlashLoanSupportedCoinTypes(options?: {
  * Supports full or partial repay: pass optional repayAmountBaseUnits to repay only that amount; omit for full exit.
  *
  * Steps:
- * 1. Flash borrow repay coin from Navi (repay amount + 0.5% buffer); get Balance + receipt.
+ * 1. Flash borrow repay coin from Navi (repay amount + fee, e.g. 0.5%); get Balance + receipt.
  * 2. Convert Balance → Coin so it can be used in AlphaLend repay.
  * 3. Repay (full or partial) debt on AlphaLend; receive leftover repay-coin (if any).
  * 4. Update oracle prices for position coins (mainnet only).
- * 5. Withdraw collateral in withdraw-coin (amount sized to cover flash loan + buffer).
+ * 5. Withdraw collateral in withdraw-coin (exact amount to cover flash loan value).
  * 6. If withdraw ≠ repay coin: swap withdrawn collateral → repay coin via Cetus; else use as-is.
  * 7. Merge merged/same-coin with leftover from repay into one coin.
  * 8–9. Convert to Balance and repay flash loan to Navi; receive remaining balance.
- * 10. Transfer remaining balance (profit) to user.
+ * 10. Repay same-coin debt with that balance (clears dust); AlphaLend returns leftover coin.
+ * 11. Transfer leftover to user.
  *
  * @param client AlphalendClient instance (passed by client.flashRepay)
  * @param params Flash repay parameters (repayAmountBaseUnits optional for partial repay)
@@ -127,13 +149,31 @@ export async function buildFlashRepayTransaction(
     borrowedBaseUnits,
   );
 
-  const flashLoanAmount = effectiveRepayBaseUnits.mul(1.005).ceil().toFixed(0);
+  // Navi docs: repay = borrow + fee; get per-asset fee from getAllFlashLoanAssets → flashloanFee (no default)
+  const feeDecimal = await getNaviFlashLoanFeeForCoinType(
+    params.repayCoinType,
+    {
+      cacheTime: 60_000,
+    },
+  );
+  if (feeDecimal == null) {
+    throw new Error(
+      `Navi flash loan fee not available for ${params.repayCoinType}. Asset may not support flash loans or API returned no fee.`,
+    );
+  }
+  const flashLoanAmount = effectiveRepayBaseUnits
+    .mul(1 + feeDecimal)
+    .ceil()
+    .toFixed(0);
 
   const flashLoanValue = new Decimal(flashLoanAmount)
     .div(new Decimal(10).pow(repayDecimals))
     .mul(repayMarket.price.toNumber());
-  const withdrawAmountRaw = flashLoanValue
-    .mul(1.1)
+
+  // 1% buffer on withdraw so that after Cetus swap (fee + slippage + rounding) we still have enough to repay Navi (avoids MoveAbort 1503).
+  const WITHDRAW_BUFFER_FOR_SWAP = 0.01;
+  const withdrawValueWithBuffer = flashLoanValue.mul(1 + WITHDRAW_BUFFER_FOR_SWAP);
+  const withdrawAmountRaw = withdrawValueWithBuffer
     .div(withdrawMarket.price.toNumber())
     .mul(new Decimal(10).pow(withdrawDecimals))
     .ceil()
@@ -229,7 +269,7 @@ export async function buildFlashRepayTransaction(
     await client.updatePrices(tx, priceUpdateCoinTypes);
   }
 
-  // Step 5: Withdraw collateral — remove collateral in withdraw-coin from the AlphaLend position (amount computed to cover flash loan value + 10% buffer). Uses promise so the withdrawn coin can be used in the next step.
+  // Step 5: Withdraw collateral — remove collateral in withdraw-coin (exact value needed to cover flash loan; no 10% buffer). Uses promise so the withdrawn coin can be used in the next step.
   // console.log("Step 5: Withdraw collateral");
   const promise = tx.moveCall({
     target: `${client.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::remove_collateral`,
@@ -302,14 +342,26 @@ export async function buildFlashRepayTransaction(
     { env: "prod" },
   );
 
-  // Step 10: Transfer profit to user — turn the remaining balance (after repaying Navi) into a coin and transfer it to the user’s address.
-  // console.log("Step 10: Transfer profit to user");
-  const profitCoin = tx.moveCall({
+  // Step 10a: Convert Navi excess to coin, then repay same-coin debt with it (clears dust); AlphaLend returns leftover coin.
+  const excessCoin = tx.moveCall({
     target: "0x2::coin::from_balance",
     typeArguments: [params.repayCoinType],
     arguments: [remainingBalance],
   });
-  tx.transferObjects([profitCoin], params.address);
+  const leftoverCoin = tx.moveCall({
+    target: `${client.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::repay`,
+    typeArguments: [params.repayCoinType],
+    arguments: [
+      tx.object(client.constants.LENDING_PROTOCOL_ID),
+      tx.object(params.positionCapId),
+      tx.pure.u64(params.repayMarketId),
+      excessCoin,
+      tx.object(client.constants.SUI_CLOCK_OBJECT_ID),
+    ],
+  });
+
+  // Step 10b: Transfer any leftover (after second repay) to user.
+  tx.transferObjects([leftoverCoin], params.address);
 
   return tx;
 }
