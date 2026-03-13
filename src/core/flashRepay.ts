@@ -11,6 +11,9 @@ import { Decimal } from "decimal.js";
 import { FlashRepayParams } from "./types.js";
 import type { AlphalendClient } from "./client.js";
 
+/** Minimum withdraw buffer for flash repay (decimal, e.g. 0.01 = 1%). Withdraw buffer = max(this, params.slippage). */
+const FLASH_REPAY_MIN_WITHDRAW_BUFFER = 0.01;
+
 function normalizeCoinType(coinType: string): string {
   return coinType.replace(/^0x0+/, "0x").toLowerCase();
 }
@@ -170,9 +173,13 @@ export async function buildFlashRepayTransaction(
     .div(new Decimal(10).pow(repayDecimals))
     .mul(repayMarket.price.toNumber());
 
-  // 1% buffer on withdraw so that after Cetus swap (fee + slippage + rounding) we still have enough to repay Navi (avoids MoveAbort 1503).
-  const WITHDRAW_BUFFER_FOR_SWAP = 0.01;
-  const withdrawValueWithBuffer = flashLoanValue.mul(1 + WITHDRAW_BUFFER_FOR_SWAP);
+  // Slippage (decimal, e.g. 0.01 = 1%): (1) min output for Cetus swap, (2) withdraw buffer so we have enough after swap to repay Navi.
+  const slippage =
+    Number.isFinite(params.slippage) && params.slippage >= 0
+      ? Math.min(1, params.slippage)
+      : FLASH_REPAY_MIN_WITHDRAW_BUFFER;
+  const withdrawBuffer = Math.max(FLASH_REPAY_MIN_WITHDRAW_BUFFER, slippage);
+  const withdrawValueWithBuffer = flashLoanValue.mul(1 + withdrawBuffer);
   const withdrawAmountRaw = withdrawValueWithBuffer
     .div(withdrawMarket.price.toNumber())
     .mul(new Decimal(10).pow(withdrawDecimals))
@@ -318,7 +325,7 @@ export async function buildFlashRepayTransaction(
       router,
       tx,
       withdrawnCoin,
-      params.slippage,
+      slippage,
     );
   }
 
