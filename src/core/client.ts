@@ -81,6 +81,9 @@ export class AlphalendClient {
   private isInitialized: boolean = false;
   private initializationPromise: Promise<void> | null = null;
 
+  /** Resolved at runtime from DEEPBOOK_UPGRADE_CAP_ID; used for dbUSDC deposit move calls. */
+  private deepbookPackageId: string = "";
+
   /**
    * Creates a new AlphaLend client instance
    *
@@ -281,6 +284,230 @@ export class AlphalendClient {
   }
 
   /**
+   * True when the target market is dbUSDC (DEEPBOOK_STAKED<USDC>).
+   * Used to choose Deepbook deposit path instead of Cetus swap.
+   */
+  private isDbUsdcMarket(marketCoinType: string): boolean {
+    return (
+      !!this.constants.DBUSDC_COIN_TYPE &&
+      this.constants.DBUSDC_COIN_TYPE === marketCoinType
+    );
+  }
+
+  /**
+   * True when the user is paying with USDC.
+   */
+  private isUsdcInput(inputCoinType: string): boolean {
+    return inputCoinType === this.constants.USDC_COIN_TYPE;
+  }
+
+  /**
+   * True when Deepbook config is set (mainnet). When false, we use Cetus path only.
+   */
+  private hasDeepbookConfig(): boolean {
+    return !!(
+      this.deepbookPackageId &&
+      this.constants.DEEPBOOK_USDC_POOL_ID &&
+      this.constants.DEEPBOOK_MARGIN_REGISTRY &&
+      this.constants.DEEPBOOK_USDC_MARGIN_POOL_ID
+    );
+  }
+
+  /**
+   * True when we have static Deepbook IDs (for quote only). Does not require deepbookPackageId.
+   * Use in getSwapQuote so SUI→dbUSDC quote works even before UpgradeCap is resolved.
+   */
+  private hasDeepbookQuoteConfig(): boolean {
+    return !!(
+      this.constants.DEEPBOOK_UPGRADE_CAP_ID &&
+      this.constants.DEEPBOOK_USDC_POOL_ID &&
+      this.constants.DEEPBOOK_MARGIN_REGISTRY &&
+      this.constants.DEEPBOOK_USDC_MARGIN_POOL_ID &&
+      this.constants.DBUSDC_COIN_TYPE
+    );
+  }
+
+  /**
+   * True when the user is already paying with dbUSDC (same as market).
+   * Then we only need to supply, no swap and no Deepbook deposit.
+   */
+  private isDbUsdcInput(inputCoinType: string): boolean {
+    return (
+      !!this.constants.DBUSDC_COIN_TYPE &&
+      this.constants.DBUSDC_COIN_TYPE === inputCoinType
+    );
+  }
+
+  /**
+   * Zap-in supply when the target market is dbUSDC.
+   * - If user pays dbUSDC: direct supply (no swap, no Deepbook deposit).
+   * - If user pays USDC: deposit USDC to Deepbook pool → get dbUSDC → supply.
+   * - If user pays another token: Cetus swap to USDC → Deepbook deposit → supply.
+   */
+  private async zapInSupplyViaDeepbook(
+    params: ZapInSupplyParams,
+  ): Promise<Transaction | undefined> {
+    // Edge case: zero amount — reject early (Move would fail with EInvalidAmount).
+    if (!params.inputAmount || params.inputAmount <= 0n) {
+      console.error("[zapInSupplyViaDeepbook] inputAmount must be > 0");
+      return undefined;
+    }
+
+    console.log("[zapInSupplyViaDeepbook] Step 0: Building tx for dbUSDC supply");
+    const tx = new Transaction();
+
+    let coinToSupply: TransactionObjectArgument | undefined;
+    let usdcCoin: TransactionObjectArgument | undefined;
+
+    // Edge case: user already has dbUSDC — direct supply, no swap or Deepbook deposit.
+    if (this.isDbUsdcInput(params.inputCoinType)) {
+      console.log("[zapInSupplyViaDeepbook] Step 1c: User pays dbUSDC — direct supply");
+      const coinObject = await this.getCoinObject(
+        tx,
+        this.constants.DBUSDC_COIN_TYPE,
+        params.address,
+        params.inputAmount,
+      );
+      if (!coinObject) {
+        console.error("Failed to get dbUSDC coin object");
+        return undefined;
+      }
+      coinToSupply = tx.splitCoins(coinObject, [params.inputAmount]);
+      if (coinObject !== tx.gas) {
+        tx.transferObjects([coinObject], params.address);
+      }
+      console.log("[zapInSupplyViaDeepbook] Step 1c done: dbUSDC coin ready for supply");
+    } else if (this.isUsdcInput(params.inputCoinType)) {
+      // Path A: User pays USDC. Get USDC coin and use it for Deepbook deposit.
+      console.log("[zapInSupplyViaDeepbook] Step 1a: User pays USDC — no swap, get USDC coin");
+      const coinObject = await this.getCoinObject(
+        tx,
+        this.constants.USDC_COIN_TYPE,
+        params.address,
+        params.inputAmount,
+      );
+      if (!coinObject) {
+        console.error("Failed to get USDC coin object");
+        return undefined;
+      }
+      usdcCoin = tx.splitCoins(coinObject, [params.inputAmount]);
+      if (coinObject !== tx.gas) {
+        tx.transferObjects([coinObject], params.address);
+      }
+      console.log("[zapInSupplyViaDeepbook] Step 1a done: USDC coin ready for Deepbook deposit");
+    } else {
+      // Path B: User pays another token. Swap to USDC via Cetus, then use that for Deepbook.
+      console.log("[zapInSupplyViaDeepbook] Step 1b: User pays non-USDC — Cetus swap to USDC");
+      const quoteResponse = await this.cetusSwap.getCetusSwapQuote(
+        params.inputCoinType,
+        this.constants.USDC_COIN_TYPE,
+        params.inputAmount.toString(),
+      );
+      if (!quoteResponse) {
+        console.error("Failed to get Cetus quote (input → USDC)");
+        return undefined;
+      }
+
+      const coinObject = await this.getCoinObject(
+        tx,
+        params.inputCoinType,
+        params.address,
+        BigInt(quoteResponse.amountIn.toString()),
+      );
+      if (!coinObject) {
+        console.error("Failed to get input coin object");
+        return undefined;
+      }
+
+      const inputCoin = tx.splitCoins(coinObject, [
+        quoteResponse.amountIn.toString(),
+      ]);
+      if (coinObject !== tx.gas) {
+        tx.transferObjects([coinObject], params.address);
+      }
+
+      const usdcFromSwap = await this.cetusSwap.cetusSwapTokensTxb(
+        quoteResponse as RouterDataV3,
+        params.slippage,
+        inputCoin,
+        params.address,
+        tx,
+      );
+      if (!usdcFromSwap) {
+        console.error("Failed to get USDC from swap");
+        return undefined;
+      }
+      usdcCoin = usdcFromSwap as TransactionObjectArgument;
+      console.log("[zapInSupplyViaDeepbook] Step 1b done: Cetus swap complete, USDC coin ready");
+    }
+
+    // Deepbook deposit only when we have USDC to deposit (Path A or B). Skip for Path 1c (direct dbUSDC).
+    if (usdcCoin !== undefined) {
+      console.log("[zapInSupplyViaDeepbook] Step 2: Deepbook deposit (USDC → dbUSDC)");
+      coinToSupply = tx.moveCall({
+        target: `${this.deepbookPackageId}::alphalend_deepbook_pool::deposit`,
+        typeArguments: [this.constants.USDC_COIN_TYPE],
+        arguments: [
+          tx.object(this.constants.DEEPBOOK_USDC_POOL_ID),
+          tx.object(this.constants.DEEPBOOK_USDC_MARGIN_POOL_ID),
+          tx.object(this.constants.DEEPBOOK_MARGIN_REGISTRY),
+          usdcCoin,
+          tx.object(this.constants.SUI_CLOCK_OBJECT_ID),
+        ],
+      });
+      console.log("[zapInSupplyViaDeepbook] Step 2 done: dbUSDC minted");
+    }
+
+    // Supply dbUSDC to lending market (same as existing add_collateral flow).
+    if (coinToSupply === undefined) {
+      console.error("[zapInSupplyViaDeepbook] No coin to supply (internal error)");
+      return undefined;
+    }
+    console.log("[zapInSupplyViaDeepbook] Step 3: add_collateral (supply dbUSDC to market)", params.marketId);
+    const marketIdU64 = typeof params.marketId === "string" ? Number(params.marketId) : params.marketId;
+    if (params.positionCapId) {
+      tx.moveCall({
+        target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::add_collateral`,
+        typeArguments: [params.marketCoinType],
+        arguments: [
+          tx.object(this.constants.LENDING_PROTOCOL_ID),
+          tx.object(params.positionCapId),
+          tx.pure.u64(marketIdU64),
+          coinToSupply,
+          tx.object(this.constants.SUI_CLOCK_OBJECT_ID),
+        ],
+      });
+    } else {
+      const positionCapId = await getUserPositionCapId(
+        this.client,
+        this.network,
+        params.address,
+      );
+      let positionCap: TransactionObjectArgument;
+      if (positionCapId) {
+        positionCap = tx.object(positionCapId);
+      } else {
+        positionCap = this.createPosition(tx);
+      }
+      tx.moveCall({
+        target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::add_collateral`,
+        typeArguments: [params.marketCoinType],
+        arguments: [
+          tx.object(this.constants.LENDING_PROTOCOL_ID),
+          positionCap,
+          tx.pure.u64(marketIdU64),
+          coinToSupply,
+          tx.object(this.constants.SUI_CLOCK_OBJECT_ID),
+        ],
+      });
+      tx.transferObjects([positionCap], params.address);
+    }
+    console.log("[zapInSupplyViaDeepbook] Step 3 done: tx ready");
+
+    return tx;
+  }
+
+  /**
    * Supplies collateral to the AlphaLend protocol with automatic token swapping
    *
    * This method performs a "zap in" operation by first swapping the input token
@@ -300,6 +527,26 @@ export class AlphalendClient {
   async zapInSupply(
     params: ZapInSupplyParams,
   ): Promise<Transaction | undefined> {
+    // Edge case: zero or invalid amount — reject for both paths.
+    if (!params.inputAmount || params.inputAmount <= 0n) {
+      console.error("[zapInSupply] inputAmount must be > 0");
+      return undefined;
+    }
+
+    // Resolve deepbook package ID from UpgradeCap before hasDeepbookConfig().
+    await this.ensureInitialized();
+
+    // Step 1: When supplying to dbUSDC market, use Deepbook path (deposit USDC → dbUSDC) instead of Cetus.
+    if (
+      this.hasDeepbookConfig() &&
+      this.isDbUsdcMarket(params.marketCoinType)
+    ) {
+      console.log("[zapInSupply] Using Deepbook path (target market = dbUSDC)");
+      return this.zapInSupplyViaDeepbook(params);
+    }
+
+    console.log("[zapInSupply] Using Cetus path (swap then supply)");
+    // Step 2: Default path — swap via Cetus, then supply.
     const tx = new Transaction();
 
     const quoteResponse = await this.cetusSwap.getCetusSwapQuote(
@@ -1738,19 +1985,64 @@ export class AlphalendClient {
   async getSwapQuote(tokenIn: string, tokenOut: string, amountIn: string) {
     await this.ensureInitialized();
 
-    // const quoteResponse = await this.sevenKGateway.getQuote(
-    //   tokenIn,
-    //   tokenOut,
-    //   amountIn,
-    // );
+    const amountInBigInt = BigInt(amountIn);
+    const coinIn = this.coinMetadataMap.get(tokenIn);
+    const coinOut = this.coinMetadataMap.get(tokenOut);
+
+    // When receive is dbUSDC: show swap quote tokenIn → USDC only (no pool rate; UI shows USDC-out then deposit to dbUSDC).
+    // Use hasDeepbookQuoteConfig (static IDs only) so quote works even before UpgradeCap is resolved.
+    if (
+      this.hasDeepbookQuoteConfig() &&
+      tokenOut === this.constants.DBUSDC_COIN_TYPE
+    ) {
+      let estimatedAmountOut: bigint;
+      let rawQuote: RouterDataV3 | null = null;
+
+      if (tokenIn === this.constants.DBUSDC_COIN_TYPE || tokenIn === this.constants.USDC_COIN_TYPE) {
+        estimatedAmountOut = amountInBigInt;
+      } else {
+        const quoteResponse = await this.cetusSwap.getCetusSwapQuote(
+          tokenIn,
+          this.constants.USDC_COIN_TYPE,
+          amountIn,
+        );
+        if (!quoteResponse) return null;
+        rawQuote = quoteResponse as RouterDataV3;
+        estimatedAmountOut = BigInt(quoteResponse.amountOut.toString());
+      }
+
+      const amount = amountInBigInt;
+      const coinOutForPrice = coinOut ?? this.coinMetadataMap.get(this.constants.USDC_COIN_TYPE);
+      let inputAmountInUSD = 0;
+      let outputAmountInUSD = 0;
+      let slippage = 0;
+      if (coinIn?.pythPrice && coinOutForPrice && coinIn?.decimals != null && coinOutForPrice?.decimals != null) {
+        const priceA = parseFloat(coinIn.pythPrice) || parseFloat(coinIn.coingeckoPrice ?? "0");
+        const priceB = parseFloat(coinOutForPrice.pythPrice ?? "0") || parseFloat(coinOutForPrice.coingeckoPrice ?? "0");
+        inputAmountInUSD = (Number(amount) / Math.pow(10, coinIn.decimals)) * priceA;
+        outputAmountInUSD = (Number(estimatedAmountOut) / Math.pow(10, coinOutForPrice.decimals)) * priceB;
+        if (inputAmountInUSD > 0) slippage = (inputAmountInUSD - outputAmountInUSD) / inputAmountInUSD;
+      }
+
+      return {
+        gateway: "cetus",
+        estimatedAmountOut,
+        estimatedFeeAmount: 0n,
+        inputAmount: amount,
+        inputAmountInUSD,
+        estimatedAmountOutInUSD: outputAmountInUSD,
+        slippage,
+        rawQuote,
+      } as quoteObject;
+    }
+
     const quoteResponse = await this.cetusSwap.getCetusSwapQuote(
       tokenIn,
       tokenOut,
       amountIn,
     );
+    if (!quoteResponse) return null;
 
-    const coinIn = this.coinMetadataMap.get(tokenIn);
-    const coinOut = this.coinMetadataMap.get(tokenOut);
     // const sevenKEstimatedAmountOut = BigInt(
     //   quoteResponse ? quoteResponse.returnAmountWithDecimal.toString() : 0,
     // );
@@ -1896,6 +2188,10 @@ export class AlphalendClient {
    * Only fetches data once - subsequent calls use cached data
    */
   private async ensureInitialized(): Promise<void> {
+    // Always resolve deepbook package ID first (needed for dbUSDC path).
+    // Must run even when isInitialized is true (e.g. client created with coinMetadataMap).
+    await this.resolveLatestDeepbookPackageId();
+
     if (this.isInitialized) {
       return; // Already initialized, return immediately
     }
@@ -1905,13 +2201,46 @@ export class AlphalendClient {
       return this.initializationPromise;
     }
 
-    // Start initialization (only happens once)
+    // Start initialization (only happens once) — fetch coin metadata.
     this.initializationPromise = this.fetchAndCacheCoinMetadata();
     return this.initializationPromise;
   }
 
   /**
-   * Fetches coin metadata from GraphQL API and caches it
+   * Reads the alphalend_deepbook UpgradeCap from chain and sets deepbookPackageId
+   * to whatever is currently live on-chain.
+   *
+   * Sui's upgrade mechanism updates the UpgradeCap's `package` field to the latest
+   * published-at address on every upgrade. The UpgradeCap object ID never changes.
+   */
+  private async resolveLatestDeepbookPackageId(): Promise<void> {
+    const capId = this.constants.DEEPBOOK_UPGRADE_CAP_ID;
+    if (!capId) return; // dev/test env has empty string — skip
+
+    try {
+      const obj = await this.client.getObject({
+        id: capId,
+        options: { showContent: true },
+      });
+      const fields = (obj?.data?.content as { fields?: Record<string, unknown> })?.fields;
+      const latestPkgId = fields?.package as string | undefined;
+      if (latestPkgId) {
+        if (latestPkgId !== this.deepbookPackageId) {
+          console.log(
+            `[AlphalendClient] deepbook package: ${this.deepbookPackageId || "(none)"} → ${latestPkgId}`,
+          );
+        }
+        this.deepbookPackageId = latestPkgId;
+      }
+    } catch (err) {
+      console.warn(
+        `[AlphalendClient] Could not resolve deepbook package ID from UpgradeCap (${capId}). Error: ${err}`,
+      );
+    }
+  }
+
+  /**
+   * Fetches coin metadata from the AlphaLend GraphQL API and caches it.
    */
   private async fetchAndCacheCoinMetadata(): Promise<void> {
     try {
