@@ -353,7 +353,9 @@ export class AlphalendClient {
       return undefined;
     }
 
-    console.log("[zapInSupplyViaDeepbook] Step 0: Building tx for dbUSDC supply");
+    console.log(
+      "[zapInSupplyViaDeepbook] Step 0: Building tx for dbUSDC supply",
+    );
     const tx = new Transaction();
 
     let coinToSupply: TransactionObjectArgument | undefined;
@@ -361,7 +363,9 @@ export class AlphalendClient {
 
     // Edge case: user already has dbUSDC — direct supply, no swap or Deepbook deposit.
     if (this.isDbUsdcInput(params.inputCoinType)) {
-      console.log("[zapInSupplyViaDeepbook] Step 1c: User pays dbUSDC — direct supply");
+      console.log(
+        "[zapInSupplyViaDeepbook] Step 1c: User pays dbUSDC — direct supply",
+      );
       const coinObject = await this.getCoinObject(
         tx,
         this.constants.DBUSDC_COIN_TYPE,
@@ -376,10 +380,14 @@ export class AlphalendClient {
       if (coinObject !== tx.gas) {
         tx.transferObjects([coinObject], params.address);
       }
-      console.log("[zapInSupplyViaDeepbook] Step 1c done: dbUSDC coin ready for supply");
+      console.log(
+        "[zapInSupplyViaDeepbook] Step 1c done: dbUSDC coin ready for supply",
+      );
     } else if (this.isUsdcInput(params.inputCoinType)) {
       // Path A: User pays USDC. Get USDC coin and use it for Deepbook deposit.
-      console.log("[zapInSupplyViaDeepbook] Step 1a: User pays USDC — no swap, get USDC coin");
+      console.log(
+        "[zapInSupplyViaDeepbook] Step 1a: User pays USDC — no swap, get USDC coin",
+      );
       const coinObject = await this.getCoinObject(
         tx,
         this.constants.USDC_COIN_TYPE,
@@ -394,10 +402,14 @@ export class AlphalendClient {
       if (coinObject !== tx.gas) {
         tx.transferObjects([coinObject], params.address);
       }
-      console.log("[zapInSupplyViaDeepbook] Step 1a done: USDC coin ready for Deepbook deposit");
+      console.log(
+        "[zapInSupplyViaDeepbook] Step 1a done: USDC coin ready for Deepbook deposit",
+      );
     } else {
       // Path B: User pays another token. Swap to USDC via Cetus, then use that for Deepbook.
-      console.log("[zapInSupplyViaDeepbook] Step 1b: User pays non-USDC — Cetus swap to USDC");
+      console.log(
+        "[zapInSupplyViaDeepbook] Step 1b: User pays non-USDC — Cetus swap to USDC",
+      );
       const quoteResponse = await this.cetusSwap.getCetusSwapQuote(
         params.inputCoinType,
         this.constants.USDC_COIN_TYPE,
@@ -438,12 +450,16 @@ export class AlphalendClient {
         return undefined;
       }
       usdcCoin = usdcFromSwap as TransactionObjectArgument;
-      console.log("[zapInSupplyViaDeepbook] Step 1b done: Cetus swap complete, USDC coin ready");
+      console.log(
+        "[zapInSupplyViaDeepbook] Step 1b done: Cetus swap complete, USDC coin ready",
+      );
     }
 
     // Deepbook deposit only when we have USDC to deposit (Path A or B). Skip for Path 1c (direct dbUSDC).
     if (usdcCoin !== undefined) {
-      console.log("[zapInSupplyViaDeepbook] Step 2: Deepbook deposit (USDC → dbUSDC)");
+      console.log(
+        "[zapInSupplyViaDeepbook] Step 2: Deepbook deposit (USDC → dbUSDC)",
+      );
       coinToSupply = tx.moveCall({
         target: `${this.deepbookPackageId}::alphalend_deepbook_pool::deposit`,
         typeArguments: [this.constants.USDC_COIN_TYPE],
@@ -460,11 +476,19 @@ export class AlphalendClient {
 
     // Supply dbUSDC to lending market (same as existing add_collateral flow).
     if (coinToSupply === undefined) {
-      console.error("[zapInSupplyViaDeepbook] No coin to supply (internal error)");
+      console.error(
+        "[zapInSupplyViaDeepbook] No coin to supply (internal error)",
+      );
       return undefined;
     }
-    console.log("[zapInSupplyViaDeepbook] Step 3: add_collateral (supply dbUSDC to market)", params.marketId);
-    const marketIdU64 = typeof params.marketId === "string" ? Number(params.marketId) : params.marketId;
+    console.log(
+      "[zapInSupplyViaDeepbook] Step 3: add_collateral (supply dbUSDC to market)",
+      params.marketId,
+    );
+    const marketIdU64 =
+      typeof params.marketId === "string"
+        ? Number(params.marketId)
+        : params.marketId;
     if (params.positionCapId) {
       tx.moveCall({
         target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::add_collateral`,
@@ -1998,7 +2022,10 @@ export class AlphalendClient {
       let estimatedAmountOut: bigint;
       let rawQuote: RouterDataV3 | null = null;
 
-      if (tokenIn === this.constants.DBUSDC_COIN_TYPE || tokenIn === this.constants.USDC_COIN_TYPE) {
+      if (
+        tokenIn === this.constants.DBUSDC_COIN_TYPE ||
+        tokenIn === this.constants.USDC_COIN_TYPE
+      ) {
         estimatedAmountOut = amountInBigInt;
       } else {
         const quoteResponse = await this.cetusSwap.getCetusSwapQuote(
@@ -2012,16 +2039,30 @@ export class AlphalendClient {
       }
 
       const amount = amountInBigInt;
-      const coinOutForPrice = coinOut ?? this.coinMetadataMap.get(this.constants.USDC_COIN_TYPE);
+      // Use USDC for output USD/slippage: estimatedAmountOut is USDC from Cetus, so price must match.
+      const coinForOutputUSD = this.coinMetadataMap.get(
+        this.constants.USDC_COIN_TYPE,
+      );
       let inputAmountInUSD = 0;
       let outputAmountInUSD = 0;
       let slippage = 0;
-      if (coinIn?.pythPrice && coinOutForPrice && coinIn?.decimals != null && coinOutForPrice?.decimals != null) {
-        const priceA = parseFloat(coinIn.pythPrice) || parseFloat(coinIn.coingeckoPrice ?? "0");
-        const priceB = parseFloat(coinOutForPrice.pythPrice ?? "0") || parseFloat(coinOutForPrice.coingeckoPrice ?? "0");
-        inputAmountInUSD = (Number(amount) / Math.pow(10, coinIn.decimals)) * priceA;
-        outputAmountInUSD = (Number(estimatedAmountOut) / Math.pow(10, coinOutForPrice.decimals)) * priceB;
-        if (inputAmountInUSD > 0) slippage = (inputAmountInUSD - outputAmountInUSD) / inputAmountInUSD;
+      const priceA = coinIn?.pythPrice || coinIn?.coingeckoPrice;
+      const priceB =
+        coinForOutputUSD?.pythPrice || coinForOutputUSD?.coingeckoPrice;
+      if (
+        priceA &&
+        priceB &&
+        coinIn?.decimals != null &&
+        coinForOutputUSD?.decimals != null
+      ) {
+        inputAmountInUSD =
+          (Number(amount) / Math.pow(10, coinIn.decimals)) * parseFloat(priceA);
+        outputAmountInUSD =
+          (Number(estimatedAmountOut) /
+            Math.pow(10, coinForOutputUSD.decimals)) *
+          parseFloat(priceB);
+        if (inputAmountInUSD > 0)
+          slippage = (inputAmountInUSD - outputAmountInUSD) / inputAmountInUSD;
       }
 
       return {
@@ -2222,7 +2263,9 @@ export class AlphalendClient {
         id: capId,
         options: { showContent: true },
       });
-      const fields = (obj?.data?.content as { fields?: Record<string, unknown> })?.fields;
+      const fields = (
+        obj?.data?.content as { fields?: Record<string, unknown> }
+      )?.fields;
       const latestPkgId = fields?.package as string | undefined;
       if (latestPkgId) {
         if (latestPkgId !== this.deepbookPackageId) {
