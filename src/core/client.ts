@@ -353,9 +353,6 @@ export class AlphalendClient {
       return undefined;
     }
 
-    console.log(
-      "[zapInSupplyViaDeepbook] Step 0: Building tx for dbUSDC supply",
-    );
     const tx = new Transaction();
 
     let coinToSupply: TransactionObjectArgument | undefined;
@@ -363,9 +360,6 @@ export class AlphalendClient {
 
     // Edge case: user already has dbUSDC — direct supply, no swap or Deepbook deposit.
     if (this.isDbUsdcInput(params.inputCoinType)) {
-      console.log(
-        "[zapInSupplyViaDeepbook] Step 1c: User pays dbUSDC — direct supply",
-      );
       const coinObject = await this.getCoinObject(
         tx,
         this.constants.DBUSDC_COIN_TYPE,
@@ -380,14 +374,8 @@ export class AlphalendClient {
       if (coinObject !== tx.gas) {
         tx.transferObjects([coinObject], params.address);
       }
-      console.log(
-        "[zapInSupplyViaDeepbook] Step 1c done: dbUSDC coin ready for supply",
-      );
     } else if (this.isUsdcInput(params.inputCoinType)) {
       // Path A: User pays USDC. Get USDC coin and use it for Deepbook deposit.
-      console.log(
-        "[zapInSupplyViaDeepbook] Step 1a: User pays USDC — no swap, get USDC coin",
-      );
       const coinObject = await this.getCoinObject(
         tx,
         this.constants.USDC_COIN_TYPE,
@@ -402,14 +390,8 @@ export class AlphalendClient {
       if (coinObject !== tx.gas) {
         tx.transferObjects([coinObject], params.address);
       }
-      console.log(
-        "[zapInSupplyViaDeepbook] Step 1a done: USDC coin ready for Deepbook deposit",
-      );
     } else {
       // Path B: User pays another token. Swap to USDC via Cetus, then use that for Deepbook.
-      console.log(
-        "[zapInSupplyViaDeepbook] Step 1b: User pays non-USDC — Cetus swap to USDC",
-      );
       const quoteResponse = await this.cetusSwap.getCetusSwapQuote(
         params.inputCoinType,
         this.constants.USDC_COIN_TYPE,
@@ -450,16 +432,10 @@ export class AlphalendClient {
         return undefined;
       }
       usdcCoin = usdcFromSwap as TransactionObjectArgument;
-      console.log(
-        "[zapInSupplyViaDeepbook] Step 1b done: Cetus swap complete, USDC coin ready",
-      );
     }
 
     // Deepbook deposit only when we have USDC to deposit (Path A or B). Skip for Path 1c (direct dbUSDC).
     if (usdcCoin !== undefined) {
-      console.log(
-        "[zapInSupplyViaDeepbook] Step 2: Deepbook deposit (USDC → dbUSDC)",
-      );
       coinToSupply = tx.moveCall({
         target: `${this.deepbookPackageId}::alphalend_deepbook_pool::deposit`,
         typeArguments: [this.constants.USDC_COIN_TYPE],
@@ -471,7 +447,6 @@ export class AlphalendClient {
           tx.object(this.constants.SUI_CLOCK_OBJECT_ID),
         ],
       });
-      console.log("[zapInSupplyViaDeepbook] Step 2 done: dbUSDC minted");
     }
 
     // Supply dbUSDC to lending market (same as existing add_collateral flow).
@@ -481,10 +456,6 @@ export class AlphalendClient {
       );
       return undefined;
     }
-    console.log(
-      "[zapInSupplyViaDeepbook] Step 3: add_collateral (supply dbUSDC to market)",
-      params.marketId,
-    );
     const marketIdU64 =
       typeof params.marketId === "string"
         ? Number(params.marketId)
@@ -565,11 +536,9 @@ export class AlphalendClient {
       this.hasDeepbookConfig() &&
       this.isDbUsdcMarket(params.marketCoinType)
     ) {
-      console.log("[zapInSupply] Using Deepbook path (target market = dbUSDC)");
       return this.zapInSupplyViaDeepbook(params);
     }
 
-    console.log("[zapInSupply] Using Cetus path (swap then supply)");
     // Step 2: Default path — swap via Cetus, then supply.
     const tx = new Transaction();
 
