@@ -83,6 +83,10 @@ export class AlphalendClient {
 
   /** Resolved at runtime from DEEPBOOK_UPGRADE_CAP_ID; used for dbUSDC deposit move calls. */
   private deepbookPackageId: string = "";
+  /** Tracks whether resolveLatestDeepbookPackageId has been called, independent of isInitialized. */
+  private deepbookPackageIdResolved: boolean = false;
+  /** In-flight promise for resolveLatestDeepbookPackageId — prevents duplicate concurrent RPC calls. */
+  private deepbookPackageIdPromise: Promise<void> | null = null;
 
   /**
    * Creates a new AlphaLend client instance
@@ -347,12 +351,6 @@ export class AlphalendClient {
   private async zapInSupplyViaDeepbook(
     params: ZapInSupplyParams,
   ): Promise<Transaction | undefined> {
-    // Edge case: zero amount — reject early (Move would fail with EInvalidAmount).
-    if (!params.inputAmount || params.inputAmount <= 0n) {
-      console.error("[zapInSupplyViaDeepbook] inputAmount must be > 0");
-      return undefined;
-    }
-
     const tx = new Transaction();
 
     let coinToSupply: TransactionObjectArgument | undefined;
@@ -527,7 +525,6 @@ export class AlphalendClient {
       return undefined;
     }
 
-    // Resolve deepbook package ID from UpgradeCap before hasDeepbookConfig().
     await this.ensureInitialized();
 
     // Step 1: When supplying to dbUSDC market, use Deepbook path (deposit USDC → dbUSDC) instead of Cetus.
@@ -2006,7 +2003,6 @@ export class AlphalendClient {
         estimatedAmountOut = BigInt(quoteResponse.amountOut.toString());
       }
 
-      const amount = amountInBigInt;
       // Use USDC for output USD/slippage: estimatedAmountOut is USDC from Cetus, so price must match.
       const coinForOutputUSD = this.coinMetadataMap.get(
         this.constants.USDC_COIN_TYPE,
@@ -2024,7 +2020,8 @@ export class AlphalendClient {
         coinForOutputUSD?.decimals != null
       ) {
         inputAmountInUSD =
-          (Number(amount) / Math.pow(10, coinIn.decimals)) * parseFloat(priceA);
+          (Number(amountInBigInt) / Math.pow(10, coinIn.decimals)) *
+          parseFloat(priceA);
         outputAmountInUSD =
           (Number(estimatedAmountOut) /
             Math.pow(10, coinForOutputUSD.decimals)) *
@@ -2037,7 +2034,7 @@ export class AlphalendClient {
         gateway: "cetus",
         estimatedAmountOut,
         estimatedFeeAmount: 0n,
-        inputAmount: amount,
+        inputAmount: amountInBigInt,
         inputAmountInUSD,
         estimatedAmountOutInUSD: outputAmountInUSD,
         slippage,
@@ -2192,25 +2189,35 @@ export class AlphalendClient {
   }
 
   /**
-   * Ensures market data is initialized by fetching from GraphQL API
-   * This method is called automatically before any operation that needs market data
-   * Only fetches data once - subsequent calls use cached data
+   * Ensures the client is fully initialized before any operation:
+   * 1. Resolves the live deepbook package ID from the UpgradeCap (once, for dbUSDC operations).
+   * 2. Fetches and caches coin metadata from the GraphQL API (once, for all other operations).
+   * Both steps are skipped on subsequent calls — zero extra RPC after first initialization.
    */
   private async ensureInitialized(): Promise<void> {
-    // Always resolve deepbook package ID first (needed for dbUSDC path).
-    // Must run even when isInitialized is true (e.g. client created with coinMetadataMap).
-    await this.resolveLatestDeepbookPackageId();
+    // Resolve deepbook package ID exactly once, independent of isInitialized.
+    // This ensures it runs even when coinMetadataMap is pre-supplied via constructor options.
+    if (!this.deepbookPackageIdResolved) {
+      if (!this.deepbookPackageIdPromise) {
+        this.deepbookPackageIdPromise = this.resolveLatestDeepbookPackageId()
+          .catch((err) => {
+            console.warn(`[AlphalendClient] deepbook package ID resolution failed: ${err}`);
+          })
+          .finally(() => {
+            this.deepbookPackageIdResolved = true;
+          });
+      }
+      await this.deepbookPackageIdPromise;
+    }
 
     if (this.isInitialized) {
-      return; // Already initialized, return immediately
+      return;
     }
 
     if (this.initializationPromise) {
-      // Already initializing, wait for it to complete
       return this.initializationPromise;
     }
 
-    // Start initialization (only happens once) — fetch coin metadata.
     this.initializationPromise = this.fetchAndCacheCoinMetadata();
     return this.initializationPromise;
   }
@@ -2231,10 +2238,10 @@ export class AlphalendClient {
         id: capId,
         options: { showContent: true },
       });
-      const fields = (
-        obj?.data?.content as { fields?: Record<string, unknown> }
-      )?.fields;
-      const latestPkgId = fields?.package as string | undefined;
+      const content = obj?.data?.content;
+      if (content?.dataType !== "moveObject") return;
+      const latestPkgId = (content.fields as Record<string, unknown>)
+        ?.package as string | undefined;
       if (latestPkgId) {
         this.deepbookPackageId = latestPkgId;
       }
