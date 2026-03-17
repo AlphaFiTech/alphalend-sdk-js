@@ -497,7 +497,6 @@ export class AlphalendClient {
       });
       tx.transferObjects([positionCap], params.address);
     }
-    console.log("[zapInSupplyViaDeepbook] Step 3 done: tx ready");
 
     return tx;
   }
@@ -2237,11 +2236,6 @@ export class AlphalendClient {
       )?.fields;
       const latestPkgId = fields?.package as string | undefined;
       if (latestPkgId) {
-        if (latestPkgId !== this.deepbookPackageId) {
-          console.log(
-            `[AlphalendClient] deepbook package: ${this.deepbookPackageId || "(none)"} → ${latestPkgId}`,
-          );
-        }
         this.deepbookPackageId = latestPkgId;
       }
     } catch (err) {
