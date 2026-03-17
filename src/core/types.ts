@@ -432,7 +432,8 @@ export interface quoteObject {
   inputAmountInUSD: number;
   estimatedAmountOutInUSD: number;
   slippage: number;
-  rawQuote: RouterDataV3;
+  /** Present when quote includes a Cetus swap; null for USDC→dbUSDC or dbUSDC→dbUSDC. */
+  rawQuote: RouterDataV3 | null;
 }
 
 /**

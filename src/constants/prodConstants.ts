@@ -94,4 +94,20 @@ export const prodConstants: Constants = {
 
   SUI_COIN_TYPE_LONG:
     "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI",
+
+  // AlphaLend package upgrade cap (used to resolve deepbookPackageId).
+  DEEPBOOK_UPGRADE_CAP_ID:
+    "0xf1180f18907a01d0f6df6bf58ca9758db94f3064d04f07b4a7496f0f19c57c2f",
+  // AlphaLend pool for USDC: mints dbUSDC and tracks deposits.
+  DEEPBOOK_USDC_POOL_ID:
+    "0x6ae707d20a057d48100539c716072725e068aa1bc13ea9fe39700ec6e75401ee",
+  // DeepBook global margin registry (one per network); validates and tracks margin pools.
+  DEEPBOOK_MARGIN_REGISTRY:
+    "0x0e40998b359a9ccbab22a98ed21bd4346abf19158bc7980c8291908086b3a742",
+  // DeepBook USDC margin pool: where USDC is supplied and dbUSDC is minted.
+  DEEPBOOK_USDC_MARGIN_POOL_ID:
+    "0xba473d9ae278f10af75c50a8fa341e9c6a1c087dc91a3f23e8048baf67d0754f",
+  // dbUSDC (DEEPBOOK_STAKED<USDC>) coin type for supply/withdraw.
+  DBUSDC_COIN_TYPE:
+    "0x66a09a4da70828bfa1ffb98998477403e4fc47ffa727adb916bb42d9bc8e1d66::alphalend_deepbook_pool::DEEPBOOK_STAKED<0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC>",
 };

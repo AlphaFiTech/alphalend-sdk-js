@@ -66,4 +66,11 @@ export interface Constants {
   ALPHA_COIN_TYPE: string;
 
   SUI_COIN_TYPE_LONG: string;
+
+  // Deepbook (AlphaFi USDC → dbUSDC)
+  DEEPBOOK_UPGRADE_CAP_ID: string;
+  DEEPBOOK_USDC_POOL_ID: string;
+  DEEPBOOK_MARGIN_REGISTRY: string;
+  DEEPBOOK_USDC_MARGIN_POOL_ID: string;
+  DBUSDC_COIN_TYPE: string;
 }
