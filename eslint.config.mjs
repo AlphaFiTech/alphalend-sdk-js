@@ -17,7 +17,7 @@ export default [
   pluginReact.configs.flat.recommended,
   {
     settings: {
-      react: { version: 'detect' },
+      react: { version: "detect" },
     },
   },
 ];

@@ -106,13 +106,16 @@ class HttpCacheManager {
     const cachedEntry = this.cache.get(cacheKey);
 
     // Check if we have fresh cached data (within max-age)
-    if (cachedEntry && isCacheFresh(cachedEntry.cacheControl, cachedEntry.timestamp)) {
+    if (
+      cachedEntry &&
+      isCacheFresh(cachedEntry.cacheControl, cachedEntry.timestamp)
+    ) {
       return cachedEntry.data as T;
     }
 
     // Prepare headers
     const headers: HeadersInit = {
-      "Accept": "application/json",
+      Accept: "application/json",
     };
 
     // Add If-None-Match header if we have an ETag
