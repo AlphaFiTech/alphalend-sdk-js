@@ -139,8 +139,8 @@ export interface ZapOutWithdrawParams {
 }
 
 /**
- * Parameters for zap-out withdraw operation to a lending market
- * Used with the `zapOutWithdraw` method to swap input tokens and withdraw them from a single market in a single transaction
+ * Parameters for swap-and-repay operation
+ * Used with the `swapAndRepay` method to swap input tokens and repay debt in a single transaction
  */
 export interface SwapAndRepayParams {
   /** Optional existing transaction to build upon */
