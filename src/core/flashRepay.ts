@@ -223,7 +223,7 @@ export async function buildFlashRepayTransaction(
   // TRANSACTION BUILDING PHASE
   // -------------------------------------------------------------------------
 
-  const tx = new Transaction();
+  const tx = params.tx || new Transaction();
 
   // Step 1: Flash borrow from Navi — borrow repay-coin from Navi’s flash loan pool (amount = debt + Navi flash loan fee for this asset). Returns a Balance and a receipt used later to repay.
   const [flashBalance, receipt] = await flashloanPTB(
