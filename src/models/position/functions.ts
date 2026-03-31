@@ -49,7 +49,10 @@ export const getUserPositionCapId = async (
 };
 
 /**
- * Fetches a user's position capability IDs
+ * Fetches a user's position capability IDs sorted by creation order (oldest first).
+ *
+ * Sorting uses the object `version` field, which in Sui is set to the lamport
+ * timestamp of the transaction that first created the object.
  *
  * @param suiClient - SuiClient instance
  * @param network - Network name ("mainnet", "testnet", or "devnet")
@@ -63,21 +66,22 @@ export const getUserPositionCapIds = async (
 ): Promise<(string | undefined)[] | undefined> => {
   try {
     const constants = getConstants(network);
-    // Fetch owned objects for the user
     const response = await suiClient.getOwnedObjects({
       owner: userAddress,
-      options: {
-        showContent: true, // Include object content to access fields
-      },
-      filter: {
-        StructType: constants.POSITION_CAP_TYPE,
-      },
+      options: { showContent: true },
+      filter: { StructType: constants.POSITION_CAP_TYPE },
     });
 
-    if (!response || !response.data || response.data.length === 0) {
+    if (!response?.data?.length) {
       return undefined;
     }
-    return response.data.map((obj) => obj.data?.objectId);
+
+    const sorted = [...response.data].sort((a, b) => {
+      const vA = parseInt(a.data?.version ?? "0", 10);
+      const vB = parseInt(b.data?.version ?? "0", 10);
+      return vA - vB;
+    });
+    return sorted.map((obj) => obj.data?.objectId);
   } catch (error) {
     console.error("Error fetching user positionCap IDs:", error);
   }
