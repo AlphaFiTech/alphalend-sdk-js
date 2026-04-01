@@ -53,6 +53,8 @@ export const MAX_U64: bigint = 18446744073709551615n;
  * Used with the `supply` method
  */
 export interface SupplyParams {
+  /** Optional existing transaction to build upon */
+  tx?: Transaction;
   /** Market ID where collateral is being added */
   marketId: string;
   /** Amount to supply as collateral in base units (in mists) */
@@ -70,6 +72,8 @@ export interface SupplyParams {
  * Used with the `zapInSupply` method to swap input tokens and supply them as collateral in a single transaction
  */
 export interface ZapInSupplyParams {
+  /** Optional existing transaction to build upon */
+  tx?: Transaction;
   /** Market ID where collateral is being added */
   marketId: string;
   /** Slippage for the swap (e.g., 0.01 for 1%) */
@@ -91,6 +95,8 @@ export interface ZapInSupplyParams {
  * Used with the `withdraw` method
  */
 export interface WithdrawParams {
+  /** Optional existing transaction to build upon */
+  tx?: Transaction;
   /** Market ID from which to withdraw */
   marketId: string;
   /** Amount to withdraw (in mists, use MAX_U64 constant to withdraw all) */
@@ -111,6 +117,8 @@ export interface WithdrawParams {
  * Used with the `zapOutWithdraw` method to swap input tokens and withdraw them from a single market in a single transaction
  */
 export interface ZapOutWithdrawParams {
+  /** Optional existing transaction to build upon */
+  tx?: Transaction;
   /** Market ID from which to withdraw */
   marketId: string;
   /** Amount to withdraw (in mists, use MAX_U64 constant to withdraw all) */
@@ -131,10 +139,12 @@ export interface ZapOutWithdrawParams {
 }
 
 /**
- * Parameters for zap-out withdraw operation to a lending market
- * Used with the `zapOutWithdraw` method to swap input tokens and withdraw them from a single market in a single transaction
+ * Parameters for swap-and-repay operation
+ * Used with the `swapAndRepay` method to swap input tokens and repay debt in a single transaction
  */
 export interface SwapAndRepayParams {
+  /** Optional existing transaction to build upon */
+  tx?: Transaction;
   /** Market ID from which to withdraw */
   marketId: string;
   /** Amount to withdraw (in mists, use MAX_U64 constant to withdraw all) */
@@ -156,6 +166,8 @@ export interface SwapAndRepayParams {
  * Used with the `borrow` method
  */
 export interface BorrowParams {
+  /** Optional existing transaction to build upon */
+  tx?: Transaction;
   /** Market ID to borrow from */
   marketId: string;
   /** Amount to borrow in base units (in mists) */
@@ -176,6 +188,8 @@ export interface BorrowParams {
  * Used with the `repay` method
  */
 export interface RepayParams {
+  /** Optional existing transaction to build upon */
+  tx?: Transaction;
   /** Market ID where the debt exists */
   marketId: string;
   /** Amount to repay in base units (in mists) */
@@ -193,6 +207,8 @@ export interface RepayParams {
  * Used with the `claimRewards` method
  */
 export interface ClaimRewardsParams {
+  /** Optional existing transaction to build upon */
+  tx?: Transaction;
   /** Object ID of the position capability object */
   positionCapId: string;
   /** Address of the user supplying collateral */
@@ -221,6 +237,8 @@ export interface ClaimRewardsParams {
  * will be supplied to the market.
  */
 export interface ClaimSwapAndSupplyOrRepayOrTransferParams {
+  /** Optional existing transaction to build upon */
+  tx?: Transaction;
   /** Object ID of the position capability object */
   positionCapId: string;
   /** Address of the user claiming rewards */
@@ -256,6 +274,8 @@ export interface MarketInfo {
  * Used with the `claimAndSupplyOrRepay` method
  */
 export interface ClaimAndSupplyOrRepayParams {
+  /** Optional existing transaction to build upon */
+  tx?: Transaction;
   /** Object ID of the position capability object */
   positionCapId: string;
   /** Address of the user claiming rewards */
@@ -273,6 +293,7 @@ export interface ClaimAndSupplyOrRepayParams {
  * Used with the `liquidate` method
  */
 export interface LiquidateParams {
+  /** Optional existing transaction to build upon */
   tx?: Transaction;
   /** Object ID of the position to liquidate */
   liquidatePositionId: string;
@@ -291,20 +312,6 @@ export interface LiquidateParams {
   priceUpdateCoinTypes: string[];
   /** Whether to update all prices */
   updateAllPrices?: boolean;
-}
-
-/**
- * Response structure for transaction operations
- */
-export interface TransactionResponse {
-  /** Transaction hash/digest */
-  txDigest: string;
-  /** Status of the transaction */
-  status: "success" | "failure";
-  /** Gas fee paid for the transaction */
-  gasFee?: Decimal;
-  /** Timestamp when the transaction completed */
-  timestamp?: number;
 }
 
 /**
@@ -441,6 +448,8 @@ export interface quoteObject {
  * Used with the `flashRepay` method.
  */
 export interface FlashRepayParams {
+  /** Optional existing transaction to build upon */
+  tx?: Transaction;
   withdrawCoinType: string;
   withdrawMarketId: string;
   repayCoinType: string;
