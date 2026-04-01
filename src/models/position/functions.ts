@@ -49,10 +49,34 @@ export const getUserPositionCapId = async (
 };
 
 /**
- * Fetches a user's position capability IDs sorted by creation order (oldest first).
- *
- * Sorting uses the object `version` field, which in Sui is set to the lamport
- * timestamp of the transaction that first created the object.
+ * Fetches the creation timestamp (ms since epoch) for a position cap object
+ * by querying the first transaction that touched it (ascending order = creation tx first).
+ */
+const getPositionCapCreatedAt = async (
+  suiClient: SuiClient,
+  positionCapId: string,
+): Promise<number> => {
+  try {
+    const result = await suiClient.queryTransactionBlocks({
+      filter: {
+        ChangedObject: positionCapId,
+      },
+      options: {
+        showEffects: true,
+      },
+      limit: 1,
+      order: "ascending",
+    });
+    const ts = result.data[0]?.timestampMs;
+    return ts ? parseInt(ts, 10) : 0;
+  } catch (e) {
+    console.error(`[getPositionCapCreatedAt] error for ${positionCapId}:`, e);
+    return 0;
+  }
+};
+
+/**
+ * Fetches a user's position capability IDs sorted by creation time (oldest first).
  *
  * @param suiClient - SuiClient instance
  * @param network - Network name ("mainnet", "testnet", or "devnet")
@@ -76,12 +100,23 @@ export const getUserPositionCapIds = async (
       return undefined;
     }
 
-    const sorted = [...response.data].sort((a, b) => {
-      const vA = parseInt(a.data?.version ?? "0", 10);
-      const vB = parseInt(b.data?.version ?? "0", 10);
-      return vA - vB;
-    });
-    return sorted.map((obj) => obj.data?.objectId);
+    const objectIds = response.data
+      .map((obj) => obj.data?.objectId)
+      .filter((id): id is string => !!id);
+
+    // Fetch creation timestamps in parallel
+    const timestamps = await Promise.all(
+      objectIds.map((id) => getPositionCapCreatedAt(suiClient, id)),
+    );
+
+    // Sort by creation timestamp ascending (oldest first, newest last)
+    const withTimestamps = objectIds.map((id, i) => ({
+      id,
+      ts: timestamps[i],
+    }));
+    withTimestamps.sort((a, b) => a.ts - b.ts);
+
+    return withTimestamps.map((entry) => entry.id);
   } catch (error) {
     console.error("Error fetching user positionCap IDs:", error);
   }
