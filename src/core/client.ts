@@ -222,7 +222,7 @@ export class AlphalendClient {
    * @returns Transaction object ready for signing and execution
    */
   async supply(params: SupplyParams): Promise<Transaction | undefined> {
-    const tx = new Transaction();
+    const tx = params.tx ?? new Transaction();
 
     // Get coin object
     const isSui = params.coinType === this.constants.SUI_COIN_TYPE;
@@ -351,7 +351,7 @@ export class AlphalendClient {
   private async zapInSupplyViaDeepbook(
     params: ZapInSupplyParams,
   ): Promise<Transaction | undefined> {
-    const tx = new Transaction();
+    const tx = params.tx ?? new Transaction();
 
     let coinToSupply: TransactionObjectArgument | undefined;
     let usdcCoin: TransactionObjectArgument | undefined;
@@ -536,7 +536,7 @@ export class AlphalendClient {
     }
 
     // Step 2: Default path — swap via Cetus, then supply.
-    const tx = new Transaction();
+    const tx = params.tx ?? new Transaction();
 
     const quoteResponse = await this.cetusSwap.getCetusSwapQuote(
       params.inputCoinType,
@@ -638,7 +638,7 @@ export class AlphalendClient {
    * @returns Transaction object ready for signing and execution
    */
   async withdraw(params: WithdrawParams): Promise<Transaction> {
-    const tx = new Transaction();
+    const tx = params.tx ?? new Transaction();
 
     // First update prices to ensure latest oracle values
     if (this.network === "mainnet") {
@@ -679,6 +679,13 @@ export class AlphalendClient {
 
     return tx;
   }
+
+  /**
+   * Gets a user's portfolio from a position capability ID
+   *
+   * @param positionCapId Position capability ID
+   * @returns User portfolio, or undefined if position not found
+   */
   async getUserPortfolioFromPositionCapId(
     positionCapId: string,
   ): Promise<UserPortfolio | undefined> {
@@ -693,6 +700,7 @@ export class AlphalendClient {
       return undefined;
     }
   }
+
   /**
    * Withdraws collateral from the AlphaLend protocol with automatic token swapping
    *
@@ -714,7 +722,7 @@ export class AlphalendClient {
   async zapOutWithdraw(
     params: ZapOutWithdrawParams,
   ): Promise<Transaction | undefined> {
-    const tx = new Transaction();
+    const tx = params.tx ?? new Transaction();
 
     let swapInAmount = (params.amount - 1n).toString();
     if (params.amount === MAX_U64) {
@@ -797,7 +805,7 @@ export class AlphalendClient {
   async swapAndRepay(
     params: SwapAndRepayParams,
   ): Promise<Transaction | undefined> {
-    const tx = new Transaction();
+    const tx = params.tx ?? new Transaction();
 
     const swapInAmount = (params.amount - 1n).toString();
 
@@ -903,7 +911,7 @@ export class AlphalendClient {
    * @returns Transaction object ready for signing and execution
    */
   async borrow(params: BorrowParams): Promise<Transaction> {
-    const tx = new Transaction();
+    const tx = params.tx ?? new Transaction();
 
     // First update prices to ensure latest oracle values
     if (this.network === "mainnet") {
@@ -963,7 +971,7 @@ export class AlphalendClient {
    * @returns Transaction object ready for signing and execution
    */
   async repay(params: RepayParams): Promise<Transaction | undefined> {
-    const tx = new Transaction();
+    const tx = params.tx ?? new Transaction();
 
     // Get coin object
     // Add 1 to the amount to repay to avoid rounding errors since contract returns the remaining amount.
@@ -1017,7 +1025,7 @@ export class AlphalendClient {
    * @returns Transaction object ready for signing and execution
    */
   async claimRewards(params: ClaimRewardsParams): Promise<Transaction> {
-    const tx = new Transaction();
+    const tx = params.tx ?? new Transaction();
     params.claimAndDepositAlpha =
       params.claimAndDepositAlpha || params.claimAlpha;
     params.claimAndDepositAll = params.claimAndDepositAll || params.claimAll;
@@ -1136,7 +1144,7 @@ export class AlphalendClient {
   async claimSwapAndSupplyOrRepayOrTransfer(
     params: ClaimSwapAndSupplyOrRepayOrTransferParams,
   ): Promise<Transaction | undefined> {
-    const tx = new Transaction();
+    const tx = params.tx ?? new Transaction();
 
     // Ensure SDK is initialized to have access to coin metadata (including prices)
     await this.ensureInitialized();
@@ -1379,7 +1387,7 @@ export class AlphalendClient {
   async claimAndSupplyOrRepay(
     params: ClaimAndSupplyOrRepayParams,
   ): Promise<Transaction | undefined> {
-    const tx = new Transaction();
+    const tx = params.tx ?? new Transaction();
 
     // Update prices if specified
     if (
@@ -1503,7 +1511,7 @@ export class AlphalendClient {
    * @returns Transaction object ready for signing and execution
    */
   async liquidate(params: LiquidateParams) {
-    const tx = params.tx || new Transaction();
+    const tx = params.tx ?? new Transaction();
 
     // First update prices to ensure latest oracle values
     if (this.network === "mainnet") {
@@ -1789,7 +1797,7 @@ export class AlphalendClient {
     if (
       type === "0x2::sui::SUI" ||
       type ===
-        "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI"
+      "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI"
     ) {
       return tx.gas;
     }

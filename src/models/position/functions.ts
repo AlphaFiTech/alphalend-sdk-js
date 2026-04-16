@@ -49,7 +49,34 @@ export const getUserPositionCapId = async (
 };
 
 /**
- * Fetches a user's position capability IDs
+ * Fetches the creation timestamp (ms since epoch) for a position cap object
+ * by querying the first transaction that touched it (ascending order = creation tx first).
+ */
+const getPositionCapCreatedAt = async (
+  suiClient: SuiClient,
+  positionCapId: string,
+): Promise<number> => {
+  try {
+    const result = await suiClient.queryTransactionBlocks({
+      filter: {
+        ChangedObject: positionCapId,
+      },
+      options: {
+        showEffects: true,
+      },
+      limit: 1,
+      order: "ascending",
+    });
+    const ts = result.data[0]?.timestampMs;
+    return ts ? parseInt(ts, 10) : 0;
+  } catch (e) {
+    console.error(`[getPositionCapCreatedAt] error for ${positionCapId}:`, e);
+    return 0;
+  }
+};
+
+/**
+ * Fetches a user's position capability IDs sorted by creation time (oldest first).
  *
  * @param suiClient - SuiClient instance
  * @param network - Network name ("mainnet", "testnet", or "devnet")
@@ -63,21 +90,33 @@ export const getUserPositionCapIds = async (
 ): Promise<(string | undefined)[] | undefined> => {
   try {
     const constants = getConstants(network);
-    // Fetch owned objects for the user
     const response = await suiClient.getOwnedObjects({
       owner: userAddress,
-      options: {
-        showContent: true, // Include object content to access fields
-      },
-      filter: {
-        StructType: constants.POSITION_CAP_TYPE,
-      },
+      options: { showContent: true },
+      filter: { StructType: constants.POSITION_CAP_TYPE },
     });
 
-    if (!response || !response.data || response.data.length === 0) {
+    if (!response?.data?.length) {
       return undefined;
     }
-    return response.data.map((obj) => obj.data?.objectId);
+
+    const objectIds = response.data
+      .map((obj) => obj.data?.objectId)
+      .filter((id): id is string => !!id);
+
+    // Fetch creation timestamps in parallel
+    const timestamps = await Promise.all(
+      objectIds.map((id) => getPositionCapCreatedAt(suiClient, id)),
+    );
+
+    // Sort by creation timestamp ascending (oldest first, newest last)
+    const withTimestamps = objectIds.map((id, i) => ({
+      id,
+      ts: timestamps[i],
+    }));
+    withTimestamps.sort((a, b) => a.ts - b.ts);
+
+    return withTimestamps.map((entry) => entry.id);
   } catch (error) {
     console.error("Error fetching user positionCap IDs:", error);
   }
