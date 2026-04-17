@@ -198,6 +198,11 @@ async function getAllMarkets() {
   const res = await client.getAllMarkets();
   console.log(res);
 }
+async function getMarket(marketId: number) {
+  const client = new AlphalendClient("mainnet", getSuiClient("mainnet"));
+  const res = await client.getMarketDataFromId(marketId);
+}
+getMarket(6);
 // getAllMarkets();
 
 async function getUserPortfolio() {
@@ -608,4 +613,4 @@ async function run() {
 //   console.log("   ✅ Your funds are protected!");
 // }
 
-run();
+// run();

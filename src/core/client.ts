@@ -286,7 +286,9 @@ export class AlphalendClient {
 
     return tx;
   }
-
+  async getUserPositionCapIdFromAddress(address: string) {
+    return await getUserPositionCapId(this.client, this.network, address);
+  }
   /**
    * True when the target market is dbUSDC (DEEPBOOK_STAKED<USDC>).
    * Used to choose Deepbook deposit path instead of Cetus swap.
@@ -1797,7 +1799,7 @@ export class AlphalendClient {
     if (
       type === "0x2::sui::SUI" ||
       type ===
-      "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI"
+        "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI"
     ) {
       return tx.gas;
     }
@@ -2209,7 +2211,9 @@ export class AlphalendClient {
       if (!this.deepbookPackageIdPromise) {
         this.deepbookPackageIdPromise = this.resolveLatestDeepbookPackageId()
           .catch((err) => {
-            console.warn(`[AlphalendClient] deepbook package ID resolution failed: ${err}`);
+            console.warn(
+              `[AlphalendClient] deepbook package ID resolution failed: ${err}`,
+            );
           })
           .finally(() => {
             this.deepbookPackageIdResolved = true;

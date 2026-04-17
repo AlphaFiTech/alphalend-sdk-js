@@ -1,4 +1,4 @@
-import { fromB64 } from "@mysten/bcs";
+import { fromB64 } from "@mysten/sui/utils";
 import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
 import { SuiClient, getFullnodeUrl } from "@mysten/sui/client";
 
@@ -61,8 +61,8 @@ export async function dryRunTransactionBlock(txb: Transaction) {
         transactionBlock: serializedTxb,
       })
       .then((res) => {
-        console.log(JSON.stringify(res, null, 2));
-        // console.log(res.effects.status, res.balanceChanges);
+        // console.log(JSON.stringify(res, null, 2));
+        console.log(res.effects.status, res.balanceChanges);
       })
       .catch((error) => {
         console.error(error);

@@ -4,11 +4,13 @@ import {
   dryRunTransactionBlock,
   executeTransactionBlock,
 } from "./utils.js";
+import { getConstants } from "../src/constants/index.js";
 import * as dotenv from "dotenv";
 
 dotenv.config();
 
-const network = (process.env.NETWORK as "mainnet" | "testnet" | "devnet") || "mainnet";
+const network =
+  (process.env.NETWORK as "mainnet" | "testnet" | "devnet") || "mainnet";
 
 /**
  * Test adding collateral (supplying) to an Alphalend market
@@ -16,20 +18,20 @@ const network = (process.env.NETWORK as "mainnet" | "testnet" | "devnet") || "ma
 async function addCollateral() {
   const { address, suiClient } = getExecStuff();
   const alphalendClient = new AlphalendClient(network, suiClient);
-  
+
   // Example parameters - should be adjusted for actual testing
   const tx = await alphalendClient.supply({
-    marketId: "1", // Example: SUI market ID
-    amount: 1000000000n, // 1 SUI (9 decimals)
-    coinType: "0x2::sui::SUI",
+    marketId: "2", // Example: SUI market ID
+    amount: 10000n,
+    coinType: getConstants(network).USDC_COIN_TYPE,
     address,
     // positionCapId: "YOUR_POSITION_CAP_ID", // Optional for new position
   });
-  
+
   if (tx) {
     tx.setGasBudget(2e8);
-    await dryRunTransactionBlock(tx);
-    // await executeTransactionBlock(tx);
+    // await dryRunTransactionBlock(tx);
+    await executeTransactionBlock(tx);
   } else {
     console.error("Failed to build supply transaction");
   }
@@ -41,16 +43,17 @@ async function addCollateral() {
 async function removeCollateral() {
   const { address, suiClient } = getExecStuff();
   const alphalendClient = new AlphalendClient(network, suiClient);
-  
+
   const tx = await alphalendClient.withdraw({
     marketId: "1",
-    amount: 500000000n, // 0.5 SUI
+    amount: 500000n, // 0.5 SUI
     coinType: "0x2::sui::SUI",
-    positionCapId: "YOUR_POSITION_CAP_ID", // Required
+    positionCapId:
+      (await alphalendClient.getUserPositionCapIdFromAddress(address))!, // Required
     address,
     priceUpdateCoinTypes: ["0x2::sui::SUI"], // Prices must be updated for withdrawals
   });
-  
+
   if (tx) {
     tx.setGasBudget(2e8);
     await dryRunTransactionBlock(tx);
@@ -66,16 +69,20 @@ async function removeCollateral() {
 async function borrow() {
   const { address, suiClient } = getExecStuff();
   const alphalendClient = new AlphalendClient(network, suiClient);
-  
+
   const tx = await alphalendClient.borrow({
     marketId: "2", // Example: USDC market ID
     amount: 1000000n, // 1 USDC (assuming 6 decimals)
-    coinType: "0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC",
+    coinType:
+      "0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC",
     positionCapId: "YOUR_POSITION_CAP_ID", // Required
     address,
-    priceUpdateCoinTypes: ["0x2::sui::SUI", "0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC"],
+    priceUpdateCoinTypes: [
+      "0x2::sui::SUI",
+      "0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC",
+    ],
   });
-  
+
   if (tx) {
     tx.setGasBudget(2e8);
     await dryRunTransactionBlock(tx);
@@ -91,15 +98,16 @@ async function borrow() {
 async function repay() {
   const { address, suiClient } = getExecStuff();
   const alphalendClient = new AlphalendClient(network, suiClient);
-  
+
   const tx = await alphalendClient.repay({
     marketId: "2",
     amount: 1000000n,
-    coinType: "0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC",
+    coinType:
+      "0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC",
     positionCapId: "YOUR_POSITION_CAP_ID",
     address,
   });
-  
+
   if (tx) {
     tx.setGasBudget(2e8);
     await dryRunTransactionBlock(tx);
@@ -111,6 +119,6 @@ async function repay() {
 
 // Example usage: uncomment the function you want to test
 // addCollateral().catch(console.error);
-// removeCollateral().catch(console.error);
+removeCollateral().catch(console.error);
 // borrow().catch(console.error);
 // repay().catch(console.error);
