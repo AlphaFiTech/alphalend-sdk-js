@@ -202,7 +202,7 @@ async function getMarket(marketId: number) {
   const client = new AlphalendClient("mainnet", getSuiClient("mainnet"));
   const res = await client.getMarketDataFromId(marketId);
 }
-getMarket(6);
+getMarket(1);
 // getAllMarkets();
 
 async function getUserPortfolio() {

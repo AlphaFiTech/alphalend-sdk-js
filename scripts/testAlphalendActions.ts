@@ -43,15 +43,19 @@ async function addCollateral() {
 async function removeCollateral() {
   const { address, suiClient } = getExecStuff();
   const alphalendClient = new AlphalendClient(network, suiClient);
+  const positionCapId =
+    (await alphalendClient.getUserPositionCapIdFromAddress(address))!;
 
   const tx = await alphalendClient.withdraw({
-    marketId: "1",
-    amount: 500000n, // 0.5 SUI
-    coinType: "0x2::sui::SUI",
-    positionCapId:
-      (await alphalendClient.getUserPositionCapIdFromAddress(address))!, // Required
+    marketId: "2",
+    amount: 5000n,
+    coinType: getConstants(network).USDC_COIN_TYPE,
+    positionCapId, // Required
     address,
-    priceUpdateCoinTypes: ["0x2::sui::SUI"], // Prices must be updated for withdrawals
+    priceUpdateCoinTypes: [
+      getConstants(network).USDC_COIN_TYPE,
+      getConstants(network).SUI_COIN_TYPE,
+    ], // Prices must be updated for withdrawals
   });
 
   if (tx) {
@@ -69,13 +73,14 @@ async function removeCollateral() {
 async function borrow() {
   const { address, suiClient } = getExecStuff();
   const alphalendClient = new AlphalendClient(network, suiClient);
-
+  const positionCapId =
+    (await alphalendClient.getUserPositionCapIdFromAddress(address))!;
   const tx = await alphalendClient.borrow({
     marketId: "2", // Example: USDC market ID
-    amount: 1000000n, // 1 USDC (assuming 6 decimals)
+    amount: 1000n, // 1 USDC (assuming 6 decimals)
     coinType:
       "0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC",
-    positionCapId: "YOUR_POSITION_CAP_ID", // Required
+    positionCapId, // Required
     address,
     priceUpdateCoinTypes: [
       "0x2::sui::SUI",
