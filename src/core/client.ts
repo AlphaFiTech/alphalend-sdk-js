@@ -46,6 +46,7 @@ import { Receipt } from "../utils/queryTypes.js";
 import { Constants } from "../constants/types.js";
 import { getUserPositionCapId } from "../models/position/functions.js";
 import { LendingProtocol } from "../models/lendingProtocol.js";
+import { Blockchain } from "../models/blockchain.js";
 import { Market } from "../models/market.js";
 import { SevenKGateway } from "./sevenKSwap.js";
 import { Decimal } from "decimal.js";
@@ -73,6 +74,7 @@ export class AlphalendClient {
   network: string;
   constants: Constants;
   lendingProtocol: LendingProtocol;
+  blockchain: Blockchain;
   sevenKGateway: SevenKGateway;
   cetusSwap: CetusSwap;
 
@@ -113,6 +115,7 @@ export class AlphalendClient {
         : "https://hermes-beta.pyth.network",
     );
     this.lendingProtocol = new LendingProtocol(network, client);
+    this.blockchain = new Blockchain(network, client);
     this.sevenKGateway = new SevenKGateway();
     this.cetusSwap = new CetusSwap("mainnet");
 
@@ -166,6 +169,7 @@ export class AlphalendClient {
         this.pythConnection,
       );
     }
+    const oracleInitialSharedVersion = await this.blockchain.getInitialSharedVersion(this.constants.ALPHAFI_ORACLE_OBJECT_ID);
 
     for (const coinType of coinTypes) {
       // Use dynamic data from GraphQL API
@@ -177,6 +181,7 @@ export class AlphalendClient {
           coinType: coinType,
         },
         this.constants,
+        oracleInitialSharedVersion,
       );
     }
   }
@@ -196,6 +201,7 @@ export class AlphalendClient {
       this.pythClient,
       this.pythConnection,
     );
+    const oracleInitialSharedVersion = await this.blockchain.getInitialSharedVersion(this.constants.ALPHAFI_ORACLE_OBJECT_ID);
 
     for (const coinType of coinTypes) {
       const priceInfoObjectId = this.getPythPriceInfoObjectId(coinType);
@@ -206,6 +212,7 @@ export class AlphalendClient {
           coinType: coinType,
         },
         this.constants,
+        oracleInitialSharedVersion,
       );
     }
   }
