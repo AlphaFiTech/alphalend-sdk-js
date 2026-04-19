@@ -22,10 +22,50 @@ export class Blockchain {
   client: SuiClient;
   constants: Constants;
 
+  private initialSharedVersionCache: Map<string, string> = new Map();
+
   constructor(network: string, client: SuiClient) {
     this.network = network;
     this.client = client;
     this.constants = getConstants(network);
+  }
+
+  /**
+   * Get the initial shared version of a shared object. Result is cached
+   * per `objectId` since `initial_shared_version` never changes for a given
+   * shared object.
+   *
+   * @param objectId The shared object ID
+   * @returns The object's `initial_shared_version` as a string
+   */
+  async getInitialSharedVersion(objectId: string): Promise<string> {
+    const cached = this.initialSharedVersionCache.get(objectId);
+    if (cached) {
+      return cached;
+    }
+
+    const response = await this.client.getObject({
+      id: objectId,
+      options: {
+        showOwner: true,
+      },
+    });
+
+    const owner = response.data?.owner;
+    if (
+      !owner ||
+      typeof owner !== "object" ||
+      !("Shared" in owner) ||
+      !owner.Shared?.initial_shared_version
+    ) {
+      throw new Error(
+        `Object ${objectId} is not a shared object or its initial shared version could not be resolved`,
+      );
+    }
+
+    const initialSharedVersion = owner.Shared.initial_shared_version;
+    this.initialSharedVersionCache.set(objectId, initialSharedVersion);
+    return initialSharedVersion;
   }
 
   async getMarketQuery(marketId: number): Promise<MarketQueryType> {
