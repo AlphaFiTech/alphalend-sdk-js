@@ -55,7 +55,7 @@ export async function dryRunTransactionBlock(txb: Transaction) {
   const { suiClient, address } = getExecStuff();
   txb.setSender(address);
   try {
-    let serializedTxb = await txb.build({ client: suiClient });
+    const serializedTxb = await txb.build({ client: suiClient });
     suiClient
       .dryRunTransactionBlock({
         transactionBlock: serializedTxb,

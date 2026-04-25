@@ -1,4 +1,5 @@
 import { AlphalendClient } from "../src/core/client.js";
+import type { MarketData } from "../src/core/types.js";
 import { performance } from "perf_hooks";
 
 /**
@@ -33,7 +34,9 @@ async function testGetAllMarkets() {
 
   console.log(`⚙️  Configuration:`);
   console.log(`   Use Cache:      ${useCache ? "✅ Enabled" : "❌ Disabled"}`);
-  console.log(`   Show Markets:   ${showMarkets ? "✅ Enabled" : "❌ Disabled"}\n`);
+  console.log(
+    `   Show Markets:   ${showMarkets ? "✅ Enabled" : "❌ Disabled"}\n`,
+  );
 
   console.log(`📡 Network: ${network}`);
   console.log(`🔄 Iterations: ${iterations}\n`);
@@ -62,7 +65,7 @@ async function testGetAllMarkets() {
   console.log("🚀 Starting getAllMarkets() benchmark...\n");
 
   // Step 4: Call getAllMarkets() multiple times
-  const allResults: any[][] = [];
+  const allResults: MarketData[][] = [];
   for (let i = 1; i <= iterations; i++) {
     const start = performance.now();
     const markets = await alphalendClient.getAllMarkets({ useCache });
@@ -158,20 +161,30 @@ async function testGetAllMarkets() {
 
     firstMarkets.forEach((market, index) => {
       console.log(`${index + 1}. Market ID ${market.marketId}:`);
-      console.log(`   Coin Type:         ${market.coinType.substring(0, 50)}...`);
+      console.log(
+        `   Coin Type:         ${market.coinType.substring(0, 50)}...`,
+      );
       console.log(`   Symbol:            ${market.symbol || "N/A"}`);
       console.log(`   Total Supply:      ${market.totalSupply}`);
       console.log(`   Total Borrow:      ${market.totalBorrow}`);
-      console.log(`   Utilization Rate:  ${market.utilizationRate.toFixed(4)}%`);
-      console.log(`   Supply APR:        ${market.supplyApr.interestApr.toFixed(2)}%`);
-      console.log(`   Borrow APR:        ${market.borrowApr.interestApr.toFixed(2)}%`);
+      console.log(
+        `   Utilization Rate:  ${market.utilizationRate.toFixed(4)}%`,
+      );
+      console.log(
+        `   Supply APR:        ${market.supplyApr.interestApr.toFixed(2)}%`,
+      );
+      console.log(
+        `   Borrow APR:        ${market.borrowApr.interestApr.toFixed(2)}%`,
+      );
       console.log(`   Price (USD):       $${market.price}`);
       console.log(`   LTV:               ${market.ltv}`);
       console.log(`   Available Liq:     ${market.availableLiquidity}`);
       console.log("");
     });
   } else if (!showMarkets && firstMarkets && firstMarkets.length > 0) {
-    console.log("\n💡 Market data hidden. Use --show-markets flag to display.\n");
+    console.log(
+      "\n💡 Market data hidden. Use --show-markets flag to display.\n",
+    );
   }
 
   // Data consistency validation
@@ -183,11 +196,13 @@ async function testGetAllMarkets() {
   const inconsistencies: string[] = [];
 
   // Check that all calls returned same number of markets
-  const marketCounts = allResults.map(r => r.length);
+  const marketCounts = allResults.map((r) => r.length);
   const uniqueCounts = new Set(marketCounts);
 
   if (uniqueCounts.size === 1) {
-    console.log(`✅ Market count consistent: ${marketCounts[0]} markets in all ${iterations} calls`);
+    console.log(
+      `✅ Market count consistent: ${marketCounts[0]} markets in all ${iterations} calls`,
+    );
   } else {
     allConsistent = false;
     console.log(`❌ Market count inconsistent across calls:`);
@@ -198,9 +213,9 @@ async function testGetAllMarkets() {
   }
 
   // Check that market IDs are consistent
-  const firstMarketIds = firstMarkets.map(m => m.marketId).sort();
+  const firstMarketIds = firstMarkets.map((m) => m.marketId).sort();
   for (let i = 1; i < allResults.length; i++) {
-    const currentMarketIds = allResults[i].map(m => m.marketId).sort();
+    const currentMarketIds = allResults[i].map((m) => m.marketId).sort();
     if (JSON.stringify(firstMarketIds) !== JSON.stringify(currentMarketIds)) {
       allConsistent = false;
       inconsistencies.push(`Call ${i + 1} has different market IDs`);
@@ -211,18 +226,22 @@ async function testGetAllMarkets() {
     console.log(`✅ Market IDs consistent across all ${iterations} calls`);
   } else {
     console.log(`❌ Market IDs inconsistent:`);
-    inconsistencies.forEach(inc => console.log(`   - ${inc}`));
+    inconsistencies.forEach((inc) => console.log(`   - ${inc}`));
   }
 
   // Sample data point validation (check first market's price across all calls)
   if (firstMarkets.length > 0) {
-    const firstMarketPrices = allResults.map(r => r[0]?.price);
-    const uniquePrices = new Set(firstMarketPrices.map(p => p?.toString()));
+    const firstMarketPrices = allResults.map((r) => r[0]?.price);
+    const uniquePrices = new Set(firstMarketPrices.map((p) => p?.toString()));
 
     if (uniquePrices.size === 1) {
-      console.log(`✅ Sample data point (Market 1 price) consistent: $${firstMarketPrices[0]}`);
+      console.log(
+        `✅ Sample data point (Market 1 price) consistent: $${firstMarketPrices[0]}`,
+      );
     } else {
-      console.log(`⚠️  Sample data point (Market 1 price) varies (expected for live data):`);
+      console.log(
+        `⚠️  Sample data point (Market 1 price) varies (expected for live data):`,
+      );
       firstMarketPrices.slice(0, 3).forEach((price, i) => {
         console.log(`   Call ${i + 1}: $${price}`);
       });

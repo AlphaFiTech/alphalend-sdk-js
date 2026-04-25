@@ -52,7 +52,7 @@ export interface EarliestTxInfo {
 
 export class Blockchain {
   network: Network;
-  gqlClient: SuiGraphQLClient<any>;
+  gqlClient: SuiGraphQLClient;
   constants: Constants;
 
   /**
@@ -182,11 +182,12 @@ export class Blockchain {
     );
 
     for (const result of results) {
-      result.data?.multiGetObjects?.forEach((obj: any) => {
+      const nodes = result.data?.multiGetObjects ?? [];
+      for (const obj of nodes) {
         if (obj?.address) {
           resMap.set(obj.address, obj.asMoveObject?.contents?.json as T);
         }
-      });
+      }
     }
 
     return resMap;
@@ -225,14 +226,17 @@ export class Blockchain {
     `);
 
     const out: GqlObject<T>[] = [];
-    let cursor: string | null | undefined = null;
-    do {
-      const response: any = await this.gqlClient.query({
-        query,
-        variables: { owner, type, cursor },
-      });
-      const conn: any = response.data?.address?.objects;
-      const nodes: any[] = conn?.nodes ?? [];
+    let cursor: string | null = null;
+    let hasMore = true;
+    while (hasMore) {
+      const variables: {
+        owner: string;
+        type: string;
+        cursor: string | null;
+      } = { owner, type, cursor };
+      const response = await this.gqlClient.query({ query, variables });
+      const conn = response.data?.address?.objects;
+      const nodes = conn?.nodes ?? [];
       for (const node of nodes) {
         if (node?.address) {
           out.push({
@@ -244,9 +248,9 @@ export class Blockchain {
       if (conn?.pageInfo?.hasNextPage && conn.pageInfo.endCursor) {
         cursor = conn.pageInfo.endCursor;
       } else {
-        break;
+        hasMore = false;
       }
-    } while (true);
+    }
     return out;
   }
 
@@ -303,31 +307,31 @@ export class Blockchain {
     }
     const coins: CoinNode[] = [];
 
-    let currentCursor: string | null | undefined = null;
-    do {
-      const response: any = await this.gqlClient.query({
-        query,
-        variables: { address, coinType: wrappedCoinType, cursor: currentCursor },
-      });
-      const objects: any = response.data?.address?.objects;
-      if (objects?.nodes) {
-        for (const node of objects.nodes) {
-          if (!node?.address) continue;
-          const fields = node.contents?.json as
-            | { balance?: string }
-            | undefined;
-          coins.push({
-            id: node.address,
-            balance: BigInt(fields?.balance ?? "0"),
-          });
-        }
+    let currentCursor: string | null = null;
+    let hasMore = true;
+    while (hasMore) {
+      const variables: {
+        address: string;
+        coinType: string;
+        cursor: string | null;
+      } = { address, coinType: wrappedCoinType, cursor: currentCursor };
+      const response = await this.gqlClient.query({ query, variables });
+      const objects = response.data?.address?.objects;
+      const nodes = objects?.nodes ?? [];
+      for (const node of nodes) {
+        if (!node?.address) continue;
+        const fields = node.contents?.json as { balance?: string } | undefined;
+        coins.push({
+          id: node.address,
+          balance: BigInt(fields?.balance ?? "0"),
+        });
       }
       if (objects?.pageInfo?.hasNextPage && objects.pageInfo.endCursor) {
         currentCursor = objects.pageInfo.endCursor;
       } else {
-        break;
+        hasMore = false;
       }
-    } while (true);
+    }
 
     if (coins.length === 0) {
       return undefined;
@@ -347,7 +351,9 @@ export class Blockchain {
     }
 
     // Otherwise merge the top 200 largest.
-    coins.sort((a, b) => (b.balance > a.balance ? 1 : b.balance < a.balance ? -1 : 0));
+    coins.sort((a, b) =>
+      b.balance > a.balance ? 1 : b.balance < a.balance ? -1 : 0,
+    );
     coins.splice(200);
 
     if (amount) {
@@ -398,10 +404,7 @@ export class Blockchain {
     childObjectAddress?: string;
   } | null> {
     const query = graphql(`
-      query getDynamicField(
-        $parent: SuiAddress!
-        $name: DynamicFieldName!
-      ) {
+      query getDynamicField($parent: SuiAddress!, $name: DynamicFieldName!) {
         address(address: $parent) {
           dynamicField(name: $name) {
             address
@@ -428,16 +431,16 @@ export class Blockchain {
       }
     `);
 
-    const response: any = await this.gqlClient.query({
+    const response = await this.gqlClient.query({
       query,
       variables: { parent: parentId, name },
     });
 
-    const df: any = response.data?.address?.dynamicField;
+    const df = response.data?.address?.dynamicField;
     if (!df) return null;
 
     const entryName = {
-      type: df.name?.type?.repr as string,
+      type: (df.name?.type?.repr as string | undefined) ?? "",
       json: df.name?.json as K,
     };
 
@@ -521,18 +524,20 @@ export class Blockchain {
       valueJson: V | undefined;
       childObjectAddress?: string;
     }[] = [];
-    let cursor: string | null | undefined = null;
-    do {
-      const response: any = await this.gqlClient.query({
-        query,
-        variables: { parent: parentId, after: cursor },
-      });
-      const conn: any = response.data?.address?.dynamicFields;
-      const nodes: any[] = conn?.nodes ?? [];
+    let cursor: string | null = null;
+    let hasMore = true;
+    while (hasMore) {
+      const variables: { parent: string; after: string | null } = {
+        parent: parentId,
+        after: cursor,
+      };
+      const response = await this.gqlClient.query({ query, variables });
+      const conn = response.data?.address?.dynamicFields;
+      const nodes = conn?.nodes ?? [];
       for (const node of nodes) {
         if (!node?.address) continue;
         const entryName = {
-          type: node.name?.type?.repr as string,
+          type: (node.name?.type?.repr as string | undefined) ?? "",
           json: node.name?.json as K,
         };
         if (node.value?.__typename === "MoveValue") {
@@ -559,9 +564,9 @@ export class Blockchain {
       if (conn?.pageInfo?.hasNextPage && conn.pageInfo.endCursor) {
         cursor = conn.pageInfo.endCursor;
       } else {
-        break;
+        hasMore = false;
       }
-    } while (true);
+    }
     return out;
   }
 
@@ -571,7 +576,9 @@ export class Blockchain {
    * position caps by creation time (replaces JSON-RPC's
    * `queryTransactionBlocks({ ChangedObject, order: "ascending" })`).
    */
-  async getEarliestTxForObject(objectId: string): Promise<EarliestTxInfo | null> {
+  async getEarliestTxForObject(
+    objectId: string,
+  ): Promise<EarliestTxInfo | null> {
     const query = graphql(`
       query earliestTxForObject($obj: SuiAddress!) {
         transactions(first: 1, filter: { affectedObject: $obj }) {
@@ -585,13 +592,13 @@ export class Blockchain {
       }
     `);
 
-    const response: any = await this.gqlClient.query({
+    const response = await this.gqlClient.query({
       query,
       variables: { obj: objectId },
     });
-    const node: any = response.data?.transactions?.nodes?.[0];
+    const node = response.data?.transactions?.nodes?.[0];
     if (!node) return null;
-    const ts = node.effects?.timestamp as string | undefined;
+    const ts = node.effects?.timestamp;
     const parsed = ts ? Date.parse(ts) : NaN;
     return {
       digest: node.digest,
@@ -609,7 +616,7 @@ export class Blockchain {
    * constructed by this SDK because inputs are already fully-resolved object
    * references.
    */
-  async simulateTransaction(tx: Transaction, sender: string): Promise<any> {
+  async simulateTransaction(tx: Transaction, sender: string) {
     tx.setSenderIfNotSet(sender);
     const txBytes = await tx.build({ client: this.txBuildClient });
     const txBase64 = toBase64(txBytes);
@@ -640,7 +647,7 @@ export class Blockchain {
       query,
       variables: { tx: { bcs: { value: txBase64 } } },
     });
-    return result.data?.simulateTransaction;
+    return result.data?.simulateTransaction ?? undefined;
   }
 
   /** Estimate gas budget by simulating the transaction. */
@@ -649,7 +656,7 @@ export class Blockchain {
     sender: string,
   ): Promise<number | undefined> {
     try {
-      const simResult: any = await this.simulateTransaction(tx, sender);
+      const simResult = await this.simulateTransaction(tx, sender);
       const gasSummary = simResult?.effects?.gasEffects?.gasSummary;
       if (!gasSummary) {
         throw new Error("Simulation returned no gas summary");
@@ -698,7 +705,10 @@ export class Blockchain {
       type: "u64",
       bcs: toBase64(bcs.u64().serialize(BigInt(marketId)).toBytes()),
     };
-    const df = await this.getDynamicField(this.constants.MARKETS_TABLE_ID, name);
+    const df = await this.getDynamicField(
+      this.constants.MARKETS_TABLE_ID,
+      name,
+    );
     if (!df?.valueJson) {
       throw new Error(`Market ${marketId} not found`);
     }
@@ -710,7 +720,10 @@ export class Blockchain {
       type: "u64",
       bcs: toBase64(bcs.u64().serialize(BigInt(marketId)).toBytes()),
     };
-    const df = await this.getDynamicField(this.constants.MARKETS_TABLE_ID, name);
+    const df = await this.getDynamicField(
+      this.constants.MARKETS_TABLE_ID,
+      name,
+    );
     if (!df?.valueJson) {
       throw new Error(`Market ${marketId} not found`);
     }
@@ -736,7 +749,10 @@ export class Blockchain {
       type: "0x2::object::ID",
       bcs: toBase64(bcs.Address.serialize(positionId).toBytes()),
     };
-    const df = await this.getDynamicField(this.constants.POSITION_TABLE_ID, name);
+    const df = await this.getDynamicField(
+      this.constants.POSITION_TABLE_ID,
+      name,
+    );
     if (!df?.valueJson) {
       throw new Error(`Position ${positionId} not found`);
     }

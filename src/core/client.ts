@@ -188,7 +188,10 @@ export class AlphalendClient {
         this.pythConnection,
       );
     }
-    const oracleInitialSharedVersion = await this.blockchain.getInitialSharedVersion(this.constants.ALPHAFI_ORACLE_OBJECT_ID);
+    const oracleInitialSharedVersion =
+      await this.blockchain.getInitialSharedVersion(
+        this.constants.ALPHAFI_ORACLE_OBJECT_ID,
+      );
 
     for (const coinType of coinTypes) {
       // Use dynamic data from GraphQL API
@@ -220,7 +223,10 @@ export class AlphalendClient {
       this.pythClient,
       this.pythConnection,
     );
-    const oracleInitialSharedVersion = await this.blockchain.getInitialSharedVersion(this.constants.ALPHAFI_ORACLE_OBJECT_ID);
+    const oracleInitialSharedVersion =
+      await this.blockchain.getInitialSharedVersion(
+        this.constants.ALPHAFI_ORACLE_OBJECT_ID,
+      );
 
     for (const coinType of coinTypes) {
       const priceInfoObjectId = this.getPythPriceInfoObjectId(coinType);
@@ -2137,7 +2143,9 @@ export class AlphalendClient {
       if (!this.deepbookPackageIdPromise) {
         this.deepbookPackageIdPromise = this.resolveLatestDeepbookPackageId()
           .catch((err) => {
-            console.warn(`[AlphalendClient] deepbook package ID resolution failed: ${err}`);
+            console.warn(
+              `[AlphalendClient] deepbook package ID resolution failed: ${err}`,
+            );
           })
           .finally(() => {
             this.deepbookPackageIdResolved = true;
@@ -2170,9 +2178,7 @@ export class AlphalendClient {
     if (!capId) return; // dev/test env has empty string — skip
 
     try {
-      const obj = await this.blockchain.getObject<{ package?: string }>(
-        capId,
-      );
+      const obj = await this.blockchain.getObject<{ package?: string }>(capId);
       const latestPkgId = obj?.contents?.package;
       if (latestPkgId) {
         this.deepbookPackageId = latestPkgId;

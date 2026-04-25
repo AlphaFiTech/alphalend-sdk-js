@@ -7,7 +7,6 @@
  * It tests the complete chain from price feed mapping to actual price retrieval.
  */
 
-import { SuiClient } from "@mysten/sui/client";
 import { AlphalendClient } from "../src";
 
 // The exact coin type from the error message
@@ -16,12 +15,8 @@ const LBTC_COIN_TYPE =
 
 describe("LBTC Price Error Reproduction", () => {
   let client: AlphalendClient;
-  let suiClient: SuiClient;
 
   beforeAll(() => {
-    suiClient = new SuiClient({
-      url: "https://fullnode.mainnet.sui.io/",
-    });
     client = new AlphalendClient("mainnet");
   });
 
@@ -37,7 +32,9 @@ describe("LBTC Price Error Reproduction", () => {
   });
 
   test("Step 2: Test direct price fetch for LBTC", async () => {
-    console.log("Attempting to resolve LBTC price from client coin metadata...");
+    console.log(
+      "Attempting to resolve LBTC price from client coin metadata...",
+    );
 
     await client.ensureInitialized?.();
     const metadataMap = await client.fetchCoinMetadataMap();
@@ -112,10 +109,14 @@ describe("LBTC Price Error Reproduction", () => {
       console.log("Batch price fetch results:");
       testCoinTypes.forEach((coinType) => {
         const meta = metadataMap.get(coinType);
-        const hasPrice = Number(meta?.pythPrice ?? meta?.coingeckoPrice ?? 0) > 0;
+        const hasPrice =
+          Number(meta?.pythPrice ?? meta?.coingeckoPrice ?? 0) > 0;
         const symbol = coinType.split("::").pop();
         console.log(`  ${symbol}: ${hasPrice ? "✅" : "❌"}`);
-        if (meta) console.log(`    Price: ${meta.pythPrice ?? meta.coingeckoPrice ?? 0}`);
+        if (meta)
+          console.log(
+            `    Price: ${meta.pythPrice ?? meta.coingeckoPrice ?? 0}`,
+          );
       });
 
       // LBTC metadata should be available
@@ -152,7 +153,8 @@ describe("LBTC Price Error Reproduction", () => {
         // Step 2: Check metadata-based price
         const metadataMap = await client.fetchCoinMetadataMap();
         const meta = metadataMap.get(LBTC_COIN_TYPE);
-        const hasPrice = Number(meta?.pythPrice ?? meta?.coingeckoPrice ?? 0) > 0;
+        const hasPrice =
+          Number(meta?.pythPrice ?? meta?.coingeckoPrice ?? 0) > 0;
         console.log(`Step 2 - Price fetch: ${hasPrice ? "✅" : "❌"}`);
 
         if (!hasPrice) {
@@ -207,7 +209,8 @@ describe("LBTC Price Error Reproduction", () => {
       console.log("Mixed batch results:");
       mixedCoinTypes.forEach((coinType) => {
         const meta = metadataMap.get(coinType);
-        const hasPrice = Number(meta?.pythPrice ?? meta?.coingeckoPrice ?? 0) > 0;
+        const hasPrice =
+          Number(meta?.pythPrice ?? meta?.coingeckoPrice ?? 0) > 0;
         console.log(
           `  ${coinType.split("::").pop()}: ${hasPrice ? "✅" : "❌"}`,
         );

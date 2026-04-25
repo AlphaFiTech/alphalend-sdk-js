@@ -10,7 +10,6 @@
  * 3. getAllMarkets integration with price validation
  */
 
-import { SuiClient } from "@mysten/sui/client";
 import { AlphalendClient } from "../src";
 
 // Test address provided by user
@@ -23,12 +22,8 @@ const LBTC_COIN_TYPE =
 
 describe("User-Reported Issues Integration Tests", () => {
   let client: AlphalendClient;
-  let suiClient: SuiClient;
 
   beforeAll(() => {
-    suiClient = new SuiClient({
-      url: "https://fullnode.mainnet.sui.io/",
-    });
     client = new AlphalendClient("mainnet");
   });
 

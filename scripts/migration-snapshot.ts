@@ -79,6 +79,8 @@ import {
   getNaviFlashLoanSupportedCoinTypes,
   getNaviFlashLoanFeeForCoinType,
 } from "../src/core/flashRepay.js";
+import type { MarketType, PositionCapType } from "../src/utils/parsedTypes.js";
+import type { Receipt } from "../src/utils/queryTypes.js";
 
 // ---------------------------------------------------------------------------
 // Configuration
@@ -149,11 +151,7 @@ function writeSnapshot(dir: string, name: string, data: unknown) {
 // Tier-1 transaction normalization.
 // Strips volatile fields so the JSON is stable across runs of the same code.
 // ---------------------------------------------------------------------------
-const VOLATILE_KEYS = new Set([
-  "version",
-  "digest",
-  "initialSharedVersion",
-]);
+const VOLATILE_KEYS = new Set(["version", "digest", "initialSharedVersion"]);
 
 function deepStripVolatile(value: unknown): unknown {
   if (Array.isArray(value)) {
@@ -218,7 +216,7 @@ async function main() {
   // READS: chain-layer market data
   // -----------------------------------------------------------------------
 
-  let allMarketsChain: any[] = [];
+  let allMarketsChain: MarketType[] = [];
   await step(
     "[reads] blockchain.getAllMarkets",
     () => alc.blockchain.getAllMarkets(),
@@ -301,7 +299,7 @@ async function main() {
   // only public surface that exposes a typed PositionCap fetch)
   // -----------------------------------------------------------------------
 
-  let positionCaps: any[] = [];
+  let positionCaps: PositionCapType[] = [];
   await step(
     "[reads] blockchain.getPositionCapsForUser",
     () => alc.blockchain.getPositionCapsForUser(TEST_ADDRESS),
@@ -357,7 +355,7 @@ async function main() {
     "[reads] getAlphaReceipt",
     () => getAlphaReceipt(alc.blockchain, TEST_ADDRESS),
     (receipts) => {
-      const normalized = receipts.map((r: any) => ({
+      const normalized = receipts.map((r: Receipt) => ({
         id: r.objectId,
         poolId: r.fields?.pool_id ?? null,
       }));

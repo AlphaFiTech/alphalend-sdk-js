@@ -34,7 +34,11 @@ export async function getClaimRewardInput(
     );
     if (!marketRewardDistributor) continue;
 
-    addClaimableCoinTypes(rewardDistributor, marketRewardDistributor, coinTypes);
+    addClaimableCoinTypes(
+      rewardDistributor,
+      marketRewardDistributor,
+      coinTypes,
+    );
     marketActionMap.set(marketId, [...coinTypes]);
   }
 

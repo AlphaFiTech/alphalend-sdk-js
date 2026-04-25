@@ -2,7 +2,8 @@
 
 # AlphaLend JavaScript SDK
 
-AlphaLend SDK for JavaScript/TypeScript applications built on the Sui blockchain. This SDK provides a comprehensive interface to interact with the AlphaLend lending protocol.
+AlphaLend SDK for JavaScript/TypeScript applications built on the Sui blockchain.
+This SDK provides a comprehensive interface to interact with the AlphaLend lending protocol.
 
 ## Features
 
@@ -50,18 +51,18 @@ config without falling back to `string`.
 `2.0.0` drops the JSON-RPC `SuiClient` from the public API. All reads now go
 through Sui's GraphQL endpoint.
 
-| Before (1.x)                                          | After (2.x)                                          |
-| ----------------------------------------------------- | ---------------------------------------------------- |
-| `new AlphalendClient("mainnet", suiClient)`           | `new AlphalendClient("mainnet")`                     |
-| `new AlphalendClient("mainnet", suiClient, options)`  | `new AlphalendClient("mainnet", undefined, options)` |
-| `new LendingProtocol("mainnet", suiClient)`           | `new LendingProtocol("mainnet")`                     |
-| `getUserPositionCapId(suiClient, network, address)`   | `getUserPositionCapId(blockchain, address)`          |
-| `getUserPositionCapIds(suiClient, network, address)`  | `getUserPositionCapIds(blockchain, address)`         |
-| `getUserPositionIds(suiClient, network, address)`     | `getUserPositionIds(blockchain, address)`            |
-| `getAlphaReceipt(suiClient, address)`                 | `getAlphaReceipt(blockchain, address)`               |
-| `alc.getEstimatedGasBudget(suiClient, tx, address)`   | `alc.getEstimatedGasBudget(tx, address)`             |
-| `network: string` (constructor arg)                   | `network: Network` (`"mainnet" \| "testnet" \| "devnet"`) |
-| `MarketType.priceIdentifier = { coinType, type }`     | `MarketType.priceIdentifier = { coinType }`          |
+| Before (1.x)                                         | After (2.x)                                               |
+| ---------------------------------------------------- | --------------------------------------------------------- |
+| `new AlphalendClient("mainnet", suiClient)`          | `new AlphalendClient("mainnet")`                          |
+| `new AlphalendClient("mainnet", suiClient, options)` | `new AlphalendClient("mainnet", undefined, options)`      |
+| `new LendingProtocol("mainnet", suiClient)`          | `new LendingProtocol("mainnet")`                          |
+| `getUserPositionCapId(suiClient, network, address)`  | `getUserPositionCapId(blockchain, address)`               |
+| `getUserPositionCapIds(suiClient, network, address)` | `getUserPositionCapIds(blockchain, address)`              |
+| `getUserPositionIds(suiClient, network, address)`    | `getUserPositionIds(blockchain, address)`                 |
+| `getAlphaReceipt(suiClient, address)`                | `getAlphaReceipt(blockchain, address)`                    |
+| `alc.getEstimatedGasBudget(suiClient, tx, address)`  | `alc.getEstimatedGasBudget(tx, address)`                  |
+| `network: string` (constructor arg)                  | `network: Network` (`"mainnet" \| "testnet" \| "devnet"`) |
+| `MarketType.priceIdentifier = { coinType, type }`    | `MarketType.priceIdentifier = { coinType }`               |
 
 ### Update Prices
 

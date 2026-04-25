@@ -172,8 +172,7 @@ function extraNoiseForFile(file: string): (path: string) => boolean {
   // Pure-input bytes change between runs. tx structure (commands, type
   // args, deterministic Pure values) is the real signal.
   if (file === "tx-updatePrices.json" || file === "tx-updateAllPrices.json") {
-    return (p) =>
-      p.endsWith(".objectId") || p.endsWith(".Pure.bytes");
+    return (p) => p.endsWith(".objectId") || p.endsWith(".Pure.bytes");
   }
   if (file.startsWith("tx-")) {
     return (p) => p.endsWith(".objectId");
@@ -364,7 +363,7 @@ function main() {
 
   console.log(
     `Compared ${shared.length} snapshot(s). ${totalDiffs} raw diffs ` +
-    `(${totalSignal} signal, ${totalExpected} expected-removal, ${totalNoise} noise).\n`,
+      `(${totalSignal} signal, ${totalExpected} expected-removal, ${totalNoise} noise).\n`,
   );
 
   if (totalExpected > 0) {
@@ -378,7 +377,7 @@ function main() {
   if (totalSignal === 0) {
     console.log(
       "All shared snapshots are semantically identical (after filtering " +
-      "known time-drift noise and intentional migration removals).",
+        "known time-drift noise and intentional migration removals).",
     );
     if (strict && filesWithSignal.length === 0) {
       console.log("(Use --strict to also dump the noise/expected lines.)");
