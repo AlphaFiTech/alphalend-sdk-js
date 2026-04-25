@@ -73,8 +73,7 @@ export async function dryRunTransactionBlock(txb: Transaction) {
 }
 
 async function updatePricesCaller() {
-  const { suiClient } = getExecStuff();
-  const alphalendClient = new AlphalendClient("mainnet", suiClient);
+  const alphalendClient = new AlphalendClient("mainnet");
   let tx = new Transaction();
   await alphalendClient.updatePrices(tx, [
     "0x2::sui::SUI",
@@ -85,11 +84,10 @@ async function updatePricesCaller() {
 }
 
 async function claimRewards() {
-  const { suiClient, keypair } = getExecStuff();
   let tx: Transaction | undefined = new Transaction();
   // await addCoinToOracleCaller(tx);
   await setPrices(tx);
-  let alc = new AlphalendClient("testnet", suiClient);
+  let alc = new AlphalendClient("testnet");
   tx = await alc.claimRewards({
     address:
       "0xa511088cc13a632a5e8f9937028a77ae271832465e067360dd13f548fe934d1a",
@@ -104,8 +102,7 @@ async function claimRewards() {
 }
 
 async function zapInSupply() {
-  const { suiClient, keypair } = getExecStuff();
-  let alc = new AlphalendClient("mainnet", suiClient);
+  let alc = new AlphalendClient("mainnet");
   const tx = await alc.zapInSupply({
     address:
       "0xe136f0b6faf27ee707725f38f2aeefc51c6c31cc508222bee5cbc4f5fcf222c3",
@@ -142,9 +139,8 @@ async function zapInSupply() {
 // zapInSupply();
 
 async function borrow() {
-  const { suiClient, keypair } = getExecStuff();
   let tx: Transaction | undefined;
-  let alc = new AlphalendClient("testnet", suiClient);
+  let alc = new AlphalendClient("testnet");
   tx = await alc.borrow({
     address:
       "0x8948f801fa2325eedb4b0ad4eb0a55bfb318acc531f3a2f0cddd8daa9b4a8c94",
@@ -194,14 +190,14 @@ export async function executeTransactionBlock() {
 // executeTransactionBlock();
 
 async function getAllMarkets() {
-  const client = new AlphalendClient("mainnet", getSuiClient("mainnet"));
+  const client = new AlphalendClient("mainnet");
   const res = await client.getAllMarkets();
   console.log(res);
 }
 // getAllMarkets();
 
 async function getUserPortfolio() {
-  const client = new AlphalendClient("mainnet", getSuiClient("mainnet"));
+  const client = new AlphalendClient("mainnet");
   const markets = await client.getMarketsChain();
   if (!markets) {
     console.error("Failed to fetch markets");
@@ -220,9 +216,8 @@ async function getUserPortfolio() {
 // getUserPortfolio();
 
 async function withdraw() {
-  const { suiClient } = getExecStuff();
   let tx: Transaction | undefined;
-  let alc = new AlphalendClient("mainnet", suiClient);
+  let alc = new AlphalendClient("mainnet");
   tx = await alc.withdraw({
     address:
       "0xe136f0b6faf27ee707725f38f2aeefc51c6c31cc508222bee5cbc4f5fcf222c3",

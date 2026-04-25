@@ -1,109 +1,101 @@
 import { Transaction } from "@mysten/sui/transactions";
-import { PaginatedObjectsResponse, SuiClient } from "@mysten/sui/client";
 import { getAlphafiConstants, getConstants } from "../constants/index.js";
-import { Receipt, RewardDistributorQueryType } from "./queryTypes.js";
+import { Receipt, ReceiptGql } from "./queryTypes.js";
 import { getUserPosition } from "../models/position/functions.js";
 import { Blockchain } from "../models/blockchain.js";
+import {
+  MarketType,
+  RewardDistributorType,
+  UserRewardDistributorType,
+  UserRewardType,
+} from "./parsedTypes.js";
 
+/**
+ * Determine which rewards are claimable for the user, grouped by market id.
+ * Uses parsed `PositionType` and `MarketType` (GraphQL-backed) — no raw
+ * JSON-RPC shapes are consumed.
+ */
 export async function getClaimRewardInput(
-  suiClient: SuiClient,
-  network: string,
+  blockchain: Blockchain,
   userAddress: string,
 ): Promise<{ marketId: number; coinTypes: string[] }[]> {
-  const position = await getUserPosition(suiClient, network, userAddress);
-  const positionFields = position!.content.fields.value.fields;
-  const rewardInput: {
-    marketId: number;
-    coinTypes: string[];
-  }[] = [];
-
+  const position = await getUserPosition(blockchain, userAddress);
+  if (!position) return [];
+  const rewardInput: { marketId: number; coinTypes: string[] }[] = [];
   const marketActionMap: Map<number, string[]> = new Map();
 
-  for (const rewardDistributor of positionFields.reward_distributors) {
-    const marketId = Number(rewardDistributor.fields.market_id);
-    const coinTypes: Set<string> = new Set(marketActionMap.get(marketId) || []);
-    const lastUpdated = rewardDistributor.fields.last_updated;
-    const marketRewardDistributorObj = await getRewardDistributor(
-      suiClient,
-      network,
+  for (const rewardDistributor of position.rewardDistributors) {
+    const marketId = Number(rewardDistributor.marketId);
+    const coinTypes: Set<string> = new Set(marketActionMap.get(marketId) ?? []);
+    const marketRewardDistributor = await getRewardDistributor(
+      blockchain,
       marketId,
-      rewardDistributor.fields.is_deposit,
+      rewardDistributor.isDeposit,
     );
-    const userRewardDistributorObj = rewardDistributor.fields.rewards;
-    if (!marketRewardDistributorObj) continue;
+    if (!marketRewardDistributor) continue;
 
-    for (let i = 0; i < marketRewardDistributorObj.rewards.length; i++) {
-      const marketReward = marketRewardDistributorObj.rewards[i];
-      if (!marketReward) continue;
-      const userReward =
-        i < userRewardDistributorObj.length
-          ? userRewardDistributorObj[i]
-          : null;
-
-      const timeElapsed =
-        Math.min(parseFloat(marketReward.fields.end_time), Date.now()) -
-        Math.max(
-          parseFloat(marketReward.fields.start_time),
-          parseFloat(lastUpdated),
-        );
-
-      const userRewardFields = userReward?.fields;
-
-      // reward currently ruuning and user has share
-      if (timeElapsed > 0 && parseFloat(rewardDistributor.fields.share) > 0) {
-        coinTypes.add(marketReward.fields.coin_type.fields.name);
-      } else if (userReward && userRewardFields) {
-        // user has earned rewards in past and not claimed
-        if (parseFloat(userRewardFields.earned_rewards.fields.value) !== 0) {
-          coinTypes.add(marketReward.fields.coin_type.fields.name);
-        } else if (
-          // user has share and some rewards have been distributed after last update
-          parseFloat(
-            marketReward.fields.cummulative_rewards_per_share.fields.value,
-          ) >
-            parseFloat(
-              userRewardFields.cummulative_rewards_per_share.fields.value,
-            ) &&
-          parseFloat(rewardDistributor.fields.share) > 0
-        ) {
-          coinTypes.add(marketReward.fields.coin_type.fields.name);
-        }
-      } else if (
-        // new reward started and finished after last update and user has share
-        parseFloat(rewardDistributor.fields.share) > 0 &&
-        parseFloat(
-          marketReward.fields.cummulative_rewards_per_share.fields.value,
-        ) > 0
-      ) {
-        coinTypes.add(marketReward.fields.coin_type.fields.name);
-      }
-    }
+    addClaimableCoinTypes(rewardDistributor, marketRewardDistributor, coinTypes);
     marketActionMap.set(marketId, [...coinTypes]);
   }
 
   for (const [marketId, coinTypes] of marketActionMap.entries()) {
-    rewardInput.push({
-      marketId,
-      coinTypes,
-    });
+    rewardInput.push({ marketId, coinTypes });
   }
-
   return rewardInput;
 }
 
+function addClaimableCoinTypes(
+  userDistributor: UserRewardDistributorType,
+  marketDistributor: RewardDistributorType,
+  coinTypes: Set<string>,
+): void {
+  const lastUpdated = parseFloat(userDistributor.lastUpdated);
+  const share = parseFloat(userDistributor.share);
+
+  for (let i = 0; i < marketDistributor.rewards.length; i++) {
+    const marketReward = marketDistributor.rewards[i];
+    if (!marketReward) continue;
+    const userReward: UserRewardType | null =
+      i < userDistributor.rewards.length ? userDistributor.rewards[i] : null;
+
+    const timeElapsed =
+      Math.min(parseFloat(marketReward.endTime), Date.now()) -
+      Math.max(parseFloat(marketReward.startTime), lastUpdated);
+
+    if (timeElapsed > 0 && share > 0) {
+      coinTypes.add(marketReward.coinType);
+      continue;
+    }
+
+    if (userReward) {
+      if (parseFloat(userReward.earnedRewards) !== 0) {
+        coinTypes.add(marketReward.coinType);
+      } else if (
+        parseFloat(marketReward.cummulativeRewardsPerShare) >
+          parseFloat(userReward.cummulativeRewardsPerShare) &&
+        share > 0
+      ) {
+        coinTypes.add(marketReward.coinType);
+      }
+    } else if (
+      share > 0 &&
+      parseFloat(marketReward.cummulativeRewardsPerShare) > 0
+    ) {
+      coinTypes.add(marketReward.coinType);
+    }
+  }
+}
+
 async function getRewardDistributor(
-  suiClient: SuiClient,
-  network: string,
+  blockchain: Blockchain,
   marketId: number,
   isDepositRewardDistributor: boolean,
-): Promise<RewardDistributorQueryType | undefined> {
-  const blockchainClient = new Blockchain(network, suiClient);
-  const market = await blockchainClient.getMarketQuery(marketId);
+): Promise<RewardDistributorType | undefined> {
+  const market: MarketType = await blockchain.getMarket(marketId);
   if (!market) return undefined;
-
   return isDepositRewardDistributor
-    ? market.content.fields.value.fields.deposit_reward_distributor.fields
-    : market.content.fields.value.fields.borrow_reward_distributor.fields;
+    ? market.depositRewardDistributor
+    : market.borrowRewardDistributor;
 }
 
 export async function setPrices(tx: Transaction) {
@@ -206,44 +198,27 @@ async function setPrice(
   return tx;
 }
 
+/**
+ * Fetch all AlphaPool receipts owned by `address`, via paginated GraphQL.
+ * Filtering by StructType is done server-side (via the `type` filter), so no
+ * client-side re-check is necessary.
+ */
 export async function getAlphaReceipt(
-  suiClient: SuiClient,
+  blockchain: Blockchain,
   address: string,
 ): Promise<Receipt[]> {
   const constants = getAlphafiConstants();
-  const nfts: Receipt[] = [];
-  if (constants.ALPHA_POOL_RECEIPT == "") {
-    return nfts;
+  if (constants.ALPHA_POOL_RECEIPT === "") {
+    return [];
   }
-  let currentCursor: string | null | undefined = null;
-  while (true) {
-    const paginatedObjects: PaginatedObjectsResponse =
-      await suiClient.getOwnedObjects({
-        owner: address,
-        cursor: currentCursor,
-        filter: {
-          // StructType: `${first_package}::${module}::Receipt`,
-          StructType: constants.ALPHA_POOL_RECEIPT,
-        },
-        options: {
-          showContent: true,
-        },
-      });
-    // Traverse the current page data and push to coins array
-    paginatedObjects.data.forEach((obj) => {
-      const o = obj.data as Receipt;
-      if (o) {
-        if (constants.ALPHA_POOL_RECEIPT === o.content.type) {
-          nfts.push(o);
-        }
-      }
-    });
-    // Check if there's a next page
-    if (paginatedObjects.hasNextPage && paginatedObjects.nextCursor) {
-      currentCursor = paginatedObjects.nextCursor;
-    } else {
-      break;
-    }
-  }
-  return nfts;
+  const nodes = await blockchain.getOwnedObjectsOfType<ReceiptGql>(
+    address,
+    constants.ALPHA_POOL_RECEIPT,
+  );
+  return nodes
+    .filter((n) => !!n.contents)
+    .map((n) => ({
+      objectId: n.address,
+      fields: n.contents as ReceiptGql,
+    }));
 }

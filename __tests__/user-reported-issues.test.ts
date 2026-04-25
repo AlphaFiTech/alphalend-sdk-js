@@ -29,7 +29,7 @@ describe("User-Reported Issues Integration Tests", () => {
     suiClient = new SuiClient({
       url: "https://fullnode.mainnet.sui.io/",
     });
-    client = new AlphalendClient("mainnet", suiClient);
+    client = new AlphalendClient("mainnet");
   });
 
   describe("Issue #1: Market price not found for LBTC", () => {

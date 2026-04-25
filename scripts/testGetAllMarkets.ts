@@ -1,4 +1,3 @@
-import { SuiClient } from "@mysten/sui/client";
 import { AlphalendClient } from "../src/core/client.js";
 import { performance } from "perf_hooks";
 
@@ -24,18 +23,6 @@ const args = process.argv.slice(2);
 const useCache = args.includes("--use-cache");
 const showMarkets = args.includes("--show-markets");
 
-function getSuiClient(network: "mainnet" | "testnet" | "devnet" = "mainnet") {
-  const rpcUrls = {
-    mainnet: "https://fullnode.mainnet.sui.io/",
-    testnet: "https://fullnode.testnet.sui.io/",
-    devnet: "https://fullnode.devnet.sui.io/",
-  };
-
-  return new SuiClient({
-    url: rpcUrls[network],
-  });
-}
-
 async function testGetAllMarkets() {
   console.log("🔍 Performance Testing getAllMarkets() - 10 iterations\n");
   console.log("=".repeat(80) + "\n");
@@ -51,17 +38,12 @@ async function testGetAllMarkets() {
   console.log(`📡 Network: ${network}`);
   console.log(`🔄 Iterations: ${iterations}\n`);
 
-  // Step 1: Pre-initialize SuiClient
-  console.log("⏱️  [STEP 1] Creating SuiClient...");
-  const clientStart = performance.now();
-  const suiClient = getSuiClient(network);
-  const clientDuration = performance.now() - clientStart;
-  console.log(`✅ SuiClient created - ${clientDuration.toFixed(2)}ms\n`);
+  const clientDuration = 0;
 
   // Step 2: Pre-initialize AlphalendClient
   console.log("⏱️  [STEP 2] Creating AlphalendClient...");
   const alphaClientStart = performance.now();
-  const alphalendClient = new AlphalendClient(network, suiClient);
+  const alphalendClient = new AlphalendClient(network);
   const alphaClientDuration = performance.now() - alphaClientStart;
   console.log(
     `✅ AlphalendClient created - ${alphaClientDuration.toFixed(2)}ms\n`,

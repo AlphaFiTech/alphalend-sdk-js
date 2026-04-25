@@ -15,3 +15,4 @@ client_id
 settings.dat
 pending/
 .envrc
+scripts/snapshots/

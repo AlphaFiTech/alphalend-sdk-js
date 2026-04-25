@@ -1,4 +1,3 @@
-import { SuiClient } from "@mysten/sui/client";
 import { Blockchain } from "./blockchain.js";
 import { Position } from "./position.js";
 import { Market } from "./market.js";
@@ -8,14 +7,19 @@ import {
   UserPortfolio,
   CoinMetadata,
 } from "../core/types.js";
+import { Network } from "../constants/index.js";
 
 export class LendingProtocol {
   private blockchain: Blockchain;
   private coinMetadataMap: Map<string, CoinMetadata>;
 
-  constructor(network: string, client: SuiClient) {
-    this.blockchain = new Blockchain(network, client);
-    this.coinMetadataMap = new Map(); // Initialize with empty map
+  /**
+   * @param network   One of the supported Sui networks.
+   * @param graphqlUrl Optional GraphQL endpoint override.
+   */
+  constructor(network: Network, graphqlUrl?: string) {
+    this.blockchain = new Blockchain(network, graphqlUrl);
+    this.coinMetadataMap = new Map();
   }
 
   /**
@@ -26,13 +30,10 @@ export class LendingProtocol {
     this.coinMetadataMap = coinMetadataMap;
   }
 
-  // Protocol-level methods
   async getProtocolStats(markets: Market[]): Promise<ProtocolStats> {
     try {
       const marketData = await Promise.all(
-        markets.map((market) => {
-          return market.getMarketData();
-        }),
+        markets.map((market) => market.getMarketData()),
       );
 
       let totalSuppliedUsd = 0;
@@ -56,7 +57,6 @@ export class LendingProtocol {
     }
   }
 
-  // Market methods
   async getAllMarkets(): Promise<Market[]> {
     const markets = await this.blockchain.getAllMarkets();
     return markets.map((market) => new Market(market, this.coinMetadataMap));
@@ -76,8 +76,6 @@ export class LendingProtocol {
     const market = await this.getMarket(marketId);
     return await market.getMarketData();
   }
-
-  // Position methods
 
   async getPositionFromPositionCapId(positionCapId: string): Promise<Position> {
     const position =
@@ -105,7 +103,6 @@ export class LendingProtocol {
     const res = await Promise.all(
       positions.map((position) => position.getUserPortfolio(markets)),
     );
-
     return res;
   }
 
@@ -117,7 +114,6 @@ export class LendingProtocol {
     const res = await Promise.all(
       positions.map((position) => position.getUserPortfolio(markets)),
     );
-
     return res;
   }
 }

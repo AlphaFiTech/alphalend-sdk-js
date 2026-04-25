@@ -6,7 +6,6 @@
 
 import { SuiClient } from "@mysten/sui/client";
 import { AlphalendClient } from "../src";
-import { getPricesMap } from "../src/utils/helper";
 
 // All coin types that have price feed mappings
 const COIN_TYPES = {
@@ -33,7 +32,7 @@ describe("Oracle Price Validation", () => {
     suiClient = new SuiClient({
       url: "https://fullnode.mainnet.sui.io/",
     });
-    client = new AlphalendClient("mainnet", suiClient);
+    client = new AlphalendClient("mainnet");
   });
 
   test("Root cause analysis: Oracle price entries validation", async () => {

@@ -22,7 +22,7 @@ describe("LBTC Price Error Reproduction", () => {
     suiClient = new SuiClient({
       url: "https://fullnode.mainnet.sui.io/",
     });
-    client = new AlphalendClient("mainnet", suiClient);
+    client = new AlphalendClient("mainnet");
   });
 
   test("Step 1: Verify client can be created for LBTC testing", async () => {
