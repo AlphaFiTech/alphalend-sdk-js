@@ -60,9 +60,15 @@ through Sui's GraphQL endpoint.
 | `getUserPositionCapIds(suiClient, network, address)` | `getUserPositionCapIds(blockchain, address)`              |
 | `getUserPositionIds(suiClient, network, address)`    | `getUserPositionIds(blockchain, address)`                 |
 | `getAlphaReceipt(suiClient, address)`                | `getAlphaReceipt(blockchain, address)`                    |
+| `receipt.content.type` / `receipt.content.fields.*`  | `receipt.objectId` / `receipt.fields.*`                   |
 | `alc.getEstimatedGasBudget(suiClient, tx, address)`  | `alc.getEstimatedGasBudget(tx, address)`                  |
 | `network: string` (constructor arg)                  | `network: Network` (`"mainnet" \| "testnet" \| "devnet"`) |
 | `MarketType.priceIdentifier = { coinType, type }`    | `MarketType.priceIdentifier = { coinType }`               |
+
+`Receipt` is a breaking shape change in `2.x`: the SDK now returns receipts as
+`{ objectId, fields }` (GraphQL-flat), so any consumer reading
+`receipt.content.type` or `receipt.content.fields.*` must migrate to
+`receipt.objectId` and `receipt.fields.*`.
 
 ### Update Prices
 
