@@ -25,11 +25,7 @@ async function run() {
   const priceFeedUpdateData =
     await pythConnection.getPriceFeedsUpdateData(priceIDs);
 
-  const priceInfoObjectIds = await pythClient.updatePriceFeeds(
-    tx,
-    priceFeedUpdateData,
-    priceIDs,
-  );
+  await pythClient.updatePriceFeeds(tx, priceFeedUpdateData, priceIDs);
 
   await suiClient
     .signAndExecuteTransaction({
@@ -50,4 +46,7 @@ async function run() {
     });
 }
 
-// run();
+run().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

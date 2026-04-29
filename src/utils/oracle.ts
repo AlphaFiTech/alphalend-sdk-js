@@ -85,11 +85,13 @@ export function updatePriceTransaction(
   tx.moveCall({
     target: `${constants.ALPHAFI_LATEST_ORACLE_PACKAGE_ID}::oracle::update_price_from_pyth`,
     arguments: [
-      tx.object(Inputs.SharedObjectRef({
-        objectId: constants.ALPHAFI_ORACLE_OBJECT_ID,
-        initialSharedVersion: oracleInitialSharedVersion,
-        mutable: true,
-      })),
+      tx.object(
+        Inputs.SharedObjectRef({
+          objectId: constants.ALPHAFI_ORACLE_OBJECT_ID,
+          initialSharedVersion: oracleInitialSharedVersion,
+          mutable: true,
+        }),
+      ),
       // tx.object(constants.ALPHAFI_ORACLE_OBJECT_ID),
       tx.object(args.priceInfoObject),
       tx.object(constants.SUI_CLOCK_OBJECT_ID),

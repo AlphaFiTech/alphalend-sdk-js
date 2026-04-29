@@ -1,8 +1,8 @@
 /**
  * Blockchain data caching utility
  *
- * Caches expensive blockchain RPC calls (getDynamicFields, multiGetObjects)
- * since market data changes infrequently on-chain.
+ * Caches expensive blockchain GraphQL calls (dynamic field lookups and
+ * multi-object fetches) since market data changes infrequently on-chain.
  */
 
 interface CacheEntry<T> {
