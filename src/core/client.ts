@@ -318,7 +318,7 @@ export class AlphalendClient {
     return tx;
   }
   async getUserPositionCapIdFromAddress(address: string) {
-    return await getUserPositionCapId(this.client, this.network, address);
+    return await getUserPositionCapId(this.blockchain, address);
   }
   /**
    * True when the target market is dbUSDC (DEEPBOOK_STAKED<USDC>).

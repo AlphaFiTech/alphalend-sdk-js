@@ -17,7 +17,7 @@ const network =
  */
 async function addCollateral() {
   const { address, suiClient } = getExecStuff();
-  const alphalendClient = new AlphalendClient(network, suiClient);
+  const alphalendClient = new AlphalendClient(network);
 
   // Example parameters - should be adjusted for actual testing
   const tx = await alphalendClient.supply({
@@ -30,8 +30,8 @@ async function addCollateral() {
 
   if (tx) {
     tx.setGasBudget(2e8);
-    // await dryRunTransactionBlock(tx);
-    await executeTransactionBlock(tx);
+    await dryRunTransactionBlock(tx);
+    // await executeTransactionBlock(tx);
   } else {
     console.error("Failed to build supply transaction");
   }
@@ -42,7 +42,7 @@ async function addCollateral() {
  */
 async function removeCollateral() {
   const { address, suiClient } = getExecStuff();
-  const alphalendClient = new AlphalendClient(network, suiClient);
+  const alphalendClient = new AlphalendClient(network);
   const positionCapId =
     (await alphalendClient.getUserPositionCapIdFromAddress(address))!;
 
@@ -72,7 +72,7 @@ async function removeCollateral() {
  */
 async function borrow() {
   const { address, suiClient } = getExecStuff();
-  const alphalendClient = new AlphalendClient(network, suiClient);
+  const alphalendClient = new AlphalendClient(network);
   const positionCapId =
     (await alphalendClient.getUserPositionCapIdFromAddress(address))!;
   const tx = await alphalendClient.borrow({
@@ -102,14 +102,15 @@ async function borrow() {
  */
 async function repay() {
   const { address, suiClient } = getExecStuff();
-  const alphalendClient = new AlphalendClient(network, suiClient);
-
+  const alphalendClient = new AlphalendClient(network);
+  const positionCapId =
+    (await alphalendClient.getUserPositionCapIdFromAddress(address))!;
   const tx = await alphalendClient.repay({
     marketId: "2",
-    amount: 1000000n,
+    amount: 100n,
     coinType:
       "0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC",
-    positionCapId: "YOUR_POSITION_CAP_ID",
+    positionCapId,
     address,
   });
 
@@ -121,9 +122,20 @@ async function repay() {
     console.error("Failed to build repay transaction");
   }
 }
+//function to get portfolio from position cap id
+
+async function getPortfolioFromPositionCapId(positionCapId: string) {
+  const alphalendClient = new AlphalendClient(network);
+  const portfolio =
+    await alphalendClient.getUserPortfolioFromPositionCapId(positionCapId);
+  console.log("Portfolio:", portfolio); // Log the portfolio;
+}
 
 // Example usage: uncomment the function you want to test
 // addCollateral().catch(console.error);
-removeCollateral().catch(console.error);
+// removeCollateral().catch(console.error);
 // borrow().catch(console.error);
-// repay().catch(console.error);
+repay().catch(console.error);
+// getPortfolioFromPositionCapId(
+//   "0x13ebdfb2c93b744e897eb043c52921329056f2956aaf7f018af3d5a4781838a6",
+// ).catch(console.error);
