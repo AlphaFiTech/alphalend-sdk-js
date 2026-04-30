@@ -1,9 +1,13 @@
-import { CoinStruct, SuiClient } from "@mysten/sui/client";
+import { SuiClient } from "@mysten/sui/client";
 import {
   SuiPriceServiceConnection,
   SuiPythClient,
 } from "@pythnetwork/pyth-sui-js";
-import { getAlphafiConstants, getConstants } from "../constants/index.js";
+import {
+  getAlphafiConstants,
+  getConstants,
+  Network,
+} from "../constants/index.js";
 import {
   Transaction,
   TransactionObjectArgument,
@@ -46,6 +50,7 @@ import { Receipt } from "../utils/queryTypes.js";
 import { Constants } from "../constants/types.js";
 import { getUserPositionCapId } from "../models/position/functions.js";
 import { LendingProtocol } from "../models/lendingProtocol.js";
+import { Blockchain } from "../models/blockchain.js";
 import { Market } from "../models/market.js";
 import { SevenKGateway } from "./sevenKSwap.js";
 import { Decimal } from "decimal.js";
@@ -67,12 +72,12 @@ import { buildFlashRepayTransaction } from "./flashRepay.js";
  */
 
 export class AlphalendClient {
-  client: SuiClient;
   pythClient: SuiPythClient;
   pythConnection: SuiPriceServiceConnection;
-  network: string;
+  network: Network;
   constants: Constants;
   lendingProtocol: LendingProtocol;
+  blockchain: Blockchain;
   sevenKGateway: SevenKGateway;
   cetusSwap: CetusSwap;
 
@@ -89,21 +94,37 @@ export class AlphalendClient {
   private deepbookPackageIdPromise: Promise<void> | null = null;
 
   /**
-   * Creates a new AlphaLend client instance
+   * Creates a new AlphaLend client instance.
    *
-   * @param network Network to connect to ("mainnet", "testnet", or "devnet")
-   * @param client SuiClient instance for blockchain interaction
+   * The SDK connects to Sui via GraphQL. The only remaining JSON-RPC usage
+   * is an internal, minimal `SuiClient` passed to `@pythnetwork/pyth-sui-js`'s
+   * `SuiPythClient` constructor (that SDK has not yet migrated to GraphQL).
+   * It is never exposed on the public surface.
+   *
+   * @param network    One of the supported Sui networks.
+   * @param graphqlUrl Optional GraphQL endpoint override. If omitted, a default
+   *                   public endpoint for the given `network` is used.
+   * @param options    Optional prebuilt coin metadata map for offline testing.
    */
   constructor(
-    network: string,
-    client: SuiClient,
+    network: Network,
+    graphqlUrl?: string,
     options?: AlphalendClientOptions,
   ) {
     this.network = network;
-    this.client = client;
     this.constants = getConstants(network);
+
+    // Minimal internal SuiClient ONLY for SuiPythClient (upstream dep still
+    // uses JSON-RPC). All other reads go through Blockchain (GraphQL).
+    const pythFullnodeUrl =
+      network === "mainnet"
+        ? "https://fullnode.mainnet.sui.io/"
+        : network === "testnet"
+          ? "https://fullnode.testnet.sui.io/"
+          : "https://fullnode.devnet.sui.io/";
+    const pythSuiClient = new SuiClient({ url: pythFullnodeUrl });
     this.pythClient = new SuiPythClient(
-      client,
+      pythSuiClient,
       this.constants.PYTH_STATE_ID,
       this.constants.WORMHOLE_STATE_ID,
     );
@@ -112,7 +133,8 @@ export class AlphalendClient {
         ? "https://hermes.pyth.network"
         : "https://hermes-beta.pyth.network",
     );
-    this.lendingProtocol = new LendingProtocol(network, client);
+    this.lendingProtocol = new LendingProtocol(network, graphqlUrl);
+    this.blockchain = new Blockchain(network, graphqlUrl);
     this.sevenKGateway = new SevenKGateway();
     this.cetusSwap = new CetusSwap("mainnet");
 
@@ -166,6 +188,10 @@ export class AlphalendClient {
         this.pythConnection,
       );
     }
+    const oracleInitialSharedVersion =
+      await this.blockchain.getInitialSharedVersion(
+        this.constants.ALPHAFI_ORACLE_OBJECT_ID,
+      );
 
     for (const coinType of coinTypes) {
       // Use dynamic data from GraphQL API
@@ -177,6 +203,7 @@ export class AlphalendClient {
           coinType: coinType,
         },
         this.constants,
+        oracleInitialSharedVersion,
       );
     }
   }
@@ -196,6 +223,10 @@ export class AlphalendClient {
       this.pythClient,
       this.pythConnection,
     );
+    const oracleInitialSharedVersion =
+      await this.blockchain.getInitialSharedVersion(
+        this.constants.ALPHAFI_ORACLE_OBJECT_ID,
+      );
 
     for (const coinType of coinTypes) {
       const priceInfoObjectId = this.getPythPriceInfoObjectId(coinType);
@@ -206,6 +237,7 @@ export class AlphalendClient {
           coinType: coinType,
         },
         this.constants,
+        oracleInitialSharedVersion,
       );
     }
   }
@@ -259,8 +291,7 @@ export class AlphalendClient {
       });
     } else {
       const positionCapId = await getUserPositionCapId(
-        this.client,
-        this.network,
+        this.blockchain,
         params.address,
       );
       let positionCap: TransactionObjectArgument;
@@ -474,8 +505,7 @@ export class AlphalendClient {
       });
     } else {
       const positionCapId = await getUserPositionCapId(
-        this.client,
-        this.network,
+        this.blockchain,
         params.address,
       );
       let positionCap: TransactionObjectArgument;
@@ -600,8 +630,7 @@ export class AlphalendClient {
       });
     } else {
       const positionCapId = await getUserPositionCapId(
-        this.client,
-        this.network,
+        this.blockchain,
         params.address,
       );
       let positionCap: TransactionObjectArgument;
@@ -1033,8 +1062,7 @@ export class AlphalendClient {
     params.claimAndDepositAll = params.claimAndDepositAll || params.claimAll;
 
     const rewardInput = await getClaimRewardInput(
-      this.client,
-      this.network,
+      this.blockchain,
       params.address,
     );
 
@@ -1153,8 +1181,7 @@ export class AlphalendClient {
 
     // Get all claimable rewards
     const rewardInput = await getClaimRewardInput(
-      this.client,
-      this.network,
+      this.blockchain,
       params.address,
     );
 
@@ -1402,8 +1429,7 @@ export class AlphalendClient {
 
     // Get reward input data (markets and coin types)
     const rewardInput = await getClaimRewardInput(
-      this.client,
-      this.network,
+      this.blockchain,
       params.address,
     );
 
@@ -1796,86 +1822,7 @@ export class AlphalendClient {
     address: string,
     amount?: bigint,
   ): Promise<string | TransactionObjectArgument | undefined> {
-    if (
-      type === "0x2::sui::SUI" ||
-      type ===
-        "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI"
-    ) {
-      return tx.gas;
-    }
-    let coins: CoinStruct[] = [];
-    let currentCursor: string | null | undefined = null;
-
-    do {
-      const response = await this.client.getCoins({
-        owner: address,
-        coinType: type,
-        cursor: currentCursor,
-      });
-
-      coins = coins.concat(response.data);
-
-      // Check if there's a next page
-      if (response.hasNextPage && response.nextCursor) {
-        currentCursor = response.nextCursor;
-      } else {
-        // No more pages available
-        // console.log("No more receipts available.");
-        break;
-      }
-    } while (currentCursor !== null);
-
-    if (coins.length === 1) {
-      return tx.object(coins[0].coinObjectId);
-    }
-
-    if (coins.length === 0) {
-      return undefined;
-    }
-
-    // find one coin if it fits
-    if (amount) {
-      for (let i = 0; i < coins.length; i++) {
-        if (BigInt(coins[i].balance) >= amount) {
-          return tx.object(coins[i].coinObjectId);
-        }
-      }
-    }
-
-    //sort the coins by value in descending order
-    coins
-      .sort((a, b) => {
-        return Number(b.balance) - Number(a.balance);
-      })
-      .splice(200);
-
-    if (amount) {
-      const coinsToMerge: string[] = [];
-      let currentAmount = 0n;
-      for (let i = 0; i < coins.length; i++) {
-        coinsToMerge.push(coins[i].coinObjectId);
-        currentAmount += BigInt(coins[i].balance);
-        if (currentAmount >= amount) {
-          break;
-        }
-      }
-
-      // Convert first coin to TransactionObjectArgument to avoid duplicate reference
-      const firstCoin = tx.object(coinsToMerge[0]);
-      const [coin] = tx.splitCoins(firstCoin, [0]);
-      // Merge the remainder (firstCoin) and other coins into the split coin
-      const otherCoins = coinsToMerge.slice(1).map((id) => tx.object(id));
-      tx.mergeCoins(coin, [firstCoin, ...otherCoins]);
-      return coin;
-    }
-
-    // Convert first coin to TransactionObjectArgument to avoid duplicate reference
-    const firstCoin = tx.object(coins[0].coinObjectId);
-    const [coin] = tx.splitCoins(firstCoin, [0]);
-    // Merge the remainder (firstCoin) and other coins into the split coin
-    const otherCoins = coins.slice(1).map((c) => tx.object(c.coinObjectId));
-    tx.mergeCoins(coin, [firstCoin, ...otherCoins]);
-    return coin;
+    return this.blockchain.getCoinObject(tx, type, address, amount);
   }
 
   private async handlePromise(
@@ -1920,7 +1867,7 @@ export class AlphalendClient {
     address: string,
   ) {
     const constants = getAlphafiConstants();
-    const receipt: Receipt[] = await getAlphaReceipt(this.client, address);
+    const receipt: Receipt[] = await getAlphaReceipt(this.blockchain, address);
 
     if (receipt.length === 0) {
       const noneReceipt = tx.moveCall({
@@ -1962,23 +1909,10 @@ export class AlphalendClient {
   }
 
   async getEstimatedGasBudget(
-    suiClient: SuiClient,
     tx: Transaction,
     address: string,
   ): Promise<number | undefined> {
-    try {
-      const simResult = await suiClient.devInspectTransactionBlock({
-        transactionBlock: tx,
-        sender: address,
-      });
-      return (
-        Number(simResult.effects.gasUsed.computationCost) +
-        Number(simResult.effects.gasUsed.nonRefundableStorageFee) +
-        1e8
-      );
-    } catch (err) {
-      console.error(`Error estimating transaction gasBudget`, err);
-    }
+    return this.blockchain.getEstimatedGasBudget(tx, address);
   }
 
   async getSwapQuote(tokenIn: string, tokenOut: string, amountIn: string) {
@@ -2246,14 +2180,8 @@ export class AlphalendClient {
     if (!capId) return; // dev/test env has empty string — skip
 
     try {
-      const obj = await this.client.getObject({
-        id: capId,
-        options: { showContent: true },
-      });
-      const content = obj?.data?.content;
-      if (content?.dataType !== "moveObject") return;
-      const latestPkgId = (content.fields as Record<string, unknown>)
-        ?.package as string | undefined;
+      const obj = await this.blockchain.getObject<{ package?: string }>(capId);
+      const latestPkgId = obj?.contents?.package;
       if (latestPkgId) {
         this.deepbookPackageId = latestPkgId;
       }

@@ -6,7 +6,6 @@
 
 import { SuiClient } from "@mysten/sui/client";
 import { AlphalendClient } from "../src";
-import { getPricesMap } from "../src/utils/helper";
 
 // All coin types that have price feed mappings
 const COIN_TYPES = {
@@ -33,7 +32,7 @@ describe("Oracle Price Validation", () => {
     suiClient = new SuiClient({
       url: "https://fullnode.mainnet.sui.io/",
     });
-    client = new AlphalendClient("mainnet", suiClient);
+    client = new AlphalendClient("mainnet");
   });
 
   test("Root cause analysis: Oracle price entries validation", async () => {
@@ -55,6 +54,12 @@ describe("Oracle Price Validation", () => {
         });
 
         if (fieldObject.data?.content && "fields" in fieldObject.data.content) {
+          // The dynamic-field content here is an arbitrary Move struct
+          // whose shape varies per object kind. Probing it with `any`
+          // and optional-chaining is the test's intent — narrowing each
+          // level to a precise type would be more code with no real
+          // safety win in a test.
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const content = fieldObject.data.content as any;
 
           // Check if this is the Pyth oracle (contains price mappings)
@@ -105,7 +110,7 @@ describe("Oracle Price Validation", () => {
             }
           }
         }
-      } catch (error) {
+      } catch {
         continue;
       }
     }
@@ -220,6 +225,8 @@ describe("Oracle Price Validation", () => {
             fieldObject.data?.content &&
             "fields" in fieldObject.data.content
           ) {
+            // Same arbitrary-Move-struct probe as above.
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const content = fieldObject.data.content as any;
 
             let fieldName = "";
@@ -251,7 +258,7 @@ describe("Oracle Price Validation", () => {
               }
             }
           }
-        } catch (error) {
+        } catch {
           continue;
         }
       }

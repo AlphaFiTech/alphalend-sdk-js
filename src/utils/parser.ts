@@ -1,16 +1,16 @@
 import {
-  FlowLimiterQueryType,
-  MarketConfigQueryType,
-  MarketQueryType,
-  RewardDistributorQueryType,
-  RewardQueryType,
-  PositionQueryType,
-  PositionCapQueryType,
-  BorrowQueryType,
-  LpPositionCollateralQueryType,
-  LpPositionCollateralConfigQueryType,
-  UserRewardDistributorQueryType,
-  UserRewardQueryType,
+  MarketGqlFields,
+  MarketConfigGql,
+  FlowLimiterGql,
+  RewardDistributorGql,
+  RewardGql,
+  PositionGqlFields,
+  PositionCapGqlFields,
+  BorrowGql,
+  LpPositionCollateralGql,
+  LpPositionCollateralConfigGql,
+  UserRewardDistributorGql,
+  UserRewardGql,
 } from "./queryTypes.js";
 import {
   FlowLimiterType,
@@ -26,6 +26,18 @@ import {
   UserRewardDistributorType,
   UserRewardType,
 } from "./parsedTypes.js";
+
+/**
+ * Decode a base64-encoded `vector<u8>` into a `number[]`. The Sui GraphQL
+ * `json` output encodes Move `vector<u8>` as a base64 string, whereas the
+ * legacy JSON-RPC output returned a plain number array. This helper
+ * transparently handles both.
+ */
+function decodeU8Vec(input: string | number[]): number[] {
+  if (Array.isArray(input)) return input.map(Number);
+  const buf = Buffer.from(input, "base64");
+  return Array.from(buf);
+}
 
 /**
  * Normalizes a Sui coin type string by ensuring all hex addresses have the `0x` prefix.
@@ -46,339 +58,268 @@ export function normalizeCoinType(coinType: string): string {
     .join("<");
 }
 
-/**
- * Parse a FlowLimiterQueryType from the raw query type
- */
-export function parseFlowLimiter(flowLimiter: {
-  fields: FlowLimiterQueryType;
-  type: string;
-}): FlowLimiterType {
-  const fields = flowLimiter.fields;
+// ---------------------------------------------------------------------------
+// Market parsers
+// ---------------------------------------------------------------------------
+
+export function parseFlowLimiter(flowLimiter: FlowLimiterGql): FlowLimiterType {
   return {
-    flowDelta: fields.flow_delta.fields.value,
-    lastUpdate: fields.last_update,
-    maxRate: fields.max_rate,
-    windowDuration: fields.window_duration,
+    flowDelta: flowLimiter.flow_delta.value,
+    lastUpdate: flowLimiter.last_update,
+    maxRate: flowLimiter.max_rate,
+    windowDuration: flowLimiter.window_duration,
   };
 }
 
-/**
- * Parse a RewardQueryType from the raw query type
- */
-export function parseReward(reward: RewardQueryType | null): RewardType | null {
+export function parseReward(reward: RewardGql | null): RewardType | null {
   if (!reward) return null;
-  reward.fields.coin_type.fields.name = normalizeCoinType(
-    reward.fields.coin_type.fields.name,
-  );
+  const coinType = normalizeCoinType(reward.coin_type);
 
   return {
-    id: reward.fields.id.id,
-    coinType: reward.fields.coin_type.fields.name,
-    distributorId: reward.fields.distributor_id,
-    isAutoCompounded: reward.fields.is_auto_compounded,
-    autoCompoundMarketId: reward.fields.auto_compound_market_id,
-    totalRewards: reward.fields.total_rewards,
-    startTime: reward.fields.start_time,
-    endTime: reward.fields.end_time,
+    id: reward.id,
+    coinType,
+    distributorId: reward.distributor_id,
+    isAutoCompounded: reward.is_auto_compounded,
+    autoCompoundMarketId: reward.auto_compound_market_id,
+    totalRewards: reward.total_rewards,
+    startTime: reward.start_time,
+    endTime: reward.end_time,
     distributedRewards: (
-      BigInt(reward.fields.distributed_rewards.fields.value) / BigInt(1e18)
+      BigInt(reward.distributed_rewards.value) / BigInt(1e18)
     ).toString(),
-    cummulativeRewardsPerShare:
-      reward.fields.cummulative_rewards_per_share.fields.value,
+    cummulativeRewardsPerShare: reward.cummulative_rewards_per_share.value,
   };
 }
 
-/**
- * Parse a RewardDistributorQueryType from the raw query type
- */
-export function parseRewardDistributor(distributor: {
-  fields: RewardDistributorQueryType;
-  type: string;
-}): RewardDistributorType {
-  const fields = distributor.fields;
+export function parseRewardDistributor(
+  distributor: RewardDistributorGql,
+): RewardDistributorType {
   return {
-    id: fields.id.id,
-    lastUpdated: fields.last_updated,
-    marketId: fields.market_id,
-    rewards: fields.rewards.map(parseReward),
-    totalXtokens: fields.total_xtokens,
+    id: distributor.id,
+    lastUpdated: distributor.last_updated,
+    marketId: distributor.market_id,
+    rewards: distributor.rewards.map(parseReward),
+    totalXtokens: distributor.total_xtokens,
   };
 }
 
-/**
- * Parse a MarketConfigQueryType from the raw query type
- */
-export function parseMarketConfig(config: {
-  fields: MarketConfigQueryType;
-  type: string;
-}): MarketConfigType {
-  const fields = config.fields;
+export function parseMarketConfig(config: MarketConfigGql): MarketConfigType {
   return {
-    active: fields.active,
-    borrowFeeBps: fields.borrow_fee_bps,
-    borrowWeight: fields.borrow_weight.fields.value,
-    borrowLimit: fields.borrow_limit,
-    borrowLimitPercentage: fields.borrow_limit_percentage,
-    cascadeMarketId: fields.cascade_market_id,
-    closeFactorPercentage: fields.close_factor_percentage,
-    collateralTypes: fields.collateral_types.map(
-      (typeQuery) => typeQuery.fields.name,
-    ),
-    depositFeeBps: fields.deposit_fee_bps,
-    depositLimit: fields.deposit_limit,
+    active: config.active,
+    borrowFeeBps: config.borrow_fee_bps,
+    borrowWeight: config.borrow_weight.value,
+    borrowLimit: config.borrow_limit,
+    borrowLimitPercentage: config.borrow_limit_percentage,
+    cascadeMarketId: config.cascade_market_id,
+    closeFactorPercentage: config.close_factor_percentage,
+    collateralTypes: config.collateral_types.map(normalizeCoinType),
+    depositFeeBps: config.deposit_fee_bps,
+    depositLimit: config.deposit_limit,
     extensionFields: {
-      id: fields.extension_fields.fields.id.id,
-      size: fields.extension_fields.fields.size,
+      id: config.extension_fields.id,
+      size: config.extension_fields.size,
     },
-    interestRateKinks: fields.interest_rate_kinks,
-    interestRates: fields.interest_rates,
-    isNative: fields.is_native,
-    isolated: fields.isolated,
-    lastUpdated: fields.last_updated,
-    liquidationBonusBps: fields.liquidation_bonus_bps,
-    liquidationFeeBps: fields.liquidation_fee_bps,
-    liquidationThreshold: fields.liquidation_threshold,
-    protocolFeeShareBps: fields.protocol_fee_share_bps,
-    protocolSpreadFeeShareBps: fields.protocol_spread_fee_share_bps,
-    safeCollateralRatio: fields.safe_collateral_ratio,
-    spreadFeeBps: fields.spread_fee_bps,
-    timeLock: fields.time_lock,
-    withdrawFeeBps: fields.withdraw_fee_bps,
+    interestRateKinks: decodeU8Vec(config.interest_rate_kinks),
+    interestRates: config.interest_rates as unknown as number[],
+    isNative: config.is_native,
+    isolated: config.isolated,
+    lastUpdated: config.last_updated,
+    liquidationBonusBps: config.liquidation_bonus_bps,
+    liquidationFeeBps: config.liquidation_fee_bps,
+    liquidationThreshold: config.liquidation_threshold,
+    protocolFeeShareBps: config.protocol_fee_share_bps,
+    protocolSpreadFeeShareBps: config.protocol_spread_fee_share_bps,
+    safeCollateralRatio: config.safe_collateral_ratio,
+    spreadFeeBps: config.spread_fee_bps,
+    timeLock: config.time_lock,
+    withdrawFeeBps: config.withdraw_fee_bps,
   };
 }
 
 /**
- * Parse a MarketQueryType from the raw query type
+ * Parse a market's flattened GraphQL fields into the domain `MarketType`.
+ *
+ * @param fields Flat Move struct fields (from `value.json` / `contents.json`).
+ * @param dynamicFieldAddress The address of the `Field<u64, Market>` wrapper
+ *        object that holds this market under `MARKETS_TABLE_ID`. Distinct
+ *        from `fields.id` (which is the inner `Market` struct's UID).
  */
-export function parseMarket(marketRaw: MarketQueryType): MarketType {
-  if (!marketRaw.content || marketRaw.content.dataType !== "moveObject") {
-    throw new Error(`Market ${marketRaw.objectId} data not found or invalid`);
+export function parseMarket(
+  fields: MarketGqlFields,
+  dynamicFieldAddress: string | undefined,
+): MarketType {
+  if (!fields) {
+    throw new Error(`Market data not found or invalid`);
   }
 
-  const marketFields = marketRaw.content.fields.value.fields;
-  marketFields.coin_type.fields.name = normalizeCoinType(
-    marketFields.coin_type.fields.name,
-  );
-  marketFields.price_identifier.fields.coin_type.fields.name =
-    normalizeCoinType(
-      marketFields.price_identifier.fields.coin_type.fields.name,
-    );
+  const coinType = normalizeCoinType(fields.coin_type);
+  const priceCoinType = normalizeCoinType(fields.price_identifier.coin_type);
 
   return {
-    marketDynamicFieldId: marketRaw.content.fields.id.id,
-    balanceHolding: marketFields.balance_holding,
+    marketDynamicFieldId: dynamicFieldAddress ?? fields.id,
+    balanceHolding: fields.balance_holding,
     borrowRewardDistributor: parseRewardDistributor(
-      marketFields.borrow_reward_distributor,
+      fields.borrow_reward_distributor,
     ),
-    borrowedAmount: marketFields.borrowed_amount,
-    coinType: marketFields.coin_type.fields.name,
-    compoundedInterest: marketFields.compounded_interest.fields.value,
-    config: parseMarketConfig(marketFields.config),
+    borrowedAmount: fields.borrowed_amount,
+    coinType,
+    compoundedInterest: fields.compounded_interest.value,
+    config: parseMarketConfig(fields.config),
     decimalDigit: (
-      BigInt(marketFields.decimal_digit.fields.value) / BigInt(1e18)
+      BigInt(fields.decimal_digit.value) / BigInt(1e18)
     ).toString(),
-    depositFlowLimiter: parseFlowLimiter(marketFields.deposit_flow_limiter),
+    depositFlowLimiter: parseFlowLimiter(fields.deposit_flow_limiter),
     depositRewardDistributor: parseRewardDistributor(
-      marketFields.deposit_reward_distributor,
+      fields.deposit_reward_distributor,
     ),
-    id: marketFields.id.id,
-    lastAutoCompound: marketFields.last_auto_compound,
-    lastUpdate: marketFields.last_update,
-    marketId: marketFields.market_id,
-    outflowLimiter: parseFlowLimiter(marketFields.outflow_limiter),
+    id: fields.id,
+    lastAutoCompound: fields.last_auto_compound,
+    lastUpdate: fields.last_update,
+    marketId: fields.market_id,
+    outflowLimiter: parseFlowLimiter(fields.outflow_limiter),
     priceIdentifier: {
-      coinType: marketFields.price_identifier.fields.coin_type.fields.name,
-      type: marketFields.price_identifier.type,
+      coinType: priceCoinType,
     },
-    unclaimedSpreadFee: marketFields.unclaimed_spread_fee,
-    unclaimedSpreadFeeProtocol: marketFields.unclaimed_spread_fee_protocol,
-    writeoffAmount: marketFields.writeoff_amount,
-    xtokenRatio: marketFields.xtoken_ratio.fields.value,
-    xtokenSupply: marketFields.xtoken_supply,
-    xtokenType: marketFields.xtoken_type.fields.name,
+    unclaimedSpreadFee: fields.unclaimed_spread_fee,
+    unclaimedSpreadFeeProtocol: fields.unclaimed_spread_fee_protocol,
+    writeoffAmount: fields.writeoff_amount,
+    xtokenRatio: fields.xtoken_ratio.value,
+    xtokenSupply: fields.xtoken_supply,
+    xtokenType: fields.xtoken_type,
   };
 }
 
-// ------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Position cap parser
+// ---------------------------------------------------------------------------
 
 /**
- * Parse a PositionCapQueryType from the raw query type
+ * Parse a position cap's flattened GraphQL fields into the domain
+ * `PositionCapType`. PositionCap is a top-level owned object, so its
+ * Sui object address is identical to the inner `id: UID` field — the
+ * caller does not need to (and should not) pass it separately.
  */
 export function parsePositionCap(
-  positionCapRaw: PositionCapQueryType,
+  fields: PositionCapGqlFields,
 ): PositionCapType {
-  if (
-    !positionCapRaw.content ||
-    positionCapRaw.content.dataType !== "moveObject"
-  ) {
-    throw new Error(
-      `PositionCap ${positionCapRaw.objectId} data not found or invalid`,
-    );
+  if (!fields) {
+    throw new Error(`PositionCap data not found or invalid`);
   }
-
-  const fields = positionCapRaw.content.fields;
-
   return {
-    id: fields.id.id,
+    id: fields.id,
     positionId: fields.position_id,
     clientAddress: fields.client_address,
   };
 }
 
-/**
- * Parse a BorrowQueryType from the raw query type
- */
-export function parseBorrow(borrow: {
-  fields: BorrowQueryType;
-  type: string;
-}): BorrowType {
-  const fields = borrow.fields;
-  fields.coin_type.fields.name = normalizeCoinType(
-    fields.coin_type.fields.name,
-  );
+// ---------------------------------------------------------------------------
+// Position parsers
+// ---------------------------------------------------------------------------
 
+export function parseBorrow(borrow: BorrowGql): BorrowType {
   return {
-    amount: fields.amount,
-    borrowCompoundedInterest: fields.borrow_compounded_interest.fields.value,
-    borrowTime: fields.borrow_time,
-    coinType: fields.coin_type.fields.name,
-    marketId: fields.market_id,
-    rewardDistributorIndex: fields.reward_distributor_index,
+    amount: borrow.amount,
+    borrowCompoundedInterest: borrow.borrow_compounded_interest.value,
+    borrowTime: borrow.borrow_time,
+    coinType: normalizeCoinType(borrow.coin_type),
+    marketId: borrow.market_id,
+    rewardDistributorIndex: borrow.reward_distributor_index,
   };
 }
 
-/**
- * Parse a LpPositionCollateralConfigQueryType from the raw query type
- */
-export function parseLpPositionCollateralConfig(config: {
-  fields: LpPositionCollateralConfigQueryType;
-  type: string;
-}): LpPositionCollateralConfigType {
-  const fields = config.fields;
-
+export function parseLpPositionCollateralConfig(
+  config: LpPositionCollateralConfigGql,
+): LpPositionCollateralConfigType {
   return {
-    closeFactorPercentage: fields.close_factor_percentage,
-    liquidationBonus: fields.liquidation_bonus,
-    liquidationFee: fields.liquidation_fee,
-    liquidationThreshold: fields.liquidation_threshold,
-    safeCollateralRatio: fields.safe_collateral_ratio,
+    closeFactorPercentage: config.close_factor_percentage,
+    liquidationBonus: config.liquidation_bonus,
+    liquidationFee: config.liquidation_fee,
+    liquidationThreshold: config.liquidation_threshold,
+    safeCollateralRatio: config.safe_collateral_ratio,
   };
 }
 
-/**
- * Parse a LpPositionCollateralQueryType from the raw query type
- */
 export function parseLpPositionCollateral(
-  lpCollateral: {
-    fields: LpPositionCollateralQueryType;
-    type: string;
-  } | null,
+  lpCollateral: LpPositionCollateralGql | null,
 ): LpPositionCollateralType | null {
   if (!lpCollateral) return null;
-
-  const fields = lpCollateral.fields;
-
   return {
-    config: parseLpPositionCollateralConfig(fields.config),
-    lastUpdated: fields.last_updated,
-    liquidity: fields.liquidity,
-    liquidationValue: fields.liquidation_value.fields.value,
-    lpPositionId: fields.lp_position_id,
-    lpType: fields.lp_type,
-    poolId: fields.pool_id,
-    safeUsdValue: fields.safe_usd_value.fields.value,
-    usdValue: fields.usd_value.fields.value,
+    config: parseLpPositionCollateralConfig(lpCollateral.config),
+    lastUpdated: lpCollateral.last_updated,
+    liquidity: lpCollateral.liquidity,
+    liquidationValue: lpCollateral.liquidation_value.value,
+    lpPositionId: lpCollateral.lp_position_id,
+    lpType: lpCollateral.lp_type,
+    poolId: lpCollateral.pool_id,
+    safeUsdValue: lpCollateral.safe_usd_value.value,
+    usdValue: lpCollateral.usd_value.value,
   };
 }
 
-/**
- * Parse a UserRewardQueryType from the raw query type
- */
-export function parseUserReward(userReward: {
-  fields: UserRewardQueryType | null;
-  type: string;
-}): UserRewardType | null {
-  if (!userReward.fields) return null;
-
-  const fields = userReward.fields;
-  fields.coin_type.fields.name = normalizeCoinType(
-    fields.coin_type.fields.name,
-  );
-
+export function parseUserReward(
+  userReward: UserRewardGql | null,
+): UserRewardType | null {
+  if (!userReward) return null;
   return {
-    rewardId: fields.reward_id,
-    coinType: fields.coin_type.fields.name,
+    rewardId: userReward.reward_id,
+    coinType: normalizeCoinType(userReward.coin_type),
     earnedRewards: (
-      BigInt(fields.earned_rewards.fields.value) / BigInt(1e18)
+      BigInt(userReward.earned_rewards.value) / BigInt(1e18)
     ).toString(),
-    cummulativeRewardsPerShare:
-      fields.cummulative_rewards_per_share.fields.value,
-    isAutoCompounded: fields.is_auto_compounded,
-    autoCompoundMarketId: fields.auto_compound_market_id,
+    cummulativeRewardsPerShare: userReward.cummulative_rewards_per_share.value,
+    isAutoCompounded: userReward.is_auto_compounded,
+    autoCompoundMarketId: userReward.auto_compound_market_id,
   };
 }
 
-/**
- * Parse a UserRewardDistributorQueryType from the raw query type
- */
-export function parseUserRewardDistributor(userRewardDistributor: {
-  fields: UserRewardDistributorQueryType;
-  type: string;
-}): UserRewardDistributorType {
-  const fields = userRewardDistributor.fields;
-
+export function parseUserRewardDistributor(
+  userRewardDistributor: UserRewardDistributorGql,
+): UserRewardDistributorType {
   return {
-    rewardDistributorId: fields.reward_distributor_id,
-    marketId: fields.market_id,
-    share: fields.share,
-    rewards: fields.rewards.map(parseUserReward),
-    lastUpdated: fields.last_updated,
-    isDeposit: fields.is_deposit,
+    rewardDistributorId: userRewardDistributor.reward_distributor_id,
+    marketId: userRewardDistributor.market_id,
+    share: userRewardDistributor.share,
+    rewards: userRewardDistributor.rewards.map(parseUserReward),
+    lastUpdated: userRewardDistributor.last_updated,
+    isDeposit: userRewardDistributor.is_deposit,
   };
 }
 
-/**
- * Parse a PositionQueryType from the raw query type
- */
-export function parsePosition(positionRaw: PositionQueryType): PositionType {
-  if (!positionRaw.content || positionRaw.content.dataType !== "moveObject") {
-    throw new Error(
-      `Position ${positionRaw.objectId} data not found or invalid`,
-    );
+export function parsePosition(
+  fields: PositionGqlFields,
+  dynamicFieldAddress: string | undefined,
+): PositionType {
+  if (!fields) {
+    throw new Error(`Position data not found or invalid`);
   }
 
-  const fields = positionRaw.content.fields.value.fields;
-
-  // Parse collaterals
-  const collaterals = fields.collaterals.fields.contents.map(
-    (content: { fields: { key: string; value: string } }) => ({
-      key: content.fields.key,
-      value: content.fields.value,
-    }),
-  );
+  const collaterals = (fields.collaterals?.contents ?? []).map((c) => ({
+    key: c.key,
+    value: c.value,
+  }));
 
   return {
-    positionDynamicFieldId: positionRaw.objectId,
+    positionDynamicFieldId: dynamicFieldAddress ?? fields.id,
     additionalPermissibleBorrowUsd:
-      fields.additional_permissible_borrow_usd.fields.value,
+      fields.additional_permissible_borrow_usd.value,
     collaterals,
-    id: fields.id.id,
+    id: fields.id,
     isIsolatedBorrowed: fields.is_isolated_borrowed,
     isPositionHealthy: fields.is_position_healthy,
     isPositionLiquidatable: fields.is_position_liquidatable,
     lastRefreshed: fields.last_refreshed,
-    liquidationValue: fields.liquidation_value.fields.value,
+    liquidationValue: fields.liquidation_value.value,
     loans: fields.loans.map(parseBorrow),
     lpCollaterals: parseLpPositionCollateral(fields.lp_collaterals),
     partnerId: fields.partner_id,
     rewardDistributors: fields.reward_distributors.map(
       parseUserRewardDistributor,
     ),
-    safeCollateralUsd: fields.safe_collateral_usd.fields.value,
-    spotTotalLoanUsd: fields.spot_total_loan_usd.fields.value,
-    totalCollateralUsd: fields.total_collateral_usd.fields.value,
-    totalLoanUsd: fields.total_loan_usd.fields.value,
-    weightedSpotTotalLoanUsd: fields.weighted_spot_total_loan_usd.fields.value,
-    weightedTotalLoanUsd: fields.weighted_total_loan_usd.fields.value,
+    safeCollateralUsd: fields.safe_collateral_usd.value,
+    spotTotalLoanUsd: fields.spot_total_loan_usd.value,
+    totalCollateralUsd: fields.total_collateral_usd.value,
+    totalLoanUsd: fields.total_loan_usd.value,
+    weightedSpotTotalLoanUsd: fields.weighted_spot_total_loan_usd.value,
+    weightedTotalLoanUsd: fields.weighted_total_loan_usd.value,
   };
 }

@@ -2,7 +2,8 @@
 
 # AlphaLend JavaScript SDK
 
-AlphaLend SDK for JavaScript/TypeScript applications built on the Sui blockchain. This SDK provides a comprehensive interface to interact with the AlphaLend lending protocol.
+AlphaLend SDK for JavaScript/TypeScript applications built on the Sui blockchain.
+This SDK provides a comprehensive interface to interact with the AlphaLend lending protocol.
 
 ## Features
 
@@ -28,17 +29,46 @@ npm install @alphafi/alphalend-sdk
 ### Creating an instance of the AlphaLend client
 
 ```typescript
-import { SuiClient } from "@mysten/sui/client";
-import { AlphalendClient } from "alphalend-sdk";
+import { AlphalendClient, Network } from "alphalend-sdk";
 
-// Create a SUI client
-const suiClient = new SuiClient({
-  url: "https://rpc.mainnet.sui.io",
-});
+// Create AlphaLend client instance (uses default public GraphQL endpoint)
+const alphalendClient = new AlphalendClient("mainnet");
 
-// Create AlphaLend client instance
-const alphalendClient = new AlphalendClient("mainnet", suiClient);
+// Or pass a custom GraphQL endpoint (e.g. a private proxy)
+const alphalendClientCustom = new AlphalendClient(
+  "mainnet",
+  "https://my-graphql-proxy.example.com/graphql",
+);
 ```
+
+The constructor's `network` argument is typed as
+`Network = "mainnet" | "testnet" | "devnet"`. `Network` is exported from
+the SDK so TypeScript callers can plumb the literal type through their own
+config without falling back to `string`.
+
+### Migrating from 1.x to 2.x
+
+`2.0.0` drops the JSON-RPC `SuiClient` from the public API. All reads now go
+through Sui's GraphQL endpoint.
+
+| Before (1.x)                                         | After (2.x)                                               |
+| ---------------------------------------------------- | --------------------------------------------------------- |
+| `new AlphalendClient("mainnet", suiClient)`          | `new AlphalendClient("mainnet")`                          |
+| `new AlphalendClient("mainnet", suiClient, options)` | `new AlphalendClient("mainnet", undefined, options)`      |
+| `new LendingProtocol("mainnet", suiClient)`          | `new LendingProtocol("mainnet")`                          |
+| `getUserPositionCapId(suiClient, network, address)`  | `getUserPositionCapId(blockchain, address)`               |
+| `getUserPositionCapIds(suiClient, network, address)` | `getUserPositionCapIds(blockchain, address)`              |
+| `getUserPositionIds(suiClient, network, address)`    | `getUserPositionIds(blockchain, address)`                 |
+| `getAlphaReceipt(suiClient, address)`                | `getAlphaReceipt(blockchain, address)`                    |
+| `receipt.content.type` / `receipt.content.fields.*`  | `receipt.objectId` / `receipt.fields.*`                   |
+| `alc.getEstimatedGasBudget(suiClient, tx, address)`  | `alc.getEstimatedGasBudget(tx, address)`                  |
+| `network: string` (constructor arg)                  | `network: Network` (`"mainnet" \| "testnet" \| "devnet"`) |
+| `MarketType.priceIdentifier = { coinType, type }`    | `MarketType.priceIdentifier = { coinType }`               |
+
+`Receipt` is a breaking shape change in `2.x`: the SDK now returns receipts as
+`{ objectId, fields }` (GraphQL-flat), so any consumer reading
+`receipt.content.type` or `receipt.content.fields.*` must migrate to
+`receipt.objectId` and `receipt.fields.*`.
 
 ### Update Prices
 
