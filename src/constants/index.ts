@@ -5,7 +5,12 @@ import { Constants } from "./types.js";
 
 export type { Constants };
 
-export const getConstants = (network: string) => {
+/**
+ * Supported Sui networks for the AlphaLend SDK.
+ */
+export type Network = "mainnet" | "testnet" | "devnet";
+
+export const getConstants = (network: Network) => {
   if (network === "mainnet") return prodConstants;
   else return devConstants;
 };

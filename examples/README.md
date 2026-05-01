@@ -38,6 +38,7 @@ USER_ADDRESS=0x... node getUserPortfolioPublished.mjs
 ```
 
 Or use the npm script:
+
 ```bash
 cd examples
 npm install
@@ -45,6 +46,7 @@ USER_ADDRESS=0x... npm run test:published
 ```
 
 **Environment Variables:**
+
 - `USER_ADDRESS`: The Sui address to fetch portfolio for (required)
 - `NETWORK`: Network to use (`mainnet`, `testnet`, or `devnet`) - defaults to `mainnet`
 
@@ -63,6 +65,7 @@ USER_ADDRESS=0x... node getUserPortfolioLocal.mjs
 ```
 
 Or use the npm script:
+
 ```bash
 cd examples
 USER_ADDRESS=0x... npm run test:local
@@ -78,12 +81,14 @@ node diagnoseInit.mjs
 ```
 
 Or use the npm script:
+
 ```bash
 cd examples
 npm run diagnose
 ```
 
 This diagnostic script will:
+
 - Test GraphQL API connectivity
 - Fetch and validate coin metadata
 - Identify any missing or null data
@@ -91,12 +96,12 @@ This diagnostic script will:
 
 ## File Overview
 
-| File | Purpose | SDK Source |
-|------|---------|------------|
-| `getUserPortfolioPublished.mjs` | Test with published npm package | `@alphafi/alphalend-sdk` (v1.1.20) |
-| `getUserPortfolioLocal.mjs` | Test with local build | `../dist/esm/index.js` |
-| `diagnoseInit.mjs` | Diagnostic tool for API/initialization issues | N/A (direct API test) |
-| `package.json` | Dependencies for published SDK testing | Specifies v1.1.20 |
+| File                            | Purpose                                       | SDK Source                         |
+| ------------------------------- | --------------------------------------------- | ---------------------------------- |
+| `getUserPortfolioPublished.mjs` | Test with published npm package               | `@alphafi/alphalend-sdk` (v1.1.20) |
+| `getUserPortfolioLocal.mjs`     | Test with local build                         | `../dist/esm/index.js`             |
+| `diagnoseInit.mjs`              | Diagnostic tool for API/initialization issues | N/A (direct API test)              |
+| `package.json`                  | Dependencies for published SDK testing        | Specifies v1.1.20                  |
 
 ## Common Issues
 
@@ -105,9 +110,11 @@ This diagnostic script will:
 This error occurs when the GraphQL API returns incomplete or null coin information during initialization.
 
 **Root Cause:**
-The SDK fetches coin metadata (decimals, price feed IDs, symbols) from the AlphaLend GraphQL API during initialization. If the API response contains null values for required fields, the initialization fails.
+The SDK fetches coin metadata (decimals, price feed IDs, symbols) from the AlphaLend GraphQL API during
+initialization. If the API response contains null values for required fields, the initialization fails.
 
 **Solution:**
+
 1. Run the diagnostic script: `node diagnoseInit.mjs`
 2. Check network connectivity to `https://api.alphalend.xyz/public/graphql`
 3. Ensure all markets have complete coin metadata in the API
@@ -118,6 +125,7 @@ The SDK fetches coin metadata (decimals, price feed IDs, symbols) from the Alpha
 This error occurs when the GraphQL API request fails entirely.
 
 **Solution:**
+
 1. Run the diagnostic: `node diagnoseInit.mjs`
 2. Verify you have an internet connection
 3. Check for firewall or proxy issues blocking the request
@@ -128,6 +136,7 @@ This error occurs when the GraphQL API request fails entirely.
 You haven't installed the dependencies in the examples directory.
 
 **Solution:**
+
 ```bash
 cd examples
 npm install
@@ -138,6 +147,7 @@ npm install
 The local SDK hasn't been built yet.
 
 **Solution:**
+
 ```bash
 cd ..
 npm run build

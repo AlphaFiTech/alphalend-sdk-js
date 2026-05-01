@@ -5,9 +5,9 @@ import { getExecStuff } from "./testRun";
 import { SuiTransactionBlockResponse } from "@mysten/sui/client";
 
 cron.schedule("* * * * *", async () => {
-  const { suiClient, keypair, address } = getExecStuff();
-  const alphalendClient = new AlphalendClient("mainnet", suiClient);
-  let tx = new Transaction();
+  const { suiClient, keypair } = getExecStuff();
+  const alphalendClient = new AlphalendClient("mainnet");
+  const tx = new Transaction();
   await alphalendClient.updatePrices(tx, [
     "0x2::sui::SUI",
     "0xdeeb7a4662eec9f2f3def03fb937a663dddaa2e215b8078a284d026b7946c270::deep::DEEP",
@@ -29,7 +29,6 @@ cron.schedule("* * * * *", async () => {
     .then((res: SuiTransactionBlockResponse) => {
       console.log("Transaction executed successfully");
       console.log(res.digest);
-      res.transaction?.data.gasData.payment
     })
     .catch((error) => {
       console.error(error);

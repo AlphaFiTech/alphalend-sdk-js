@@ -1,121 +1,56 @@
 /**
  * Position Functions Module
  *
- * This module provides utility functions for working with user positions in the AlphaLend protocol:
- * - Fetching position capability IDs and position IDs
- * - Retrieving user position data
- * - Managing position objects and their relationships
+ * This module provides utility functions for working with user positions in
+ * the AlphaLend protocol. All functions go through the `Blockchain` (GraphQL)
+ * primitive — no JSON-RPC / `SuiClient` is used.
  */
-import { SuiClient } from "@mysten/sui/client";
-import { getConstants } from "../../constants/index.js";
-import {
-  PositionCapQueryType,
-  PositionQueryType,
-} from "../../utils/queryTypes.js";
+import { Blockchain } from "../blockchain.js";
+import { PositionType } from "../../utils/parsedTypes.js";
 
 /**
- * Fetches a user's position capability ID
+ * Fetches a user's position capability ID (first cap returned by GraphQL).
  *
- * @param suiClient - SuiClient instance
- * @param network - Network name ("mainnet", "testnet", or "devnet")
+ * @param blockchain - Blockchain client
  * @param userAddress - Address of the user
- * @returns Promise resolving to the position capability ID or undefined if not found
+ * @returns Promise resolving to the position capability ID or undefined if
+ *          the user owns no PositionCap.
  */
 export const getUserPositionCapId = async (
-  suiClient: SuiClient,
-  network: string,
+  blockchain: Blockchain,
   userAddress: string,
 ): Promise<string | undefined> => {
   try {
-    const constants = getConstants(network);
-    // Fetch owned objects for the user
-    const response = await suiClient.getOwnedObjects({
-      owner: userAddress,
-      options: {
-        showContent: true, // Include object content to access fields
-      },
-      filter: {
-        StructType: constants.POSITION_CAP_TYPE,
-      },
-    });
-
-    if (!response || !response.data || response.data.length === 0) {
-      return undefined;
-    }
-    return response.data[0].data?.objectId;
+    const caps = await blockchain.getPositionCapsForUser(userAddress);
+    return caps[0]?.id;
   } catch (error) {
     console.error("Error fetching user positionCap ID:", error);
   }
 };
 
 /**
- * Fetches the creation timestamp (ms since epoch) for a position cap object
- * by querying the first transaction that touched it (ascending order = creation tx first).
- */
-const getPositionCapCreatedAt = async (
-  suiClient: SuiClient,
-  positionCapId: string,
-): Promise<number> => {
-  try {
-    const result = await suiClient.queryTransactionBlocks({
-      filter: {
-        ChangedObject: positionCapId,
-      },
-      options: {
-        showEffects: true,
-      },
-      limit: 1,
-      order: "ascending",
-    });
-    const ts = result.data[0]?.timestampMs;
-    return ts ? parseInt(ts, 10) : 0;
-  } catch (e) {
-    console.error(`[getPositionCapCreatedAt] error for ${positionCapId}:`, e);
-    return 0;
-  }
-};
-
-/**
  * Fetches a user's position capability IDs sorted by creation time (oldest first).
  *
- * @param suiClient - SuiClient instance
- * @param network - Network name ("mainnet", "testnet", or "devnet")
+ * @param blockchain - Blockchain client
  * @param userAddress - Address of the user
- * @returns Promise resolving to the position capability IDs or undefined if not found
+ * @returns Promise resolving to sorted position capability IDs or undefined
+ *          on error. Returns empty array if the user has no caps.
  */
 export const getUserPositionCapIds = async (
-  suiClient: SuiClient,
-  network: string,
+  blockchain: Blockchain,
   userAddress: string,
 ): Promise<(string | undefined)[] | undefined> => {
   try {
-    const constants = getConstants(network);
-    const response = await suiClient.getOwnedObjects({
-      owner: userAddress,
-      options: { showContent: true },
-      filter: { StructType: constants.POSITION_CAP_TYPE },
-    });
+    const caps = await blockchain.getPositionCapsForUser(userAddress);
+    if (caps.length === 0) return undefined;
 
-    if (!response?.data?.length) {
-      return undefined;
-    }
-
-    const objectIds = response.data
-      .map((obj) => obj.data?.objectId)
-      .filter((id): id is string => !!id);
-
-    // Fetch creation timestamps in parallel
-    const timestamps = await Promise.all(
-      objectIds.map((id) => getPositionCapCreatedAt(suiClient, id)),
+    const withTimestamps = await Promise.all(
+      caps.map(async (cap) => {
+        const tx = await blockchain.getEarliestTxForObject(cap.id);
+        return { id: cap.id, ts: tx?.timestampMs ?? 0 };
+      }),
     );
-
-    // Sort by creation timestamp ascending (oldest first, newest last)
-    const withTimestamps = objectIds.map((id, i) => ({
-      id,
-      ts: timestamps[i],
-    }));
     withTimestamps.sort((a, b) => a.ts - b.ts);
-
     return withTimestamps.map((entry) => entry.id);
   } catch (error) {
     console.error("Error fetching user positionCap IDs:", error);
@@ -123,114 +58,59 @@ export const getUserPositionCapIds = async (
 };
 
 /**
- * Fetches a user's position ID from their position capability
+ * Fetches a user's position ID (first cap's position_id).
  *
- * @param suiClient - SuiClient instance
- * @param network - Network name ("mainnet", "testnet", or "devnet")
+ * @param blockchain - Blockchain client
  * @param userAddress - Address of the user
- * @returns Promise resolving to the position ID or undefined if not found
+ * @returns Promise resolving to the position ID or undefined if not found.
  */
 export const getUserPositionId = async (
-  suiClient: SuiClient,
-  network: string,
+  blockchain: Blockchain,
   userAddress: string,
 ): Promise<string | undefined> => {
   try {
-    const constants = getConstants(network);
-    // Fetch owned objects for the user
-    const response = await suiClient.getOwnedObjects({
-      owner: userAddress,
-      options: {
-        showContent: true, // Include object content to access fields
-      },
-      filter: {
-        StructType: constants.POSITION_CAP_TYPE,
-      },
-    });
-
-    if (!response || !response.data || response.data.length === 0) {
-      return undefined;
-    }
-
-    // Find the first PositionCap object and extract the positionCap ID
-    const positionCapObject = response.data[0]
-      .data as unknown as PositionCapQueryType;
-
-    return positionCapObject.content.fields.position_id;
+    const caps = await blockchain.getPositionCapsForUser(userAddress);
+    return caps[0]?.positionId;
   } catch (error) {
     console.error("Error fetching user position ID:", error);
   }
 };
 
 /**
- * Fetches a user's position IDs from their position capabilities
+ * Fetches all of a user's position IDs from their position capabilities.
  *
- * @param suiClient - SuiClient instance
- * @param network - Network name ("mainnet", "testnet", or "devnet")
+ * @param blockchain - Blockchain client
  * @param userAddress - Address of the user
- * @returns Promise resolving to the position IDs, empty array if not found, undefined if error
+ * @returns Promise resolving to the position IDs, empty array if not found,
+ *          undefined on error.
  */
 export const getUserPositionIds = async (
-  suiClient: SuiClient,
-  network: string,
+  blockchain: Blockchain,
   userAddress: string,
 ): Promise<string[] | undefined> => {
   try {
-    const constants = getConstants(network);
-    // Fetch owned objects for the user
-    const response = await suiClient.getOwnedObjects({
-      owner: userAddress,
-      options: {
-        showContent: true, // Include object content to access fields
-      },
-      filter: {
-        StructType: constants.POSITION_CAP_TYPE,
-      },
-    });
-
-    if (!response || !response.data || response.data.length === 0) {
-      return [];
-    }
-
-    // Find all the PositionCap objects and extract the positionCap IDs
-    const positionCapObjects = response.data.map(
-      (obj) => obj.data as unknown as PositionCapQueryType,
-    );
-
-    const ids = positionCapObjects.map((obj) => obj.content.fields.position_id);
-    return ids;
+    const caps = await blockchain.getPositionCapsForUser(userAddress);
+    return caps.map((c) => c.positionId);
   } catch (error) {
     console.error("Error fetching user position IDs:", error);
   }
 };
 
 /**
- * Retrieves the complete position object for a user
+ * Retrieves the complete position object for a user.
  *
- * @param suiClient - SuiClient instance
- * @param network - Network name ("mainnet", "testnet", or "devnet")
+ * @param blockchain - Blockchain client
  * @param userAddress - Address of the user
- * @returns Promise resolving to the position object or undefined if not found
+ * @returns Promise resolving to the parsed position or undefined if not found.
  */
 export const getUserPosition = async (
-  suiClient: SuiClient,
-  network: string,
+  blockchain: Blockchain,
   userAddress: string,
-): Promise<PositionQueryType | undefined> => {
-  const constants = getConstants(network);
-  const positionId = await getUserPositionId(suiClient, network, userAddress);
+): Promise<PositionType | undefined> => {
+  const positionId = await getUserPositionId(blockchain, userAddress);
   if (!positionId) {
     console.error("No position ID found");
     return undefined;
   }
-
-  const response = await suiClient.getDynamicFieldObject({
-    parentId: constants.POSITION_TABLE_ID,
-    name: {
-      type: "0x2::object::ID",
-      value: positionId,
-    },
-  });
-
-  return response.data as unknown as PositionQueryType;
+  return blockchain.getPosition(positionId);
 };

@@ -5,16 +5,17 @@ import {
   TransactionObjectArgument,
 } from "@mysten/sui/transactions";
 
-// Dynamically import from CJS version which has working exports
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let sdkPromise: Promise<any> | null = null;
+// Dynamically import from CJS version which has working exports.
+// Typed via the package's main module so call sites stay type-safe.
+type SevenKSdk = typeof import("@7kprotocol/sdk-ts");
+let sdkPromise: Promise<SevenKSdk> | null = null;
 
-function getSDK() {
+function getSDK(): Promise<SevenKSdk> {
   if (!sdkPromise) {
     // Use CJS export path which has all exports working
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore - Dynamic import path not resolvable in CJS config but works at runtime
-    sdkPromise = import("@7kprotocol/sdk-ts/cjs");
+    sdkPromise = import("@7kprotocol/sdk-ts/cjs") as Promise<SevenKSdk>;
   }
   return sdkPromise;
 }

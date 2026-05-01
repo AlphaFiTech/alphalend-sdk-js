@@ -1,153 +1,54 @@
-interface NumberQueryType {
-  fields: {
-    value: string;
-  };
-  type: string;
+// ---------------------------------------------------------------------------
+// GraphQL-flat Move struct shapes
+// ---------------------------------------------------------------------------
+//
+// These interfaces mirror what `asMoveObject.contents.json` (or
+// `dynamicField.value.json`) returns from Sui GraphQL: all Move struct
+// `fields` wrappers are stripped and only the inner flat object is kept.
+// Type discriminators like `type: string` are also absent.
+//
+// Old JSON-RPC shapes: `X.fields.Y`  →  GraphQL shape: `X.Y`.
+
+// ---- Shared primitives ----------------------------------------------------
+
+export interface NumberGql {
+  value: string;
 }
 
-interface TypeNameQueryType {
-  fields: {
-    name: string;
-  };
-  type: string;
-}
+// ---- Markets --------------------------------------------------------------
+// Note: Sui's `0x1::type_name::TypeName` flattens to a plain type string in
+// the GraphQL `json` output (no inner `name` wrapper), e.g. `"0x2::sui::SUI"`
+// or `"0x..::market::XToken<0x2::sui::SUI>"`. Hence all `*_type` / `coin_type`
+// fields below are typed as plain `string`.
 
-// Market Query Types
-
-export interface MarketQueryType {
-  objectId: string;
-  version: string;
-  digest: string;
-  content: {
-    disassembled: {
-      [key: string]: unknown;
-    };
-    dataType: string;
-    type: string;
-    fields: {
-      id: {
-        id: string;
-      };
-      name: string;
-      value: {
-        fields: {
-          balance_holding: string;
-          borrow_reward_distributor: {
-            fields: RewardDistributorQueryType;
-            type: string;
-          };
-          borrowed_amount: string;
-          coin_type: TypeNameQueryType;
-          compounded_interest: NumberQueryType;
-          config: {
-            fields: MarketConfigQueryType;
-            type: string;
-          };
-          decimal_digit: NumberQueryType;
-          deposit_flow_limiter: {
-            fields: FlowLimiterQueryType;
-            type: string;
-          };
-          deposit_reward_distributor: {
-            fields: RewardDistributorQueryType;
-            type: string;
-          };
-          id: {
-            id: string;
-          };
-          last_auto_compound: string;
-          last_update: string;
-          market_id: string;
-          outflow_limiter: {
-            fields: FlowLimiterQueryType;
-            type: string;
-          };
-          price_identifier: {
-            fields: {
-              coin_type: TypeNameQueryType;
-            };
-            type: string;
-          };
-          unclaimed_spread_fee: string;
-          unclaimed_spread_fee_protocol: string;
-          writeoff_amount: string;
-          xtoken_ratio: NumberQueryType;
-          xtoken_supply: string;
-          xtoken_type: TypeNameQueryType;
-        };
-        type: string;
-      };
-    };
-  };
-}
-
-export interface RewardDistributorQueryType {
-  id: {
-    id: string;
-  };
-  last_updated: string;
-  market_id: string;
-  rewards: (RewardQueryType | null)[];
-  total_xtokens: string;
-}
-
-export interface RewardQueryType {
-  type: string;
-  fields: {
-    id: {
-      id: string;
-    };
-    coin_type: TypeNameQueryType;
-    distributor_id: string;
-    is_auto_compounded: boolean;
-    auto_compound_market_id: string;
-    total_rewards: string;
-    start_time: string;
-    end_time: string;
-    distributed_rewards: {
-      fields: {
-        value: string;
-      };
-      type: string;
-    };
-    cummulative_rewards_per_share: {
-      fields: {
-        value: string;
-      };
-      type: string;
-    };
-  };
-}
-
-export interface FlowLimiterQueryType {
-  flow_delta: NumberQueryType;
+export interface FlowLimiterGql {
+  flow_delta: NumberGql;
   last_update: string;
   max_rate: string;
   window_duration: string;
 }
 
-export interface MarketConfigQueryType {
+export interface MarketConfigGql {
   active: boolean;
   borrow_fee_bps: string;
-  borrow_weight: NumberQueryType;
+  borrow_weight: NumberGql;
   borrow_limit: string;
   borrow_limit_percentage: string;
   cascade_market_id: string;
   close_factor_percentage: number;
-  collateral_types: TypeNameQueryType[];
+  collateral_types: string[];
   deposit_fee_bps: string;
   deposit_limit: string;
   extension_fields: {
-    fields: {
-      id: {
-        id: string;
-      };
-      size: string;
-    };
-    type: string;
+    id: string;
+    size: string;
   };
-  interest_rate_kinks: number[];
-  interest_rates: number[];
+  /**
+   * GraphQL encodes `vector<u8>` as a base64 string in the flattened `json`
+   * output. The parser decodes it into the canonical `number[]` form.
+   */
+  interest_rate_kinks: string | number[];
+  interest_rates: string[] | number[];
   is_native: boolean;
   isolated: boolean;
   last_updated: string;
@@ -162,105 +63,95 @@ export interface MarketConfigQueryType {
   withdraw_fee_bps: string;
 }
 
-// Position Query Types
-
-export interface PositionCapQueryType {
-  objectId: string;
-  version: string;
-  digest: string;
-  content: {
-    dataType: string;
-    type: string;
-    fields: {
-      id: {
-        id: string;
-      };
-      position_id: string;
-      client_address: string;
-    };
-  };
+export interface RewardGql {
+  id: string;
+  coin_type: string;
+  distributor_id: string;
+  is_auto_compounded: boolean;
+  auto_compound_market_id: string;
+  total_rewards: string;
+  start_time: string;
+  end_time: string;
+  distributed_rewards: NumberGql;
+  cummulative_rewards_per_share: NumberGql;
 }
 
-export interface PositionQueryType {
-  objectId: string;
-  version: string;
-  digest: string;
-  content: {
-    disassembled: {
-      [key: string]: unknown;
-    };
-    dataType: string;
-    type: string;
-    fields: {
-      id: {
-        id: string;
-      };
-      name: string;
-      value: {
-        fields: {
-          additional_permissible_borrow_usd: NumberQueryType;
-          collaterals: {
-            fields: {
-              contents: {
-                fields: {
-                  key: string;
-                  value: string;
-                };
-                type: string;
-              }[];
-            };
-            type: string;
-          };
-          id: {
-            id: string;
-          };
-          is_isolated_borrowed: boolean;
-          is_position_healthy: boolean;
-          is_position_liquidatable: boolean;
-          last_refreshed: string;
-          liquidation_value: NumberQueryType;
-          loans: {
-            fields: BorrowQueryType;
-            type: string;
-          }[];
-          lp_collaterals: {
-            fields: LpPositionCollateralQueryType;
-            type: string;
-          } | null;
-          partner_id: string | null;
-          reward_distributors: {
-            fields: UserRewardDistributorQueryType;
-            type: string;
-          }[];
-          safe_collateral_usd: NumberQueryType;
-          spot_total_loan_usd: NumberQueryType;
-          total_collateral_usd: NumberQueryType;
-          total_loan_usd: NumberQueryType;
-          weighted_spot_total_loan_usd: NumberQueryType;
-          weighted_total_loan_usd: NumberQueryType;
-        };
-        type: string;
-      };
-    };
-  };
-}
-
-export interface LpPositionCollateralQueryType {
-  config: {
-    fields: LpPositionCollateralConfigQueryType;
-    type: string;
-  };
+export interface RewardDistributorGql {
+  id: string;
   last_updated: string;
-  liquidity: string;
-  liquidation_value: NumberQueryType;
-  lp_position_id: string;
-  lp_type: number;
-  pool_id: string;
-  safe_usd_value: NumberQueryType;
-  usd_value: NumberQueryType;
+  market_id: string;
+  rewards: (RewardGql | null)[];
+  total_xtokens: string;
 }
 
-export interface LpPositionCollateralConfigQueryType {
+export interface MarketGqlFields {
+  id: string;
+  balance_holding: string;
+  borrow_reward_distributor: RewardDistributorGql;
+  borrowed_amount: string;
+  coin_type: string;
+  compounded_interest: NumberGql;
+  config: MarketConfigGql;
+  decimal_digit: NumberGql;
+  deposit_flow_limiter: FlowLimiterGql;
+  deposit_reward_distributor: RewardDistributorGql;
+  last_auto_compound: string;
+  last_update: string;
+  market_id: string;
+  outflow_limiter: FlowLimiterGql;
+  // The GraphQL flattened shape does NOT carry the outer wrapper's `type`
+  // discriminator (`...::oracle::PriceIdentifier`); only the inner fields
+  // are present. The parser reconstructs `type` from `Constants` when
+  // building the domain `PriceIdentifier`.
+  price_identifier: {
+    coin_type: string;
+  };
+  unclaimed_spread_fee: string;
+  unclaimed_spread_fee_protocol: string;
+  writeoff_amount: string;
+  xtoken_ratio: NumberGql;
+  xtoken_supply: string;
+  xtoken_type: string;
+}
+
+// ---- Position cap ---------------------------------------------------------
+
+export interface PositionCapGqlFields {
+  id: string;
+  position_id: string;
+  client_address: string;
+}
+
+// ---- Position -------------------------------------------------------------
+
+export interface BorrowGql {
+  amount: string;
+  borrow_compounded_interest: NumberGql;
+  borrow_time: string;
+  coin_type: string;
+  market_id: string;
+  reward_distributor_index: string;
+}
+
+export interface UserRewardGql {
+  reward_id: string;
+  coin_type: string;
+  earned_rewards: NumberGql;
+  cummulative_rewards_per_share: NumberGql;
+  is_auto_compounded: boolean;
+  auto_compound_market_id: string;
+}
+
+export interface UserRewardDistributorGql {
+  reward_distributor_id: string;
+  market_id: string;
+  share: string;
+  rewards: (UserRewardGql | null)[];
+  last_updated: string;
+  is_deposit: boolean;
+}
+
+export interface LpPositionCollateralConfigGql {
   close_factor_percentage: number;
   liquidation_bonus: string;
   liquidation_fee: string;
@@ -268,97 +159,78 @@ export interface LpPositionCollateralConfigQueryType {
   safe_collateral_ratio: number;
 }
 
-export interface BorrowQueryType {
-  amount: string;
-  borrow_compounded_interest: NumberQueryType;
-  borrow_time: string;
-  coin_type: TypeNameQueryType;
-  market_id: string;
-  reward_distributor_index: string;
-}
-
-export interface UserRewardDistributorQueryType {
-  reward_distributor_id: string;
-  market_id: string;
-  share: string;
-  rewards: {
-    fields: UserRewardQueryType | null;
-    type: string;
-  }[];
+export interface LpPositionCollateralGql {
+  config: LpPositionCollateralConfigGql;
   last_updated: string;
-  is_deposit: boolean;
+  liquidity: string;
+  liquidation_value: NumberGql;
+  lp_position_id: string;
+  lp_type: number;
+  pool_id: string;
+  safe_usd_value: NumberGql;
+  usd_value: NumberGql;
 }
 
-export interface UserRewardQueryType {
-  reward_id: string;
-  coin_type: TypeNameQueryType;
-  earned_rewards: NumberQueryType;
-  cummulative_rewards_per_share: NumberQueryType;
-  is_auto_compounded: boolean;
-  auto_compound_market_id: string;
+export interface PositionGqlFields {
+  id: string;
+  additional_permissible_borrow_usd: NumberGql;
+  collaterals: {
+    contents: { key: string; value: string }[];
+  };
+  is_isolated_borrowed: boolean;
+  is_position_healthy: boolean;
+  is_position_liquidatable: boolean;
+  last_refreshed: string;
+  liquidation_value: NumberGql;
+  loans: BorrowGql[];
+  lp_collaterals: LpPositionCollateralGql | null;
+  partner_id: string | null;
+  reward_distributors: UserRewardDistributorGql[];
+  safe_collateral_usd: NumberGql;
+  spot_total_loan_usd: NumberGql;
+  total_collateral_usd: NumberGql;
+  total_loan_usd: NumberGql;
+  weighted_spot_total_loan_usd: NumberGql;
+  weighted_total_loan_usd: NumberGql;
 }
 
+// ---- Alpha pool receipt (GraphQL flat) ------------------------------------
+
+export interface ReceiptGql {
+  id: string;
+  image_url: string;
+  last_acc_reward_per_xtoken: {
+    contents: {
+      value: string;
+      key: { name: string };
+    }[];
+  };
+  locked_balance?: {
+    head: string;
+    id: string;
+    size: string;
+    tail: string;
+  };
+  name: string;
+  owner: string;
+  pending_rewards: {
+    contents: {
+      key: { name: string };
+      value: string;
+    }[];
+  };
+  pool_id: string;
+  xTokenBalance: string;
+  unlocked_xtokens?: string;
+}
+
+/**
+ * Result type for `getAlphaReceipt`. The migration exposes each receipt as
+ * `{ objectId, fields }` so existing callers (which only read
+ * `receipt.objectId` and sometimes pass `receipt.content.type`) keep working
+ * with a shallow rewrite.
+ */
 export interface Receipt {
   objectId: string;
-  version: string;
-  digest: string;
-  content: {
-    dataType: string;
-    type: string;
-    hasPublicTransfer: boolean;
-    fields: {
-      id: { id: string };
-      image_url: string;
-      last_acc_reward_per_xtoken: {
-        type: string;
-        fields: {
-          contents: {
-            type: string;
-            fields: {
-              value: string;
-              key: {
-                type: string;
-                fields: {
-                  name: string;
-                };
-              };
-            };
-          }[];
-        };
-      };
-      locked_balance:
-        | {
-            type: string;
-            fields: {
-              head: string;
-              id: { id: string };
-              size: string;
-              tail: string;
-            };
-          }
-        | undefined;
-      name: string;
-      owner: string;
-      pending_rewards: {
-        type: string;
-        fields: {
-          contents: {
-            fields: {
-              key: {
-                type: string;
-                fields: {
-                  name: string;
-                };
-              };
-              value: string;
-            };
-            type: string;
-          }[];
-        };
-      };
-      pool_id: string;
-      xTokenBalance: string;
-      unlocked_xtokens: string | undefined;
-    };
-  };
+  fields: ReceiptGql;
 }

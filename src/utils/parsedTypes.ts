@@ -16,7 +16,6 @@ export interface MarketType {
   outflowLimiter: FlowLimiterType;
   priceIdentifier: {
     coinType: string;
-    type: string;
   };
   unclaimedSpreadFee: string;
   unclaimedSpreadFeeProtocol: string;
