@@ -626,7 +626,7 @@ export class Blockchain {
         simulateTransaction(
           transaction: $tx
           checksEnabled: true
-          doGasSelection: false
+          doGasSelection: true
         ) {
           effects {
             status
@@ -655,20 +655,28 @@ export class Blockchain {
     tx: Transaction,
     sender: string,
   ): Promise<number | undefined> {
+    const fallbackBudget = 500_000_000;
     try {
       const simResult = await this.simulateTransaction(tx, sender);
       const gasSummary = simResult?.effects?.gasEffects?.gasSummary;
       if (!gasSummary) {
-        throw new Error("Simulation returned no gas summary");
+        console.warn(
+          "Simulation returned no gas summary; using fallback gas budget",
+        );
+        return fallbackBudget;
       }
-      return (
+      const estimatedBudget =
         Number(gasSummary.computationCost) +
         Number(gasSummary.nonRefundableStorageFee) +
-        1e8
-      );
+        fallbackBudget;
+      if (!Number.isFinite(estimatedBudget) || estimatedBudget <= 0) {
+        console.warn("Simulation returned invalid gas summary; using fallback");
+        return fallbackBudget;
+      }
+      return estimatedBudget;
     } catch (err) {
       console.error(`Error estimating transaction gasBudget`, err);
-      return undefined;
+      return fallbackBudget;
     }
   }
 
