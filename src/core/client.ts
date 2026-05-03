@@ -1221,7 +1221,7 @@ export class AlphalendClient {
     const usdValuesByCoinType = new Map<string, number | null>();
     for (const data of rewardInput) {
       for (let coinType of data.coinTypes) {
-        coinType = "0x" + coinType;
+        coinType = normalizeCoinType(coinType);
         if (!usdValuesByCoinType.has(coinType)) {
           const usdValue = calculateUsdValue(coinType);
           usdValuesByCoinType.set(coinType, usdValue);
@@ -1236,7 +1236,7 @@ export class AlphalendClient {
     // Claim rewards (skip small rewards if claimSmallRewardsToWallet is false)
     for (const data of rewardInput) {
       for (let coinType of data.coinTypes) {
-        coinType = "0x" + coinType;
+        coinType = normalizeCoinType(coinType);
 
         const usdValue = usdValuesByCoinType.get(coinType);
 
