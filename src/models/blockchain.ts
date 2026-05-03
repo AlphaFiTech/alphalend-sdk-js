@@ -655,7 +655,7 @@ export class Blockchain {
     tx: Transaction,
     sender: string,
   ): Promise<number | undefined> {
-    const fallbackBudget = 100_000_000;
+    const fallbackBudget = 500_000_000;
     try {
       const simResult = await this.simulateTransaction(tx, sender);
       const gasSummary = simResult?.effects?.gasEffects?.gasSummary;
