@@ -41,8 +41,6 @@ async function testGetAllMarkets() {
   console.log(`📡 Network: ${network}`);
   console.log(`🔄 Iterations: ${iterations}\n`);
 
-  const clientDuration = 0;
-
   // Step 2: Pre-initialize AlphalendClient
   console.log("⏱️  [STEP 2] Creating AlphalendClient...");
   const alphaClientStart = performance.now();
@@ -136,9 +134,8 @@ async function testGetAllMarkets() {
   );
 
   // Initialization overhead
-  const totalInitTime = clientDuration + alphaClientDuration + metadataDuration;
+  const totalInitTime = alphaClientDuration + metadataDuration;
   console.log("\n🔧 Initialization Overhead:");
-  console.log(`   SuiClient:       ${clientDuration.toFixed(2)}ms`);
   console.log(`   AlphalendClient: ${alphaClientDuration.toFixed(2)}ms`);
   console.log(`   Coin Metadata:   ${metadataDuration.toFixed(2)}ms`);
   console.log(`   Total Init:      ${totalInitTime.toFixed(2)}ms`);
@@ -164,7 +161,7 @@ async function testGetAllMarkets() {
       console.log(
         `   Coin Type:         ${market.coinType.substring(0, 50)}...`,
       );
-      console.log(`   Symbol:            ${market.symbol || "N/A"}`);
+      console.log(`   Coin Type:            ${market.coinType || "N/A"}`);
       console.log(`   Total Supply:      ${market.totalSupply}`);
       console.log(`   Total Borrow:      ${market.totalBorrow}`);
       console.log(

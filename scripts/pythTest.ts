@@ -2,15 +2,15 @@ import {
   SuiPriceServiceConnection,
   SuiPythClient,
 } from "@pythnetwork/pyth-sui-js";
-import { getConstants } from "../src/constants";
-import { getExecStuff } from "./testRun";
 import { Transaction } from "@mysten/sui/transactions";
+import { getConstants } from "../src/constants/index.js";
+import { getExecStuff, signAndExecuteTransaction } from "./suiClient.js";
 
 async function run() {
-  const { suiClient, keypair } = getExecStuff();
+  const { suiClient } = getExecStuff();
   const constants = getConstants("mainnet");
   const pythClient = new SuiPythClient(
-    suiClient,
+    suiClient as ConstructorParameters<typeof SuiPythClient>[0],
     constants.PYTH_STATE_ID,
     constants.WORMHOLE_STATE_ID,
   );
@@ -27,23 +27,8 @@ async function run() {
 
   await pythClient.updatePriceFeeds(tx, priceFeedUpdateData, priceIDs);
 
-  await suiClient
-    .signAndExecuteTransaction({
-      signer: keypair,
-      transaction: tx,
-      requestType: "WaitForLocalExecution",
-      options: {
-        showEffects: true,
-        showBalanceChanges: true,
-        showObjectChanges: true,
-      },
-    })
-    .then((res) => {
-      console.log(JSON.stringify(res, null, 2));
-    })
-    .catch((error) => {
-      console.error(error);
-    });
+  const res = await signAndExecuteTransaction(tx);
+  console.log(JSON.stringify(res, null, 2));
 }
 
 run().catch((err) => {

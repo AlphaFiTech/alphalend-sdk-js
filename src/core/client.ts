@@ -1,4 +1,4 @@
-import { SuiClient } from "@mysten/sui/client";
+import { SuiJsonRpcClient } from "@mysten/sui/jsonRpc";
 import {
   SuiPriceServiceConnection,
   SuiPythClient,
@@ -122,9 +122,13 @@ export class AlphalendClient {
         : network === "testnet"
           ? "https://fullnode.testnet.sui.io/"
           : "https://fullnode.devnet.sui.io/";
-    const pythSuiClient = new SuiClient({ url: pythFullnodeUrl });
+    const pythSuiClient = new SuiJsonRpcClient({
+      url: pythFullnodeUrl,
+      network,
+    });
     this.pythClient = new SuiPythClient(
-      pythSuiClient,
+      // @pythnetwork/pyth-sui-js still types the provider as legacy SuiClient
+      pythSuiClient as ConstructorParameters<typeof SuiPythClient>[0],
       this.constants.PYTH_STATE_ID,
       this.constants.WORMHOLE_STATE_ID,
     );

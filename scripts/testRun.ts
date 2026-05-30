@@ -1,76 +1,26 @@
-import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
 import { Transaction } from "@mysten/sui/transactions";
-import { fromB64 } from "@mysten/sui/utils";
 import { getConstants } from "../src/constants/index.js";
 import { AlphalendClient } from "../src/core/client.js";
-import * as dotenv from "dotenv";
 import { setPrices } from "../src/utils/helper.js";
-import { SuiClient } from "@mysten/sui/client";
 import {
   SuiPriceServiceConnection,
   SuiPythClient,
 } from "@pythnetwork/pyth-sui-js";
+import {
+  dryRunTransactionBlock,
+  getExecStuff,
+  getSuiClient,
+  signAndExecuteTransaction,
+} from "./suiClient.js";
 
-dotenv.config();
-
-export function getSuiClient(network?: string) {
-  const mainnetUrl = "https://fullnode.mainnet.sui.io/";
-  const testnetUrl = "https://fullnode.testnet.sui.io/";
-  const devnetUrl = "https://fullnode.devnet.sui.io/";
-
-  let rpcUrl = devnetUrl;
-  if (network === "mainnet") {
-    rpcUrl = mainnetUrl;
-  } else if (network === "testnet") {
-    rpcUrl = testnetUrl;
-  }
-
-  return new SuiClient({
-    url: rpcUrl,
-  });
-}
+export {
+  dryRunTransactionBlock,
+  getExecStuff,
+  getSuiClient,
+  getSuiJsonRpcClient,
+} from "./suiClient.js";
 
 const constants = getConstants("testnet");
-
-export function getExecStuff() {
-  if (!process.env.PK_B64) {
-    throw new Error("env var PK_B64 not configured");
-  }
-
-  const b64PrivateKey = process.env.PK_B64 as string;
-  const keypair = Ed25519Keypair.fromSecretKey(fromB64(b64PrivateKey).slice(1));
-  const address = `${keypair.getPublicKey().toSuiAddress()}`;
-
-  if (!process.env.NETWORK) {
-    throw new Error("env var NETWORK not configured");
-  }
-
-  const suiClient = getSuiClient(process.env.NETWORK);
-
-  return { address, keypair, suiClient };
-}
-
-export async function dryRunTransactionBlock(txb: Transaction) {
-  const { suiClient, address } = getExecStuff();
-  txb.setSender(address);
-  txb.setGasBudget(1e9);
-  try {
-    const serializedTxb = await txb.build({ client: suiClient });
-    await suiClient
-      .dryRunTransactionBlock({
-        transactionBlock: serializedTxb,
-      })
-      .then((res) => {
-        console.log(JSON.stringify(res, null, 2));
-        // console.log(res.effects.status, res.balanceChanges);
-      })
-      .catch((error) => {
-        console.error(error);
-      });
-  } catch (e) {
-    console.log(e);
-  }
-}
 
 async function updatePricesCaller() {
   const alphalendClient = new AlphalendClient("mainnet");
@@ -157,7 +107,7 @@ async function borrow() {
 }
 
 export async function executeTransactionBlock() {
-  const { keypair, suiClient } = getExecStuff();
+  getExecStuff();
   const tx = new Transaction();
   const constants = getConstants("testnet");
   // removeAlternate(tx);
@@ -168,17 +118,7 @@ export async function executeTransactionBlock() {
   //   "testnet",
   // );
   // await setPrice(tx, "0x2::sui::SUI", 10, 10, 1);
-  await suiClient
-    .signAndExecuteTransaction({
-      signer: keypair,
-      transaction: tx,
-      requestType: "WaitForLocalExecution",
-      options: {
-        showEffects: true,
-        showBalanceChanges: true,
-        showObjectChanges: true,
-      },
-    })
+  await signAndExecuteTransaction(tx)
     .then((res) => {
       console.log(JSON.stringify(res, null, 2));
     })
@@ -255,7 +195,7 @@ async function run() {
   // const tx = new Transaction();
   const constants = getConstants("mainnet");
   const pythClient = new SuiPythClient(
-    suiClient,
+    suiClient as ConstructorParameters<typeof SuiPythClient>[0],
     constants.PYTH_STATE_ID,
     constants.WORMHOLE_STATE_ID,
   );
