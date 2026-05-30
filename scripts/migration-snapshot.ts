@@ -57,7 +57,7 @@
  *
  * NOTE: this version of the script targets the POST-MIGRATION (GraphQL)
  * API. The pre-migration variant is identical except the constructor and
- * a few helper functions take a `SuiClient` rather than a `Blockchain`.
+ * a few helper functions take JSON-RPC rather than `Blockchain` directly.
  * See `makeClient()` and the position helper calls below.
  */
 
@@ -369,7 +369,7 @@ async function main() {
       const capId = constants.DEEPBOOK_UPGRADE_CAP_ID;
       if (!capId) return { deepbookPackageId: null };
       // POST-MIGRATION: Blockchain.getObject returns { address, contents }.
-      // PRE-MIGRATION: SuiClient.getObject(...) was used (already captured).
+      // PRE-MIGRATION: JSON-RPC getObject(...) was used (already captured).
       // Both yield the same `package` field; the snapshot file is the
       // single { deepbookPackageId } object below either way.
       const obj = await alc.blockchain.getObject<{ package?: string }>(capId);

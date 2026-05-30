@@ -1,17 +1,12 @@
 /**
  * Blockchain interface wrapper for Sui network operations using the SuiGraphQLClient.
  *
- * All reads go through GraphQL. The public API exposes no JSON-RPC client.
- * Transaction building (BCS serialization for simulation) still requires a
- * `SuiClient` internally because `Transaction.build()` needs chain-backed
- * resolution of input object versions (e.g. the sender's gas coin). We
- * construct that client privately from the default JSON-RPC endpoint; it is
- * never exposed to callers.
+ * All reads, transaction building (BCS bytes for simulation), and simulation
+ * go through GraphQL.
  */
 
-import { SuiClient, getFullnodeUrl } from "@mysten/sui/client";
 import { SuiGraphQLClient } from "@mysten/sui/graphql";
-import { graphql } from "@mysten/sui/graphql/schemas/latest";
+import { graphql } from "@mysten/sui/graphql/schema";
 import { Transaction } from "@mysten/sui/transactions";
 import { bcs } from "@mysten/sui/bcs";
 import { toBase64 } from "@mysten/sui/utils";
@@ -55,13 +50,6 @@ export class Blockchain {
   gqlClient: SuiGraphQLClient;
   constants: Constants;
 
-  /**
-   * Internal-only SuiClient used solely for `Transaction.build()` input
-   * resolution (gas coin lookup etc.) during simulation. Never returned to
-   * callers; all public reads still go through `gqlClient`.
-   */
-  private txBuildClient: SuiClient;
-
   private initialSharedVersionCache: Map<string, string> = new Map();
 
   constructor(network: Network, graphqlUrl?: string) {
@@ -69,9 +57,7 @@ export class Blockchain {
     this.constants = getConstants(network);
     this.gqlClient = new SuiGraphQLClient({
       url: graphqlUrl ?? GRAPHQL_URL[network],
-    });
-    this.txBuildClient = new SuiClient({
-      url: getFullnodeUrl(network),
+      network,
     });
   }
 
@@ -611,14 +597,12 @@ export class Blockchain {
   // --------------------------------------------------------------------------
 
   /**
-   * Simulate a transaction via GraphQL. The transaction is built with no
-   * client (client-less BCS serialization) — this works for all transactions
-   * constructed by this SDK because inputs are already fully-resolved object
-   * references.
+   * Simulate a transaction via GraphQL. BCS bytes are built via the same
+   * GraphQL client (gas payment and object resolution).
    */
   async simulateTransaction(tx: Transaction, sender: string) {
     tx.setSenderIfNotSet(sender);
-    const txBytes = await tx.build({ client: this.txBuildClient });
+    const txBytes = await tx.build({ client: this.gqlClient });
     const txBase64 = toBase64(txBytes);
 
     const query = graphql(`
