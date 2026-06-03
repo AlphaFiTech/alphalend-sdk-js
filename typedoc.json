@@ -5,5 +5,5 @@
   "includeVersion": true,
   "excludePrivate": true,
   "excludeProtected": true,
-  "tsconfig": "tsconfig.cjs.json"
+  "tsconfig": "tsconfig.esm.json"
 }

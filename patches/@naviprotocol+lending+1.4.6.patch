@@ -1,0 +1,12 @@
+diff --git a/node_modules/@naviprotocol/lending/dist/index.esm.js b/node_modules/@naviprotocol/lending/dist/index.esm.js
+index e7b07de..f536c8c 100644
+--- a/node_modules/@naviprotocol/lending/dist/index.esm.js
++++ b/node_modules/@naviprotocol/lending/dist/index.esm.js
+@@ -1,6 +1,6 @@
+ import { Transaction as F } from "@mysten/sui/transactions";
+ import { bcs as d, toHex as ue, fromHex as pe } from "@mysten/bcs";
+-import { SuiClient as de, getFullnodeUrl as me } from "@mysten/sui/client";
++import { SuiJsonRpcClient as de, getJsonRpcFullnodeUrl as me } from "@mysten/sui/jsonRpc";
+ import fe from "lodash.camelcase";
+ import { normalizeStructTag as ye } from "@mysten/sui/utils";
+ import { SuiPriceServiceConnection as x, SuiPythClient as ge } from "@pythnetwork/pyth-sui-js";
