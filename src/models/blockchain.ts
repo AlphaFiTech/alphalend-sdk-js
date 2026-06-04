@@ -263,31 +263,21 @@ export class Blockchain {
    * Uses `@mysten/sui`'s `tx.coin()` (the `coinWithBalance` intent), which is
    * resolved lazily at `tx.build({ client })` time — so the transaction MUST be
    * built with a v2 client that exposes `.core` (our `SuiJsonRpcClient` does, as
-   * does the wallet's dapp-kit client). SUI resolves from the gas coin
-   * automatically (`coinWithBalance` defaults to `useGasCoin: true` and
-   * normalizes the type), so no SUI special-case is needed here.
+   * does the wallet's dapp-kit client). The sender is set to `address` (via
+   * `setSenderIfNotSet`, preserving any sender a wallet already set) because the
+   * `coinWithBalance` intent resolves against the tx sender at build time. SUI
+   * resolves from the gas coin automatically (`coinWithBalance` defaults to
+   * `useGasCoin: true` and normalizes the type), so no SUI special-case is
+   * needed here.
    */
-  getSpendCoin(tx: Transaction, coinType: string, amount: bigint) {
-    return tx.coin({ type: coinType, balance: amount });
-  }
-
-  /**
-   * @deprecated Use {@link getSpendCoin}. Retained for source compatibility.
-   * Now address-balance aware and requires an explicit `amount`; the `address`
-   * argument is ignored (coins resolve against the tx sender at build time).
-   */
-  async getCoinObject(
+  getCoinObject(
     tx: Transaction,
     coinType: string,
-    _address: string,
-    amount?: bigint,
+    address: string,
+    amount: bigint,
   ) {
-    if (amount === undefined) {
-      throw new Error(
-        "getCoinObject now requires an `amount`; use getSpendCoin(tx, coinType, amount).",
-      );
-    }
-    return this.getSpendCoin(tx, coinType, amount);
+    tx.setSenderIfNotSet(address);
+    return tx.coin({ type: coinType, balance: amount });
   }
 
   // --------------------------------------------------------------------------

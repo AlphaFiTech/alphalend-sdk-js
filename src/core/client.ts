@@ -260,9 +260,10 @@ export class AlphalendClient {
     const tx = params.tx ?? new Transaction();
 
     // Source the supply coin from address balance + coin objects (SUI handled inside).
-    const supplyCoinA: TransactionObjectArgument = this.getSpendCoin(
+    const supplyCoinA: TransactionObjectArgument = this.getCoinObject(
       tx,
       params.coinType,
+      params.address,
       BigInt(params.amount),
     );
 
@@ -379,16 +380,18 @@ export class AlphalendClient {
 
     // Edge case: user already has dbUSDC — direct supply, no swap or Deepbook deposit.
     if (this.isDbUsdcInput(params.inputCoinType)) {
-      coinToSupply = this.getSpendCoin(
+      coinToSupply = this.getCoinObject(
         tx,
         this.constants.DBUSDC_COIN_TYPE,
+        params.address,
         BigInt(params.inputAmount),
       );
     } else if (this.isUsdcInput(params.inputCoinType)) {
       // Path A: User pays USDC. Source USDC and use it for the Deepbook deposit.
-      usdcCoin = this.getSpendCoin(
+      usdcCoin = this.getCoinObject(
         tx,
         this.constants.USDC_COIN_TYPE,
+        params.address,
         BigInt(params.inputAmount),
       );
     } else {
@@ -403,9 +406,10 @@ export class AlphalendClient {
         return undefined;
       }
 
-      const inputCoin = this.getSpendCoin(
+      const inputCoin = this.getCoinObject(
         tx,
         params.inputCoinType,
+        params.address,
         BigInt(quoteResponse.amountIn.toString()),
       );
 
@@ -540,9 +544,10 @@ export class AlphalendClient {
     }
 
     // Source the exact swap-input amount from address balance + coin objects.
-    const inputCoin = this.getSpendCoin(
+    const inputCoin = this.getCoinObject(
       tx,
       params.inputCoinType,
+      params.address,
       BigInt(quoteResponse.amountIn.toString()),
     );
 
@@ -803,10 +808,11 @@ export class AlphalendClient {
       throw new Error("Failed to get swap quote: Empty response from Cetus");
     }
     // Source the exact swap-input amount from address balance + coin objects
-    // (SUI handled inside getSpendCoin via the gas coin).
-    const inputCoin = this.getSpendCoin(
+    // (SUI handled inside getCoinObject via the gas coin).
+    const inputCoin = this.getCoinObject(
       tx,
       params.swapFromCoinType,
+      params.address,
       BigInt(quoteResponse.amountIn.toString()),
     );
 
@@ -927,9 +933,10 @@ export class AlphalendClient {
     const tx = params.tx ?? new Transaction();
 
     // Source the repay coin from address balance + coin objects (SUI handled inside).
-    const repayCoinA: TransactionObjectArgument = this.getSpendCoin(
+    const repayCoinA: TransactionObjectArgument = this.getCoinObject(
       tx,
       params.coinType,
+      params.address,
       BigInt(params.amount),
     );
 
@@ -1719,32 +1726,22 @@ export class AlphalendClient {
    *
    * Source an exact-`amount` coin of `type` for spending, drawing from BOTH the
    * user's address balance (accumulator) AND their `Coin<T>` objects. SUI is
-   * sourced from the gas coin. The intent resolves at `tx.build({ client })`
-   * time, so the tx must be built with a v2 client (`.core` available).
+   * sourced from the gas coin. Sets the tx sender to `address` (the intent
+   * resolves against the sender at `tx.build({ client })` time), so the tx must
+   * be built with a v2 client (`.core` available).
    *
    * @param tx Transaction to which the coin will be added
    * @param type Fully qualified coin type to source
+   * @param address Owner address whose balance/coins are spent (sets tx sender)
    * @param amount Exact coin amount in base units
    * @returns Transaction argument representing the exact-amount coin
    */
-  getSpendCoin(
-    tx: Transaction,
-    type: string,
-    amount: bigint,
-  ): TransactionObjectArgument {
-    return this.blockchain.getSpendCoin(tx, type, amount);
-  }
-
-  /**
-   * @deprecated Use {@link getSpendCoin}. Now address-balance aware and requires
-   * an explicit `amount`; the `address` argument is ignored.
-   */
-  async getCoinObject(
+  getCoinObject(
     tx: Transaction,
     type: string,
     address: string,
-    amount?: bigint,
-  ): Promise<string | TransactionObjectArgument | undefined> {
+    amount: bigint,
+  ): TransactionObjectArgument {
     return this.blockchain.getCoinObject(tx, type, address, amount);
   }
 
