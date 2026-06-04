@@ -257,127 +257,44 @@ export class Blockchain {
   }
 
   /**
-   * Resolve a coin object (or merge path) for a user at `address`. When
-   * `amount` is provided, this returns a coin large enough (merging up to
-   * 200 coins if necessary); otherwise returns the first (or merged) coin.
+   * Source an exact-`amount` coin of `coinType` for spending, drawing from BOTH
+   * the user's address balance (the accumulator) AND their `Coin<T>` objects.
    *
-   * Preserves the "pick one coin big enough" optimization from the previous
-   * JSON-RPC implementation by reading `balance` from each node's flattened
-   * `contents.json`.
+   * Uses `@mysten/sui`'s `tx.coin()` (the `coinWithBalance` intent), which is
+   * resolved lazily at `tx.build({ client })` time — so the transaction MUST be
+   * built with a v2 client that exposes `.core` (our `SuiJsonRpcClient` does, as
+   * does the wallet's dapp-kit client). SUI is always sourced from the gas coin
+   * (`useGasCoin: true`); keep ALL SUI sourcing on this path so a single tx never
+   * mixes gas-sourced and non-gas SUI intents (which `@mysten/sui` forbids).
+   */
+  getSpendCoin(tx: Transaction, coinType: string, amount: bigint) {
+    if (this.isCoinTypeSui(coinType)) {
+      return tx.coin({
+        type: "0x2::sui::SUI",
+        balance: amount,
+        useGasCoin: true,
+      });
+    }
+    return tx.coin({ type: coinType, balance: amount });
+  }
+
+  /**
+   * @deprecated Use {@link getSpendCoin}. Retained for source compatibility.
+   * Now address-balance aware and requires an explicit `amount`; the `address`
+   * argument is ignored (coins resolve against the tx sender at build time).
    */
   async getCoinObject(
     tx: Transaction,
     coinType: string,
-    address: string,
+    _address: string,
     amount?: bigint,
   ) {
-    if (this.isCoinTypeSui(coinType)) {
-      if (amount) {
-        return tx.splitCoins(tx.gas, [amount]);
-      }
-      return tx.gas;
+    if (amount === undefined) {
+      throw new Error(
+        "getCoinObject now requires an `amount`; use getSpendCoin(tx, coinType, amount).",
+      );
     }
-
-    const query = graphql(`
-      query getCoins(
-        $address: SuiAddress!
-        $coinType: String!
-        $cursor: String
-      ) {
-        address(address: $address) {
-          objects(after: $cursor, filter: { type: $coinType }) {
-            pageInfo {
-              hasNextPage
-              endCursor
-            }
-            nodes {
-              address
-              contents {
-                json
-              }
-            }
-          }
-        }
-      }
-    `);
-
-    const wrappedCoinType = `0x2::coin::Coin<${coinType}>`;
-
-    interface CoinNode {
-      id: string;
-      balance: bigint;
-    }
-    const coins: CoinNode[] = [];
-
-    let currentCursor: string | null = null;
-    let hasMore = true;
-    while (hasMore) {
-      const variables: {
-        address: string;
-        coinType: string;
-        cursor: string | null;
-      } = { address, coinType: wrappedCoinType, cursor: currentCursor };
-      const response = await this.gqlClient.query({ query, variables });
-      const objects = response.data?.address?.objects;
-      const nodes = objects?.nodes ?? [];
-      for (const node of nodes) {
-        if (!node?.address) continue;
-        const fields = node.contents?.json as { balance?: string } | undefined;
-        coins.push({
-          id: node.address,
-          balance: BigInt(fields?.balance ?? "0"),
-        });
-      }
-      if (objects?.pageInfo?.hasNextPage && objects.pageInfo.endCursor) {
-        currentCursor = objects.pageInfo.endCursor;
-      } else {
-        hasMore = false;
-      }
-    }
-
-    if (coins.length === 0) {
-      return undefined;
-    }
-
-    if (coins.length === 1) {
-      return tx.object(coins[0].id);
-    }
-
-    // Pick one coin large enough (gas optimization — avoids merge).
-    if (amount) {
-      for (const c of coins) {
-        if (c.balance >= amount) {
-          return tx.object(c.id);
-        }
-      }
-    }
-
-    // Otherwise merge the top 200 largest.
-    coins.sort((a, b) =>
-      b.balance > a.balance ? 1 : b.balance < a.balance ? -1 : 0,
-    );
-    coins.splice(200);
-
-    if (amount) {
-      const coinsToMerge: string[] = [];
-      let total = 0n;
-      for (const c of coins) {
-        coinsToMerge.push(c.id);
-        total += c.balance;
-        if (total >= amount) break;
-      }
-      const firstCoin = tx.object(coinsToMerge[0]);
-      const [coin] = tx.splitCoins(firstCoin, [0]);
-      const otherCoins = coinsToMerge.slice(1).map((id) => tx.object(id));
-      tx.mergeCoins(coin, [firstCoin, ...otherCoins]);
-      return coin;
-    }
-
-    const firstCoin = tx.object(coins[0].id);
-    const [coin] = tx.splitCoins(firstCoin, [0]);
-    const otherCoins = coins.slice(1).map((c) => tx.object(c.id));
-    tx.mergeCoins(coin, [firstCoin, ...otherCoins]);
-    return coin;
+    return this.getSpendCoin(tx, coinType, amount);
   }
 
   // --------------------------------------------------------------------------
