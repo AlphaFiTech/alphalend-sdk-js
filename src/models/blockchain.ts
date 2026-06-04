@@ -263,18 +263,11 @@ export class Blockchain {
    * Uses `@mysten/sui`'s `tx.coin()` (the `coinWithBalance` intent), which is
    * resolved lazily at `tx.build({ client })` time — so the transaction MUST be
    * built with a v2 client that exposes `.core` (our `SuiJsonRpcClient` does, as
-   * does the wallet's dapp-kit client). SUI is always sourced from the gas coin
-   * (`useGasCoin: true`); keep ALL SUI sourcing on this path so a single tx never
-   * mixes gas-sourced and non-gas SUI intents (which `@mysten/sui` forbids).
+   * does the wallet's dapp-kit client). SUI resolves from the gas coin
+   * automatically (`coinWithBalance` defaults to `useGasCoin: true` and
+   * normalizes the type), so no SUI special-case is needed here.
    */
   getSpendCoin(tx: Transaction, coinType: string, amount: bigint) {
-    if (this.isCoinTypeSui(coinType)) {
-      return tx.coin({
-        type: "0x2::sui::SUI",
-        balance: amount,
-        useGasCoin: true,
-      });
-    }
     return tx.coin({ type: coinType, balance: amount });
   }
 
@@ -720,12 +713,4 @@ export class Blockchain {
   // --------------------------------------------------------------------------
   // Internal helpers
   // --------------------------------------------------------------------------
-
-  private isCoinTypeSui(coinType: string): boolean {
-    return (
-      coinType === "0x2::sui::SUI" ||
-      coinType ===
-        "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI"
-    );
-  }
 }
