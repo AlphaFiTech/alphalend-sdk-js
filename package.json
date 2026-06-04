@@ -30,7 +30,7 @@
   "author": "",
   "license": "ISC",
   "engines": {
-    "node": ">=20"
+    "node": ">=22.14.0"
   },
   "dependencies": {
     "@7kprotocol/sdk-ts": "^3.4.1",
