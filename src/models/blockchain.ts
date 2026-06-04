@@ -257,127 +257,17 @@ export class Blockchain {
   }
 
   /**
-   * Resolve a coin object (or merge path) for a user at `address`. When
-   * `amount` is provided, this returns a coin large enough (merging up to
-   * 200 coins if necessary); otherwise returns the first (or merged) coin.
-   *
-   * Preserves the "pick one coin big enough" optimization from the previous
-   * JSON-RPC implementation by reading `balance` from each node's flattened
-   * `contents.json`.
+   * Source an exact-`amount` coin of `coinType` for spending, drawing from BOTH
+   * the user's address balance (the accumulator) AND their `Coin<T>` objects.
    */
-  async getCoinObject(
+  getCoinObject(
     tx: Transaction,
     coinType: string,
     address: string,
-    amount?: bigint,
+    amount: bigint,
   ) {
-    if (this.isCoinTypeSui(coinType)) {
-      if (amount) {
-        return tx.splitCoins(tx.gas, [amount]);
-      }
-      return tx.gas;
-    }
-
-    const query = graphql(`
-      query getCoins(
-        $address: SuiAddress!
-        $coinType: String!
-        $cursor: String
-      ) {
-        address(address: $address) {
-          objects(after: $cursor, filter: { type: $coinType }) {
-            pageInfo {
-              hasNextPage
-              endCursor
-            }
-            nodes {
-              address
-              contents {
-                json
-              }
-            }
-          }
-        }
-      }
-    `);
-
-    const wrappedCoinType = `0x2::coin::Coin<${coinType}>`;
-
-    interface CoinNode {
-      id: string;
-      balance: bigint;
-    }
-    const coins: CoinNode[] = [];
-
-    let currentCursor: string | null = null;
-    let hasMore = true;
-    while (hasMore) {
-      const variables: {
-        address: string;
-        coinType: string;
-        cursor: string | null;
-      } = { address, coinType: wrappedCoinType, cursor: currentCursor };
-      const response = await this.gqlClient.query({ query, variables });
-      const objects = response.data?.address?.objects;
-      const nodes = objects?.nodes ?? [];
-      for (const node of nodes) {
-        if (!node?.address) continue;
-        const fields = node.contents?.json as { balance?: string } | undefined;
-        coins.push({
-          id: node.address,
-          balance: BigInt(fields?.balance ?? "0"),
-        });
-      }
-      if (objects?.pageInfo?.hasNextPage && objects.pageInfo.endCursor) {
-        currentCursor = objects.pageInfo.endCursor;
-      } else {
-        hasMore = false;
-      }
-    }
-
-    if (coins.length === 0) {
-      return undefined;
-    }
-
-    if (coins.length === 1) {
-      return tx.object(coins[0].id);
-    }
-
-    // Pick one coin large enough (gas optimization — avoids merge).
-    if (amount) {
-      for (const c of coins) {
-        if (c.balance >= amount) {
-          return tx.object(c.id);
-        }
-      }
-    }
-
-    // Otherwise merge the top 200 largest.
-    coins.sort((a, b) =>
-      b.balance > a.balance ? 1 : b.balance < a.balance ? -1 : 0,
-    );
-    coins.splice(200);
-
-    if (amount) {
-      const coinsToMerge: string[] = [];
-      let total = 0n;
-      for (const c of coins) {
-        coinsToMerge.push(c.id);
-        total += c.balance;
-        if (total >= amount) break;
-      }
-      const firstCoin = tx.object(coinsToMerge[0]);
-      const [coin] = tx.splitCoins(firstCoin, [0]);
-      const otherCoins = coinsToMerge.slice(1).map((id) => tx.object(id));
-      tx.mergeCoins(coin, [firstCoin, ...otherCoins]);
-      return coin;
-    }
-
-    const firstCoin = tx.object(coins[0].id);
-    const [coin] = tx.splitCoins(firstCoin, [0]);
-    const otherCoins = coins.slice(1).map((c) => tx.object(c.id));
-    tx.mergeCoins(coin, [firstCoin, ...otherCoins]);
-    return coin;
+    tx.setSenderIfNotSet(address);
+    return tx.coin({ type: coinType, balance: amount });
   }
 
   // --------------------------------------------------------------------------
@@ -803,12 +693,4 @@ export class Blockchain {
   // --------------------------------------------------------------------------
   // Internal helpers
   // --------------------------------------------------------------------------
-
-  private isCoinTypeSui(coinType: string): boolean {
-    return (
-      coinType === "0x2::sui::SUI" ||
-      coinType ===
-        "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI"
-    );
-  }
 }
