@@ -9,9 +9,9 @@
  * never exposed to callers.
  */
 
-import { SuiClient, getFullnodeUrl } from "@mysten/sui/client";
+import { SuiJsonRpcClient, getJsonRpcFullnodeUrl } from "@mysten/sui/jsonRpc";
 import { SuiGraphQLClient } from "@mysten/sui/graphql";
-import { graphql } from "@mysten/sui/graphql/schemas/latest";
+import { graphql } from "@mysten/sui/graphql/schema";
 import { Transaction } from "@mysten/sui/transactions";
 import { bcs } from "@mysten/sui/bcs";
 import { toBase64 } from "@mysten/sui/utils";
@@ -60,7 +60,7 @@ export class Blockchain {
    * resolution (gas coin lookup etc.) during simulation. Never returned to
    * callers; all public reads still go through `gqlClient`.
    */
-  private txBuildClient: SuiClient;
+  private txBuildClient: SuiJsonRpcClient;
 
   private initialSharedVersionCache: Map<string, string> = new Map();
 
@@ -69,9 +69,11 @@ export class Blockchain {
     this.constants = getConstants(network);
     this.gqlClient = new SuiGraphQLClient({
       url: graphqlUrl ?? GRAPHQL_URL[network],
+      network,
     });
-    this.txBuildClient = new SuiClient({
-      url: getFullnodeUrl(network),
+    this.txBuildClient = new SuiJsonRpcClient({
+      url: getJsonRpcFullnodeUrl(network),
+      network,
     });
   }
 

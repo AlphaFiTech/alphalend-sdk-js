@@ -4,7 +4,7 @@
  * Clean, focused tests that show only the root cause of failures.
  */
 
-import { SuiClient } from "@mysten/sui/client";
+import { SuiJsonRpcClient } from "@mysten/sui/jsonRpc";
 import { AlphalendClient } from "../src";
 
 // All coin types that have price feed mappings
@@ -26,11 +26,12 @@ const COIN_TYPES = {
 
 describe("Oracle Price Validation", () => {
   let client: AlphalendClient;
-  let suiClient: SuiClient;
+  let suiClient: SuiJsonRpcClient;
 
   beforeAll(() => {
-    suiClient = new SuiClient({
+    suiClient = new SuiJsonRpcClient({
       url: "https://fullnode.mainnet.sui.io/",
+      network: "mainnet",
     });
     client = new AlphalendClient("mainnet");
   });

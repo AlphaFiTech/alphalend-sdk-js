@@ -1,9 +1,9 @@
-import { SuiClient } from "@mysten/sui/client";
+import { SuiJsonRpcClient } from "@mysten/sui/jsonRpc";
 import { AlphalendClient } from "@alphafi/alphalend-sdk";
 import { displayPortfolio, handleError, validateAddress, getRpcUrl } from "./lib/portfolioDisplay.mjs";
 
 /**
- * Example: Get User Portfolio (Published SDK v1.1.20)
+ * Example: Get User Portfolio (Published SDK v3.0.0)
  *
  * This example uses the published @alphafi/alphalend-sdk package from npm.
  *
@@ -23,10 +23,10 @@ async function main() {
     process.exit(1);
   }
 
-  console.log(`\nTesting with Published SDK (@alphafi/alphalend-sdk@1.1.20)`);
+  console.log(`\nTesting with Published SDK (@alphafi/alphalend-sdk@3.0.0)`);
   console.log(`Fetching portfolio for ${userAddress} on ${network}...`);
 
-  const suiClient = new SuiClient({ url: getRpcUrl(network) });
+  const suiClient = new SuiJsonRpcClient({ url: getRpcUrl(network), network });
   const alphalendClient = new AlphalendClient(network, suiClient);
 
   try {
