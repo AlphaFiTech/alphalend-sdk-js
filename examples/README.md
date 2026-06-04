@@ -4,7 +4,7 @@ This directory contains example scripts demonstrating how to use the AlphaLend S
 
 ## Setup
 
-### Test with Published SDK (v1.1.20)
+### Test with Published SDK (v3.0.0)
 
 This tests the published npm package version that users will install:
 
@@ -13,7 +13,7 @@ cd examples
 npm install
 ```
 
-This installs `@alphafi/alphalend-sdk@1.1.20` from npm.
+This installs `@alphafi/alphalend-sdk@3.0.0` from npm.
 
 ### Test with Local Build
 
@@ -29,7 +29,7 @@ npm run build
 
 ### 1. Get User Portfolio (Published SDK)
 
-Uses the published `@alphafi/alphalend-sdk@1.1.20` from npm:
+Uses the published `@alphafi/alphalend-sdk@3.0.0` from npm:
 
 ```bash
 cd examples
@@ -96,12 +96,12 @@ This diagnostic script will:
 
 ## File Overview
 
-| File                            | Purpose                                       | SDK Source                         |
-| ------------------------------- | --------------------------------------------- | ---------------------------------- |
-| `getUserPortfolioPublished.mjs` | Test with published npm package               | `@alphafi/alphalend-sdk` (v1.1.20) |
-| `getUserPortfolioLocal.mjs`     | Test with local build                         | `../dist/esm/index.js`             |
-| `diagnoseInit.mjs`              | Diagnostic tool for API/initialization issues | N/A (direct API test)              |
-| `package.json`                  | Dependencies for published SDK testing        | Specifies v1.1.20                  |
+| File                            | Purpose                                       | SDK Source                        |
+| ------------------------------- | --------------------------------------------- | --------------------------------- |
+| `getUserPortfolioPublished.mjs` | Test with published npm package               | `@alphafi/alphalend-sdk` (v3.0.0) |
+| `getUserPortfolioLocal.mjs`     | Test with local build                         | `../dist/esm/index.js`            |
+| `diagnoseInit.mjs`              | Diagnostic tool for API/initialization issues | N/A (direct API test)             |
+| `package.json`                  | Dependencies for published SDK testing        | Specifies v3.0.0                  |
 
 ## Common Issues
 
