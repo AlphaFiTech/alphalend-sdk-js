@@ -1724,12 +1724,6 @@ export class AlphalendClient {
   /**
    * Gets a coin object suitable for a transaction. Upto 200 coins are merged together and returned.
    *
-   * Source an exact-`amount` coin of `type` for spending, drawing from BOTH the
-   * user's address balance (accumulator) AND their `Coin<T>` objects. SUI is
-   * sourced from the gas coin. Sets the tx sender to `address` (the intent
-   * resolves against the sender at `tx.build({ client })` time), so the tx must
-   * be built with a v2 client (`.core` available).
-   *
    * @param tx Transaction to which the coin will be added
    * @param type Fully qualified coin type to source
    * @param address Owner address whose balance/coins are spent (sets tx sender)

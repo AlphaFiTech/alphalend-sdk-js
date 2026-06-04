@@ -259,16 +259,6 @@ export class Blockchain {
   /**
    * Source an exact-`amount` coin of `coinType` for spending, drawing from BOTH
    * the user's address balance (the accumulator) AND their `Coin<T>` objects.
-   *
-   * Uses `@mysten/sui`'s `tx.coin()` (the `coinWithBalance` intent), which is
-   * resolved lazily at `tx.build({ client })` time — so the transaction MUST be
-   * built with a v2 client that exposes `.core` (our `SuiJsonRpcClient` does, as
-   * does the wallet's dapp-kit client). The sender is set to `address` (via
-   * `setSenderIfNotSet`, preserving any sender a wallet already set) because the
-   * `coinWithBalance` intent resolves against the tx sender at build time. SUI
-   * resolves from the gas coin automatically (`coinWithBalance` defaults to
-   * `useGasCoin: true` and normalizes the type), so no SUI special-case is
-   * needed here.
    */
   getCoinObject(
     tx: Transaction,
