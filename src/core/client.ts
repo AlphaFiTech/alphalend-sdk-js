@@ -653,7 +653,7 @@ export class AlphalendClient {
       coin = await this.handlePromise(tx, promise, params.coinType);
     }
     if (coin) {
-      tx.transferObjects([coin], params.address);
+      this.sendCoinToAddressBalance(tx, params.coinType, params.address, coin);
     }
 
     return tx;
@@ -775,7 +775,12 @@ export class AlphalendClient {
       coin,
     );
     if (withdrawCoin) {
-      tx.transferObjects([withdrawCoin], params.address);
+      this.sendCoinToAddressBalance(
+        tx,
+        params.outputCoinType,
+        params.address,
+        withdrawCoin,
+      );
     }
 
     return tx;
@@ -851,8 +856,13 @@ export class AlphalendClient {
       ],
     });
 
-    // Transfer remaining coin from repayment back to user
-    tx.transferObjects([remainingCoin], params.address);
+    // Credit remaining coin from repayment back to the user's address balance
+    this.sendCoinToAddressBalance(
+      tx,
+      params.swapToCoinType,
+      params.address,
+      remainingCoin,
+    );
 
     return tx;
   }
@@ -913,7 +923,7 @@ export class AlphalendClient {
         ],
       });
     }
-    tx.transferObjects([coin], params.address);
+    this.sendCoinToAddressBalance(tx, params.coinType, params.address, coin);
 
     return tx;
   }
@@ -952,7 +962,12 @@ export class AlphalendClient {
         tx.object(this.constants.SUI_CLOCK_OBJECT_ID), // Clock object
       ],
     });
-    tx.transferObjects([repayCoin], params.address);
+    this.sendCoinToAddressBalance(
+      tx,
+      params.coinType,
+      params.address,
+      repayCoin,
+    );
 
     return tx;
   }
@@ -1029,10 +1044,20 @@ export class AlphalendClient {
             }
           } else {
             if (coin2) {
-              tx.transferObjects([coin2], params.address);
+              this.sendCoinToAddressBalance(
+                tx,
+                coinType,
+                params.address,
+                coin2,
+              );
             }
             if (coin1) {
-              tx.transferObjects([coin1], params.address);
+              this.sendCoinToAddressBalance(
+                tx,
+                coinType,
+                params.address,
+                coin1,
+              );
             }
           }
         } else if (coin1) {
@@ -1042,7 +1067,7 @@ export class AlphalendClient {
           ) {
             alphaCoin = this.mergeCoins(tx, alphaCoin, [coin1]);
           } else {
-            tx.transferObjects([coin1], params.address);
+            this.sendCoinToAddressBalance(tx, coinType, params.address, coin1);
           }
         }
       }
@@ -1263,10 +1288,11 @@ export class AlphalendClient {
       }
     }
 
-    // Handle coins that should be claimed directly to wallet
+    // Handle coins that should be claimed directly to the user's address balance
     if (coinsToClaimDirectly.size > 0) {
-      const coinsToTransfer = Array.from(coinsToClaimDirectly.values());
-      tx.transferObjects(coinsToTransfer, params.address);
+      for (const [coinType, coin] of coinsToClaimDirectly.entries()) {
+        this.sendCoinToAddressBalance(tx, coinType, params.address, coin);
+      }
     }
 
     // If no target coin, all rewards were either too small or claimed directly
@@ -1281,7 +1307,12 @@ export class AlphalendClient {
     }
 
     if (params.transferTargetCoin) {
-      tx.transferObjects([targetCoin], params.address);
+      this.sendCoinToAddressBalance(
+        tx,
+        params.targetCoinType,
+        params.address,
+        targetCoin,
+      );
       return tx;
     }
 
@@ -1300,7 +1331,12 @@ export class AlphalendClient {
       });
 
       // todo - check if remainingCoin is zero and destroy it if it is
-      tx.transferObjects([remainingCoin], params.address);
+      this.sendCoinToAddressBalance(
+        tx,
+        params.targetCoinType,
+        params.address,
+        remainingCoin,
+      );
     } else {
       // Supply the remaining reward coin to the target market
       tx.moveCall({
@@ -1408,8 +1444,7 @@ export class AlphalendClient {
           ],
         });
       } else {
-        // todo - check if remainingCoin is zero and destroy it if it is
-        tx.transferObjects([coin], params.address);
+        this.sendCoinToAddressBalance(tx, coinType, params.address, coin);
       }
     };
 
@@ -1438,7 +1473,12 @@ export class AlphalendClient {
         });
 
         // todo - check if remainingCoin is zero and destroy it if it is
-        tx.transferObjects([remainingCoin], params.address);
+        this.sendCoinToAddressBalance(
+          tx,
+          coinType,
+          params.address,
+          remainingCoin,
+        );
       } else {
         // Not borrowed - supply or transfer
         handleCoin(mergedCoin, coinType, params.supplyMarkets?.get(coinType));
@@ -1737,6 +1777,25 @@ export class AlphalendClient {
     amount: bigint,
   ): TransactionObjectArgument {
     return this.blockchain.getCoinObject(tx, type, address, amount);
+  }
+
+  /**
+   * Credits a coin to `address`'s address balance (the accumulator) instead of
+   * sending it as a standalone coin object. Used to return withdrawn/borrowed
+   * coins and leftovers back to the user.
+   *
+   * @param tx Transaction to which the move call will be added
+   * @param type Fully qualified coin type being returned
+   * @param address Recipient whose address balance is credited
+   * @param coin The coin to credit (consumed by the call)
+   */
+  sendCoinToAddressBalance(
+    tx: Transaction,
+    type: string,
+    address: string,
+    coin: TransactionObjectArgument | string,
+  ): void {
+    this.blockchain.sendCoinToAddressBalance(tx, type, address, coin);
   }
 
   private async handlePromise(

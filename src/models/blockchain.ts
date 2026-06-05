@@ -12,7 +12,10 @@
 import { SuiJsonRpcClient, getJsonRpcFullnodeUrl } from "@mysten/sui/jsonRpc";
 import { SuiGraphQLClient } from "@mysten/sui/graphql";
 import { graphql } from "@mysten/sui/graphql/schema";
-import { Transaction } from "@mysten/sui/transactions";
+import {
+  Transaction,
+  TransactionObjectArgument,
+} from "@mysten/sui/transactions";
 import { bcs } from "@mysten/sui/bcs";
 import { toBase64 } from "@mysten/sui/utils";
 
@@ -268,6 +271,25 @@ export class Blockchain {
   ) {
     tx.setSenderIfNotSet(address);
     return tx.coin({ type: coinType, balance: amount });
+  }
+
+  /**
+   * Credit a `Coin<coinType>` to `address`'s address balance (the accumulator)
+   */
+  sendCoinToAddressBalance(
+    tx: Transaction,
+    coinType: string,
+    address: string,
+    coin: TransactionObjectArgument | string,
+  ) {
+    tx.moveCall({
+      target: "0x2::coin::send_funds",
+      typeArguments: [coinType],
+      arguments: [
+        typeof coin === "string" ? tx.object(coin) : coin,
+        tx.pure.address(address),
+      ],
+    });
   }
 
   // --------------------------------------------------------------------------
