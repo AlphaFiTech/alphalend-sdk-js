@@ -1,18 +1,17 @@
 /**
  * Blockchain interface wrapper for Sui network operations using the SuiGraphQLClient.
  *
- * All reads go through GraphQL. The public API exposes no JSON-RPC client.
- * Transaction building (BCS serialization for simulation) still requires a
- * `SuiClient` internally because `Transaction.build()` needs chain-backed
- * resolution of input object versions (e.g. the sender's gas coin). We
- * construct that client privately from the default JSON-RPC endpoint; it is
- * never exposed to callers.
+ * All operations go through GraphQL, including transaction simulation via
+ * `gqlClient.core.simulateTransaction`, which builds the transaction, resolves
+ * gas, and simulates server-side. No JSON-RPC or gRPC client is used.
  */
 
-import { SuiJsonRpcClient, getJsonRpcFullnodeUrl } from "@mysten/sui/jsonRpc";
 import { SuiGraphQLClient } from "@mysten/sui/graphql";
 import { graphql } from "@mysten/sui/graphql/schema";
-import { Transaction } from "@mysten/sui/transactions";
+import {
+  Transaction,
+  TransactionObjectArgument,
+} from "@mysten/sui/transactions";
 import { bcs } from "@mysten/sui/bcs";
 import { toBase64 } from "@mysten/sui/utils";
 
@@ -55,13 +54,6 @@ export class Blockchain {
   gqlClient: SuiGraphQLClient;
   constants: Constants;
 
-  /**
-   * Internal-only SuiClient used solely for `Transaction.build()` input
-   * resolution (gas coin lookup etc.) during simulation. Never returned to
-   * callers; all public reads still go through `gqlClient`.
-   */
-  private txBuildClient: SuiJsonRpcClient;
-
   private initialSharedVersionCache: Map<string, string> = new Map();
 
   constructor(network: Network, graphqlUrl?: string) {
@@ -69,10 +61,6 @@ export class Blockchain {
     this.constants = getConstants(network);
     this.gqlClient = new SuiGraphQLClient({
       url: graphqlUrl ?? GRAPHQL_URL[network],
-      network,
-    });
-    this.txBuildClient = new SuiJsonRpcClient({
-      url: getJsonRpcFullnodeUrl(network),
       network,
     });
   }
@@ -268,6 +256,25 @@ export class Blockchain {
   ) {
     tx.setSenderIfNotSet(address);
     return tx.coin({ type: coinType, balance: amount });
+  }
+
+  /**
+   * Credit a `Coin<coinType>` to `address`'s address balance (the accumulator)
+   */
+  sendCoinToAddressBalance(
+    tx: Transaction,
+    coinType: string,
+    address: string,
+    coin: TransactionObjectArgument | string,
+  ) {
+    tx.moveCall({
+      target: "0x2::coin::send_funds",
+      typeArguments: [coinType],
+      arguments: [
+        typeof coin === "string" ? tx.object(coin) : coin,
+        tx.pure.address(address),
+      ],
+    });
   }
 
   // --------------------------------------------------------------------------
@@ -503,43 +510,21 @@ export class Blockchain {
   // --------------------------------------------------------------------------
 
   /**
-   * Simulate a transaction via GraphQL. The transaction is built with no
-   * client (client-less BCS serialization) — this works for all transactions
-   * constructed by this SDK because inputs are already fully-resolved object
-   * references.
+   * Simulate a transaction via the GraphQL client's core API, which builds the
+   * transaction, resolves gas, and simulates server-side. Returns the parsed
+   * transaction effects (or undefined if effects are unavailable).
    */
   async simulateTransaction(tx: Transaction, sender: string) {
     tx.setSenderIfNotSet(sender);
-    const txBytes = await tx.build({ client: this.txBuildClient });
-    const txBase64 = toBase64(txBytes);
-
-    const query = graphql(`
-      query simulate($tx: JSON!) {
-        simulateTransaction(
-          transaction: $tx
-          checksEnabled: true
-          doGasSelection: true
-        ) {
-          effects {
-            status
-            gasEffects {
-              gasSummary {
-                computationCost
-                storageCost
-                storageRebate
-                nonRefundableStorageFee
-              }
-            }
-          }
-        }
-      }
-    `);
-
-    const result = await this.gqlClient.query({
-      query,
-      variables: { tx: { bcs: { value: txBase64 } } },
+    const result = await this.gqlClient.core.simulateTransaction({
+      transaction: tx,
+      include: { effects: true },
     });
-    return result.data?.simulateTransaction ?? undefined;
+    const txData =
+      result.$kind === "Transaction"
+        ? result.Transaction
+        : result.FailedTransaction;
+    return txData?.effects ?? undefined;
   }
 
   /** Estimate gas budget by simulating the transaction. */
@@ -549,17 +534,17 @@ export class Blockchain {
   ): Promise<number | undefined> {
     const fallbackBudget = 500_000_000;
     try {
-      const simResult = await this.simulateTransaction(tx, sender);
-      const gasSummary = simResult?.effects?.gasEffects?.gasSummary;
-      if (!gasSummary) {
+      const effects = await this.simulateTransaction(tx, sender);
+      const gasUsed = effects?.gasUsed;
+      if (!gasUsed) {
         console.warn(
           "Simulation returned no gas summary; using fallback gas budget",
         );
         return fallbackBudget;
       }
       const estimatedBudget =
-        Number(gasSummary.computationCost) +
-        Number(gasSummary.nonRefundableStorageFee) +
+        Number(gasUsed.computationCost) +
+        Number(gasUsed.nonRefundableStorageFee) +
         fallbackBudget;
       if (!Number.isFinite(estimatedBudget) || estimatedBudget <= 0) {
         console.warn("Simulation returned invalid gas summary; using fallback");
