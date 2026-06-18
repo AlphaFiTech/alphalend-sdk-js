@@ -195,7 +195,13 @@ export class AlphalendClient {
       this.constants.LAZER_STATE_ID,
       bytes,
     );
-    /// TODO: THIS WILL BREAK PARITY BETWEEN THE TWO ORACLES
+    // ingest_lazer_update above refreshed EVERY tracked feed in the global alphafi_oracle, but we only
+    // bridge the coins this tx touches into the LendingProtocol's embedded oracle — so the two oracles
+    // diverge (the global one is fresher for coins not in `coinTypes`). This is safe by design: the global
+    // oracle is the source of truth, the embedded one is a per-tx working set, and alpha_lending::verify_price
+    // only reads the coins actually used here. Every coin a position touches is passed in `coinTypes` (the
+    // same contract the Pyth path relies on), so the un-bridged coins are never read this tx. Bridging all
+    // ~35 tracked coins on every tx would be wasteful and pointless.
     for (const coinType of new Set(coinTypes)) {
       appendOracleToLendingBridge(tx, coinType, this.constants);
     }

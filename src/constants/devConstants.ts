@@ -70,15 +70,13 @@ export const devConstants: Constants = {
 
   PYTH_PRICE_PATH: "/api/latest_price_feeds",
 
-  // Pyth Lazer (Pyth Pro) Constants. LAZER_PACKAGE_ID = the package version exposing
-  // parse_and_verify_le_ecdsa_update_v2 (the PTB verify call). NOTE: testnet Lazer is STILL v1 (no _v2),
-  // so this PTB verify won't succeed on testnet until Pyth upgrades it — testnet e2e uses the
-  // controllable-signer harness instead (see oracle-migration/lazer-migration/testnet-e2e).
+  // Pyth Lazer (Pyth Pro) Constants. Testnet Pyth's canonical package is still v1 (no _v2), so testnet
+  // uses our published v2 verifier harness for the PTB verify call.
   LAZER_PACKAGE_ID:
-    "0xf5bd2141967507050a91b58de3d95e77c432cd90d1799ee46effc27430a68c21",
+    "0xf9686303df959b4b6a000fcac0befe0cc2cee24f2c2ec02dae914b3c525a5639",
 
   LAZER_STATE_ID:
-    "0xe2b9096a5ea341a9f1eef126b2203727e29e73fdb0641ade2e1e32942f97e4d8",
+    "0x470a1b15fae80369812c0f96f70788321f6f822ff8b8f35884743c175919fc39",
 
   // Backend proxy serving the signed payload at `${LAZER_PROXY_URL}/lazer/update`.
   LAZER_PROXY_URL: "https://api-staging.alphalend.xyz",

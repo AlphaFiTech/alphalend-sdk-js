@@ -27,11 +27,12 @@ import { SuiJsonRpcClient } from "@mysten/sui/jsonRpc";
 import { appendLazerUpdate } from "../src/utils/lazer.js";
 
 // --- Testnet mock-signer harness deployment (see oracle-migration/lazer-migration/testnet-e2e) ---------
-// alphafi_oracle refactored to the ingest_lazer_update consumer; SUI is registered to Lazer feed_id 2.
+// Latest testnet alphafi_oracle refactored to the ingest_lazer_update consumer; SUI is registered to
+// Lazer feed_id 11.
 const ORACLE_PKG =
-  "0xa22cc6fa2ed207568b620e5adcc6b28999f4ad50110f342fe6f54a47d4705ef0";
+  "0xde8437ddf4fdfe2bb87ed5ba1b26c24773b75bb90656b4c5a5d4b793c5e22c2b";
 const ORACLE_OBJ =
-  "0xa577a610c3f604865b35ab65c99e3a9bc8186cf6899cfd08158b90f651c85bea";
+  "0x798196e3673aa7f3c36cfd7455511efcd11b982bd28d026a03e77643deb1b6a4";
 // Self-published `pyth_lazer` (full v2 source) whose set_trusted_signer is permissionless, plus its State.
 const HARNESS_PKG =
   "0xf9686303df959b4b6a000fcac0befe0cc2cee24f2c2ec02dae914b3c525a5639";
@@ -45,7 +46,7 @@ const SENDER = `0x${"11".repeat(32)}`;
 // Signed feed values. Distinctive $1337 (not the $2500 a prior testnet run stored) so the read-back can
 // ONLY match if this devInspect's verify+ingest wrote it. ema == spot so the circuit breaker diff is 0;
 // conf of $1 is ~0.07% of price, well inside the 10% band the oracle enforces.
-const FEED_ID = 2;
+const FEED_ID = 11;
 const EXPO = -8;
 const PRICE_M = 133_700_000_000n; // 1337.00000000 (x1e8, expo -8)
 const EMA_M = 133_700_000_000n;
