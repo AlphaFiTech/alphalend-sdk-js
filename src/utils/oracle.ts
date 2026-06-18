@@ -70,6 +70,36 @@ export async function getPriceInfoObjectIdsWithoutUpdate(
 }
 
 /**
+ * Bridges a coin's fresh price from the global alphafi_oracle into the LendingProtocol's embedded
+ * oracle (`protocol.oracle`) — the price source every supply/withdraw/borrow/liquidate actually reads.
+ * Shared by the Pyth and Lazer refresh paths so the two stay identical.
+ *
+ * @param tx - The transaction to add the bridge calls to
+ * @param coinType - The fully qualified coin type to bridge
+ * @param constants - Protocol constants
+ */
+export function appendOracleToLendingBridge(
+  tx: Transaction,
+  coinType: string,
+  constants: Constants,
+) {
+  const coinTypeName = tx.moveCall({
+    target: `0x1::type_name::get`,
+    typeArguments: [coinType],
+  });
+
+  const oraclePriceInfo = tx.moveCall({
+    target: `${constants.ALPHAFI_LATEST_ORACLE_PACKAGE_ID}::oracle::get_price_info`,
+    arguments: [tx.object(constants.ALPHAFI_ORACLE_OBJECT_ID), coinTypeName],
+  });
+
+  tx.moveCall({
+    target: `${constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::update_price`,
+    arguments: [tx.object(constants.LENDING_PROTOCOL_ID), oraclePriceInfo],
+  });
+}
+
+/**
  * Adds oracle price update instructions to a transaction
  *
  * @param tx - The transaction to add price updates to
@@ -98,18 +128,5 @@ export function updatePriceTransaction(
     ],
   });
 
-  const coinTypeName = tx.moveCall({
-    target: `0x1::type_name::get`,
-    typeArguments: [args.coinType],
-  });
-
-  const oraclePriceInfo = tx.moveCall({
-    target: `${constants.ALPHAFI_LATEST_ORACLE_PACKAGE_ID}::oracle::get_price_info`,
-    arguments: [tx.object(constants.ALPHAFI_ORACLE_OBJECT_ID), coinTypeName],
-  });
-
-  tx.moveCall({
-    target: `${constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::update_price`,
-    arguments: [tx.object(constants.LENDING_PROTOCOL_ID), oraclePriceInfo],
-  });
+  appendOracleToLendingBridge(tx, args.coinType, constants);
 }

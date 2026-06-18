@@ -71,6 +71,25 @@ export const prodConstants: Constants = {
 
   PYTH_PRICE_PATH: "/api/latest_price_feeds",
 
+  // Pyth Lazer (Pyth Pro) Constants.
+  // LAZER_PACKAGE_ID = the package VERSION exposing parse_and_verify_le_ecdsa_update_v2 (the v2 upgrade id),
+  // which the PTB calls to verify the signed update — NOT the type-origin id (0x7b50…f580). Only this
+  // constant moves when Pyth upgrades the verifier; the oracle never needs a republish.
+  LAZER_PACKAGE_ID:
+    "0xefbfd064480777699fd9c557a5804d72ace7bc82661fdc8d1f1a44ea6d92ee10",
+
+  LAZER_STATE_ID:
+    "0xd0db9c1e9212a98120384bf78d8b8c985d87b9ee6921dffcf9d1394062911573",
+
+  // Backend proxy serving the signed payload at `${LAZER_PROXY_URL}/lazer/update`.
+  LAZER_PROXY_URL: "https://api.alphalend.xyz",
+
+  // Per-network Lazer default; flip to `true` at cutover.
+  LAZER_ENABLED: false,
+
+  // Client-side freshness ceiling (ms); mirror of the proxy's LAZER_STALE_MS default.
+  LAZER_MAX_PROXY_AGE_MS: 3000,
+
   // Coin Types
   SUI_COIN_TYPE: "0x2::sui::SUI",
 

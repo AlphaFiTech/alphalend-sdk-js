@@ -50,6 +50,18 @@ export interface Constants {
 
   PYTH_PRICE_PATH: string;
 
+  // Pyth Lazer (Pyth Pro) Constants
+  LAZER_PACKAGE_ID: string;
+
+  LAZER_STATE_ID: string;
+
+  LAZER_PROXY_URL: string;
+
+  LAZER_ENABLED: boolean;
+
+  // Client-side freshness ceiling for the proxy payload (ms); mirror of the proxy's LAZER_STALE_MS.
+  LAZER_MAX_PROXY_AGE_MS: number;
+
   // Coin Types
   SUI_COIN_TYPE: string;
 
