@@ -21,19 +21,43 @@ export async function getClaimRewardInput(
 ): Promise<{ marketId: number; coinTypes: string[] }[]> {
   const position = await getUserPosition(blockchain, userAddress);
   if (!position) return [];
+
+  // Fetch every distinct market referenced by the position's reward
+  // distributors ONCE and in parallel. The previous implementation awaited
+  // blockchain.getMarket() sequentially inside the loop (an N+1 pattern) and
+  // re-fetched the same market for its deposit and borrow distributors. With
+  // ~30 markets that dominated claim-transaction build time (~12s on the
+  // public Sui GraphQL endpoint, ~384ms per sequential round-trip). Fetching
+  // unique markets concurrently brings this down to ~2s. Per-request latency
+  // is transport-bound, so the win comes from parallelism + de-duplication
+  // rather than the transport itself — see
+  // __tests__/grpc-vs-graphql-benchmark.test.ts.
+  const uniqueMarketIds = [
+    ...new Set(position.rewardDistributors.map((rd) => Number(rd.marketId))),
+  ];
+  const fetchedMarkets = await Promise.all(
+    uniqueMarketIds.map((id) => blockchain.getMarket(id).catch(() => undefined)),
+  );
+  const marketById = new Map<number, MarketType>();
+  uniqueMarketIds.forEach((id, i) => {
+    const market = fetchedMarkets[i];
+    if (market) marketById.set(id, market);
+  });
+
   const rewardInput: { marketId: number; coinTypes: string[] }[] = [];
   const marketActionMap: Map<number, string[]> = new Map();
 
   for (const rewardDistributor of position.rewardDistributors) {
     const marketId = Number(rewardDistributor.marketId);
-    const coinTypes: Set<string> = new Set(marketActionMap.get(marketId) ?? []);
-    const marketRewardDistributor = await getRewardDistributor(
-      blockchain,
-      marketId,
-      rewardDistributor.isDeposit,
-    );
+    const market = marketById.get(marketId);
+    if (!market) continue;
+
+    const marketRewardDistributor = rewardDistributor.isDeposit
+      ? market.depositRewardDistributor
+      : market.borrowRewardDistributor;
     if (!marketRewardDistributor) continue;
 
+    const coinTypes: Set<string> = new Set(marketActionMap.get(marketId) ?? []);
     addClaimableCoinTypes(
       rewardDistributor,
       marketRewardDistributor,
@@ -88,18 +112,6 @@ function addClaimableCoinTypes(
       coinTypes.add(marketReward.coinType);
     }
   }
-}
-
-async function getRewardDistributor(
-  blockchain: Blockchain,
-  marketId: number,
-  isDepositRewardDistributor: boolean,
-): Promise<RewardDistributorType | undefined> {
-  const market: MarketType = await blockchain.getMarket(marketId);
-  if (!market) return undefined;
-  return isDepositRewardDistributor
-    ? market.depositRewardDistributor
-    : market.borrowRewardDistributor;
 }
 
 export async function setPrices(tx: Transaction) {
