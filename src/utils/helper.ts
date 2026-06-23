@@ -27,22 +27,24 @@ export async function getClaimRewardInput(
   // blockchain.getMarket() sequentially inside the loop (an N+1 pattern) and
   // re-fetched the same market for its deposit and borrow distributors. With
   // ~30 markets that dominated claim-transaction build time (~12s on the
-  // public Sui GraphQL endpoint, ~384ms per sequential round-trip). Fetching
-  // unique markets concurrently brings this down to ~2s. Per-request latency
-  // is transport-bound, so the win comes from parallelism + de-duplication
-  // rather than the transport itself — see
-  // __tests__/grpc-vs-graphql-benchmark.test.ts.
+  // public Sui GraphQL endpoint, ~384ms per sequential round-trip); fetching
+  // unique markets concurrently brings this down to ~2s. The win is
+  // parallelism + de-duplication, not the transport.
+  //
+  // No .catch() here on purpose: blockchain.getMarket() throws on a
+  // missing/failed fetch, and these markets drive the claim. We let that
+  // reject the whole call (as the previous sequential await did) so a
+  // transient GraphQL error surfaces loudly rather than silently dropping a
+  // market's rewards and building an incomplete claim transaction.
   const uniqueMarketIds = [
     ...new Set(position.rewardDistributors.map((rd) => Number(rd.marketId))),
   ];
   const fetchedMarkets = await Promise.all(
-    uniqueMarketIds.map((id) => blockchain.getMarket(id).catch(() => undefined)),
+    uniqueMarketIds.map((id) => blockchain.getMarket(id)),
   );
-  const marketById = new Map<number, MarketType>();
-  uniqueMarketIds.forEach((id, i) => {
-    const market = fetchedMarkets[i];
-    if (market) marketById.set(id, market);
-  });
+  const marketById = new Map<number, MarketType>(
+    uniqueMarketIds.map((id, i) => [id, fetchedMarkets[i]]),
+  );
 
   const rewardInput: { marketId: number; coinTypes: string[] }[] = [];
   const marketActionMap: Map<number, string[]> = new Map();
