@@ -1117,14 +1117,15 @@ export class AlphalendClient {
   ): Promise<Transaction | undefined> {
     const tx = params.tx ?? new Transaction();
 
-    // Ensure SDK is initialized to have access to coin metadata (including prices)
-    await this.ensureInitialized();
-
-    // Get all claimable rewards
-    const rewardInput = await getClaimRewardInput(
-      this.blockchain,
-      params.address,
-    );
+    // ensureInitialized (coin metadata fetch) and getClaimRewardInput (position
+    // + market reads) are independent network round-trips, so run them
+    // concurrently instead of sequentially.
+    const [, rewardInput] = await Promise.all([
+      // Ensure SDK is initialized to have access to coin metadata (including prices)
+      this.ensureInitialized(),
+      // Get all claimable rewards
+      getClaimRewardInput(this.blockchain, params.address),
+    ]);
 
     if (!rewardInput || rewardInput.length === 0) {
       return undefined;
@@ -1370,20 +1371,21 @@ export class AlphalendClient {
   ): Promise<Transaction | undefined> {
     const tx = params.tx ?? new Transaction();
 
-    // Update prices if specified
-    if (
+    const shouldUpdatePrices =
       this.network === "mainnet" &&
-      params.priceUpdateCoinTypes &&
-      params.priceUpdateCoinTypes.length > 0
-    ) {
-      await this.updatePrices(tx, params.priceUpdateCoinTypes);
-    }
+      !!params.priceUpdateCoinTypes &&
+      params.priceUpdateCoinTypes.length > 0;
 
-    // Get reward input data (markets and coin types)
-    const rewardInput = await getClaimRewardInput(
-      this.blockchain,
-      params.address,
-    );
+    // updatePrices (Pyth fetch + price-update moveCalls) and getClaimRewardInput
+    // (position + market reads) are independent network round-trips, so run them
+    // concurrently. updatePrices still appends its price-update calls before the
+    // reward-collection loop below, preserving transaction ordering.
+    const [, rewardInput] = await Promise.all([
+      shouldUpdatePrices
+        ? this.updatePrices(tx, params.priceUpdateCoinTypes!)
+        : Promise.resolve(),
+      getClaimRewardInput(this.blockchain, params.address),
+    ]);
 
     // Collect rewards for each market and coin type
     const rewardCoinsByType = new Map<string, TransactionObjectArgument[]>();
