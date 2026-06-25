@@ -1,8 +1,6 @@
 import { SuiJsonRpcClient } from "@mysten/sui/jsonRpc";
-import {
-  SuiPriceServiceConnection,
-  SuiPythClient,
-} from "@pythnetwork/pyth-sui-js";
+import { SuiPythClient } from "@pythnetwork/pyth-sui-js";
+import { HermesClient } from "@pythnetwork/hermes-client";
 import {
   getAlphafiConstants,
   getConstants,
@@ -15,9 +13,11 @@ import {
   TransactionArgument,
 } from "@mysten/sui/transactions";
 import {
+  appendOracleToLendingBridge,
   getPriceInfoObjectIdsWithUpdate,
   updatePriceTransaction,
 } from "../utils/oracle.js";
+import { appendLazerUpdate, fetchLazerUpdateBytes } from "../utils/lazer.js";
 import {
   SupplyParams,
   WithdrawParams,
@@ -73,13 +73,14 @@ import { buildFlashRepayTransaction } from "./flashRepay.js";
 
 export class AlphalendClient {
   pythClient: SuiPythClient;
-  pythConnection: SuiPriceServiceConnection;
+  pythConnection: HermesClient;
   network: Network;
   constants: Constants;
   lendingProtocol: LendingProtocol;
   blockchain: Blockchain;
   sevenKGateway: SevenKGateway;
   cetusSwap: CetusSwap;
+  useLazer: boolean;
 
   // Dynamic coin metadata properties
   private coinMetadataMap: Map<string, CoinMetadata> = new Map();
@@ -128,10 +129,14 @@ export class AlphalendClient {
     });
     this.pythClient = new SuiPythClient(
       pythSuiClient,
-      this.constants.PYTH_STATE_ID,
-      this.constants.WORMHOLE_STATE_ID,
+      this.constants.PYTH_CORE_UPGRADED
+        ? this.constants.PYTH_UPGRADED_STATE_ID
+        : this.constants.PYTH_STATE_ID,
+      this.constants.PYTH_CORE_UPGRADED
+        ? this.constants.WORMHOLE_UPGRADED_STATE_ID
+        : this.constants.WORMHOLE_STATE_ID,
     );
-    this.pythConnection = new SuiPriceServiceConnection(
+    this.pythConnection = new HermesClient(
       network === "mainnet"
         ? "https://hermes.pyth.network"
         : "https://hermes-beta.pyth.network",
@@ -140,6 +145,7 @@ export class AlphalendClient {
     this.blockchain = new Blockchain(network, graphqlUrl);
     this.sevenKGateway = new SevenKGateway();
     this.cetusSwap = new CetusSwap("mainnet");
+    this.useLazer = this.constants.LAZER_ENABLED;
 
     // If a coin metadata map is provided, use it and mark as initialized
     if (options?.coinMetadataMap) {
@@ -159,6 +165,30 @@ export class AlphalendClient {
     return this.coinMetadataMap;
   }
 
+  async updatePricesLazer(tx: Transaction, coinTypes: string[]): Promise<void> {
+    await this.ensureInitialized();
+    const bytes = await fetchLazerUpdateBytes(
+      this.constants.LAZER_PROXY_URL,
+      this.constants.LAZER_MAX_PROXY_AGE_MS,
+    );
+    const oracleInitialSharedVersion =
+      await this.blockchain.getInitialSharedVersion(
+        this.constants.ALPHAFI_ORACLE_OBJECT_ID,
+      );
+    appendLazerUpdate(
+      tx,
+      this.constants.LAZER_PACKAGE_ID,
+      this.constants.ALPHAFI_LATEST_ORACLE_PACKAGE_ID,
+      this.constants.ALPHAFI_ORACLE_OBJECT_ID,
+      oracleInitialSharedVersion,
+      this.constants.LAZER_STATE_ID,
+      bytes,
+    );
+    for (const coinType of new Set(coinTypes)) {
+      appendOracleToLendingBridge(tx, coinType, this.constants);
+    }
+  }
+
   /**
    * Updates price information for assets from Pyth oracle
    *
@@ -173,6 +203,10 @@ export class AlphalendClient {
    * @returns Transaction object with price update calls
    */
   async updatePrices(tx: Transaction, coinTypes: string[]) {
+    if (this.useLazer) {
+      await this.updatePricesLazer(tx, coinTypes);
+      return;
+    }
     // Auto-initialize market data if needed
     await this.ensureInitialized();
 
@@ -189,6 +223,8 @@ export class AlphalendClient {
         updatePriceFeedIds,
         this.pythClient,
         this.pythConnection,
+        this.constants.PYTH_CORE_UPGRADED,
+        this.constants.PYTH_PROXY_URL,
       );
     }
     const oracleInitialSharedVersion =
@@ -212,6 +248,10 @@ export class AlphalendClient {
   }
 
   async updateAllPrices(tx: Transaction, coinTypes: string[]) {
+    if (this.useLazer) {
+      await this.updatePricesLazer(tx, coinTypes);
+      return;
+    }
     // Auto-initialize market data if needed
     await this.ensureInitialized();
 
@@ -225,6 +265,8 @@ export class AlphalendClient {
       updatePriceFeedIds,
       this.pythClient,
       this.pythConnection,
+      this.constants.PYTH_CORE_UPGRADED,
+      this.constants.PYTH_PROXY_URL,
     );
     const oracleInitialSharedVersion =
       await this.blockchain.getInitialSharedVersion(
@@ -2172,7 +2214,12 @@ export class AlphalendClient {
    */
   private async fetchAndCacheCoinMetadata(): Promise<void> {
     try {
-      const apiUrl = "https://api.alphalend.xyz/public/graphql";
+      const env = typeof process !== "undefined" ? process.env : {};
+      const apiUrl =
+        env.ALPHALEND_GRAPHQL_URL ||
+        env.REACT_APP_ALPHALEND_GRAPHQL_URL ||
+        env.REACT_APP_GRAPHQL_URL ||
+        "https://api.alphalend.xyz/public/graphql";
 
       // Extended query to get all the data we need
       const query = `

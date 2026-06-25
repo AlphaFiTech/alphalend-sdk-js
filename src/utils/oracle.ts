@@ -7,10 +7,8 @@
  * - Handles the connection between external price feeds and the lending protocol
  */
 import { Inputs, Transaction } from "@mysten/sui/transactions";
-import {
-  SuiPriceServiceConnection,
-  SuiPythClient,
-} from "@pythnetwork/pyth-sui-js";
+import { SuiPythClient } from "@pythnetwork/pyth-sui-js";
+import { HermesClient } from "@pythnetwork/hermes-client";
 import { Constants } from "../constants/types.js";
 
 /**
@@ -29,17 +27,46 @@ export interface UpdatePriceTransactionArgs {
  * @param tx - The transaction to add price updates to
  * @param priceIDs - Array of Pyth price feed IDs
  * @param pythClient - SuiPythClient instance
- * @param pythConnection - SuiPriceServiceConnection instance
+ * @param pythConnection - Pyth Hermes client
+ * @param pythCoreUpgraded - When true (post Pyth Core upgrade), fetch signed update
+ *   data from `pythProxyUrl`. Defaults to false (existing behavior).
+ * @param pythProxyUrl - Hermes-compatible endpoint base. Only used when `pythCoreUpgraded` is true.
  * @returns Promise resolving to an array of price info object IDs
  */
 export async function getPriceInfoObjectIdsWithUpdate(
   tx: Transaction,
   priceIDs: string[],
   pythClient: SuiPythClient,
-  pythConnection: SuiPriceServiceConnection,
+  pythConnection: HermesClient,
+  pythCoreUpgraded = false,
+  pythProxyUrl = "https://hermes.pyth.network",
 ): Promise<string[]> {
-  const priceFeedUpdateData =
-    await pythConnection.getPriceFeedsUpdateData(priceIDs);
+  let priceFeedUpdateData: Buffer[];
+  if (pythCoreUpgraded) {
+    const idsQuery = priceIDs
+      .map((id) => `ids[]=${id.startsWith("0x") ? id : "0x" + id}`)
+      .join("&");
+    const res = await fetch(
+      `${pythProxyUrl}/v2/updates/price/latest?${idsQuery}&encoding=hex`,
+    );
+    if (!res.ok) {
+      throw new Error(
+        `Pyth proxy request failed: ${res.status} ${res.statusText}`,
+      );
+    }
+    const json = await res.json();
+    priceFeedUpdateData = (json.binary.data as string[]).map((h: string) =>
+      Buffer.from(h.startsWith("0x") ? h.slice(2) : h, "hex"),
+    );
+  } else {
+    const priceUpdates = await pythConnection.getLatestPriceUpdates(priceIDs, {
+      encoding: "base64",
+      parsed: false,
+    });
+    priceFeedUpdateData = priceUpdates.binary.data.map((update) =>
+      Buffer.from(update, "base64"),
+    );
+  }
 
   const priceInfoObjectIds = await pythClient.updatePriceFeeds(
     tx,
@@ -67,6 +94,27 @@ export async function getPriceInfoObjectIdsWithoutUpdate(
     }),
   );
   return priceInfoObjectIds;
+}
+
+export function appendOracleToLendingBridge(
+  tx: Transaction,
+  coinType: string,
+  constants: Constants,
+) {
+  const coinTypeName = tx.moveCall({
+    target: `0x1::type_name::get`,
+    typeArguments: [coinType],
+  });
+
+  const oraclePriceInfo = tx.moveCall({
+    target: `${constants.ALPHAFI_LATEST_ORACLE_PACKAGE_ID}::oracle::get_price_info`,
+    arguments: [tx.object(constants.ALPHAFI_ORACLE_OBJECT_ID), coinTypeName],
+  });
+
+  tx.moveCall({
+    target: `${constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::update_price`,
+    arguments: [tx.object(constants.LENDING_PROTOCOL_ID), oraclePriceInfo],
+  });
 }
 
 /**
@@ -98,18 +146,5 @@ export function updatePriceTransaction(
     ],
   });
 
-  const coinTypeName = tx.moveCall({
-    target: `0x1::type_name::get`,
-    typeArguments: [args.coinType],
-  });
-
-  const oraclePriceInfo = tx.moveCall({
-    target: `${constants.ALPHAFI_LATEST_ORACLE_PACKAGE_ID}::oracle::get_price_info`,
-    arguments: [tx.object(constants.ALPHAFI_ORACLE_OBJECT_ID), coinTypeName],
-  });
-
-  tx.moveCall({
-    target: `${constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::update_price`,
-    arguments: [tx.object(constants.LENDING_PROTOCOL_ID), oraclePriceInfo],
-  });
+  appendOracleToLendingBridge(tx, args.coinType, constants);
 }

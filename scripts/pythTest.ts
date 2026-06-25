@@ -1,7 +1,5 @@
-import {
-  SuiPriceServiceConnection,
-  SuiPythClient,
-} from "@pythnetwork/pyth-sui-js";
+import { SuiPythClient } from "@pythnetwork/pyth-sui-js";
+import { HermesClient } from "@pythnetwork/hermes-client";
 import { getConstants } from "../src/constants";
 import { getExecStuff } from "./testRun";
 import { Transaction } from "@mysten/sui/transactions";
@@ -14,16 +12,19 @@ async function run() {
     constants.PYTH_STATE_ID,
     constants.WORMHOLE_STATE_ID,
   );
-  const pythConnection = new SuiPriceServiceConnection(
-    "https://hermes.pyth.network",
-  );
+  const pythConnection = new HermesClient("https://hermes.pyth.network");
 
   const tx = new Transaction();
   const priceIDs = [
     "0a03c915d98ab4084795d283e20f08d7130acd826bca180754b120bfc202f2fb",
   ];
-  const priceFeedUpdateData =
-    await pythConnection.getPriceFeedsUpdateData(priceIDs);
+  const priceUpdates = await pythConnection.getLatestPriceUpdates(priceIDs, {
+    encoding: "base64",
+    parsed: false,
+  });
+  const priceFeedUpdateData = priceUpdates.binary.data.map((update) =>
+    Buffer.from(update, "base64"),
+  );
 
   await pythClient.updatePriceFeeds(tx, priceFeedUpdateData, priceIDs);
 

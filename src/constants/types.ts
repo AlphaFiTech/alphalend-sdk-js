@@ -50,6 +50,34 @@ export interface Constants {
 
   PYTH_PRICE_PATH: string;
 
+  // Pyth Core in-place upgrade ("sui-pro-compatible"). When true, use the upgraded
+  // Pyth/Wormhole State ids and fetch Hermes update data from PYTH_PROXY_URL.
+  PYTH_CORE_UPGRADED: boolean;
+
+  // Upgraded (post-cutover) Pyth + Wormhole package + State ids, used only when PYTH_CORE_UPGRADED is true.
+  PYTH_UPGRADED_PACKAGE_ID: string;
+
+  PYTH_UPGRADED_STATE_ID: string;
+
+  WORMHOLE_UPGRADED_PACKAGE_ID: string;
+
+  WORMHOLE_UPGRADED_STATE_ID: string;
+
+  // Hermes-compatible update endpoint base. May be public Hermes or the alphalend-api proxy when mounted.
+  PYTH_PROXY_URL: string;
+
+  // Pyth Lazer (Pyth Pro) constants.
+  LAZER_PACKAGE_ID: string;
+
+  LAZER_STATE_ID: string;
+
+  LAZER_PROXY_URL: string;
+
+  LAZER_ENABLED: boolean;
+
+  // Client-side freshness ceiling for the proxy payload (ms); mirror of the proxy's LAZER_STALE_MS.
+  LAZER_MAX_PROXY_AGE_MS: number;
+
   // Coin Types
   SUI_COIN_TYPE: string;
 

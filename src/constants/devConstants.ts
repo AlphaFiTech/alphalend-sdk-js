@@ -70,6 +70,29 @@ export const devConstants: Constants = {
 
   PYTH_PRICE_PATH: "/api/latest_price_feeds",
 
+  // --- Pyth Core in-place upgrade (flip PYTH_CORE_UPGRADED at the 2026-07-31 cutover) ---
+  // Upgraded ids are mainnet values (Pyth's upgrade doc is mainnet-only); dev keeps the flag off.
+  PYTH_CORE_UPGRADED: false,
+  PYTH_UPGRADED_PACKAGE_ID:
+    "0x55300367a2d40813727ccac4ecee977a39fb9cdb46f2e6b2c354b9798f5de2c0",
+  PYTH_UPGRADED_STATE_ID:
+    "0x03719fae774ddab3cfcaa53bbc046f0cbe21410019b6280811bf3f9f4b05839d",
+  WORMHOLE_UPGRADED_PACKAGE_ID:
+    "0x99de5c967d8206ef4b75c0afab3df2a59eb02b05c282821db803831008ac25b4",
+  WORMHOLE_UPGRADED_STATE_ID:
+    "0xdbca52b9fb4f712e25f61f974586d93ac541bcf8389564f0323bb07215168b5c",
+  PYTH_PROXY_URL: "https://hermes.pyth.network",
+
+  // Pyth Lazer (Pyth Pro) Constants. Testnet Pyth's canonical package is still v1 (no _v2), so testnet
+  // uses our published v2 verifier harness for the PTB verify call.
+  LAZER_PACKAGE_ID:
+    "0xf9686303df959b4b6a000fcac0befe0cc2cee24f2c2ec02dae914b3c525a5639",
+  LAZER_STATE_ID:
+    "0x470a1b15fae80369812c0f96f70788321f6f822ff8b8f35884743c175919fc39",
+  LAZER_PROXY_URL: "https://api-staging.alphalend.xyz",
+  LAZER_ENABLED: false,
+  LAZER_MAX_PROXY_AGE_MS: 3000,
+
   // Coin Types
   SUI_COIN_TYPE: "0x2::sui::SUI",
 

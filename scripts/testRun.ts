@@ -6,10 +6,7 @@ import { AlphalendClient } from "../src/core/client.js";
 import * as dotenv from "dotenv";
 import { setPrices } from "../src/utils/helper.js";
 import { SuiClient } from "@mysten/sui/client";
-import {
-  SuiPriceServiceConnection,
-  SuiPythClient,
-} from "@pythnetwork/pyth-sui-js";
+import { SuiPythClient } from "@pythnetwork/pyth-sui-js";
 
 dotenv.config();
 
@@ -259,16 +256,13 @@ async function run() {
     constants.PYTH_STATE_ID,
     constants.WORMHOLE_STATE_ID,
   );
-  const pythConnection = new SuiPriceServiceConnection(
-    "https://hermes.pyth.network",
-  );
   // const positionCapId =
   // "0xf9ca35f404dd3c1ea10c381dd3e1fe8a0c4586adf5e186f4eb52307462a5af7d";
   // await getPriceInfoObjectIdsWithUpdate(
   //   tx,
   //   [pythPriceFeedIdMap[coinType]],
   //   pythClient,
-  //   pythConnection,
+  //   new HermesClient("https://hermes.pyth.network"),
   // );
   // console.log(pythPriceFeedIdMap[coinType]);
   const priceInfoObjectIds = await pythClient.getPriceFeedObjectId(
