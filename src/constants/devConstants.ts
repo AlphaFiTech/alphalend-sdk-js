@@ -81,7 +81,7 @@ export const devConstants: Constants = {
     "0x99de5c967d8206ef4b75c0afab3df2a59eb02b05c282821db803831008ac25b4",
   WORMHOLE_UPGRADED_STATE_ID:
     "0xdbca52b9fb4f712e25f61f974586d93ac541bcf8389564f0323bb07215168b5c",
-  PYTH_PROXY_URL: "https://hermes.pyth.network",
+  PYTH_HERMES_URL: "https://hermes.pyth.network",
 
   // Pyth Lazer (Pyth Pro) Constants. Testnet Pyth's canonical package is still v1 (no _v2), so testnet
   // uses our published v2 verifier harness for the PTB verify call.

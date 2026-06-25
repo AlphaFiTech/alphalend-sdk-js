@@ -224,7 +224,7 @@ export class AlphalendClient {
         this.pythClient,
         this.pythConnection,
         this.constants.PYTH_CORE_UPGRADED,
-        this.constants.PYTH_PROXY_URL,
+        this.constants.PYTH_HERMES_URL,
       );
     }
     const oracleInitialSharedVersion =
@@ -266,7 +266,7 @@ export class AlphalendClient {
       this.pythClient,
       this.pythConnection,
       this.constants.PYTH_CORE_UPGRADED,
-      this.constants.PYTH_PROXY_URL,
+      this.constants.PYTH_HERMES_URL,
     );
     const oracleInitialSharedVersion =
       await this.blockchain.getInitialSharedVersion(
