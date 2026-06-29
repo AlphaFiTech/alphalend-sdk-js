@@ -71,17 +71,18 @@ export const devConstants: Constants = {
   PYTH_PRICE_PATH: "/api/latest_price_feeds",
 
   // --- Pyth Core in-place upgrade (flip PYTH_CORE_UPGRADED at the 2026-07-31 cutover) ---
-  // Upgraded ids are mainnet values (Pyth's upgrade doc is mainnet-only); dev keeps the flag off.
+  // Upgraded ids = Pyth's official TESTNET upgrade addresses; flag stays off until staging rehearsal.
   PYTH_CORE_UPGRADED: false,
   PYTH_UPGRADED_PACKAGE_ID:
-    "0x55300367a2d40813727ccac4ecee977a39fb9cdb46f2e6b2c354b9798f5de2c0",
+    "0xd1ac23e1582080e2e5d43dbad1cf463ea2337cdbbb1a9ca669e470cefb74d8fd",
   PYTH_UPGRADED_STATE_ID:
-    "0x03719fae774ddab3cfcaa53bbc046f0cbe21410019b6280811bf3f9f4b05839d",
+    "0x3c48fe392912de6c18087a2b3f5fdbfbfdb4598e180947feff1f12f8e9ea073e",
   WORMHOLE_UPGRADED_PACKAGE_ID:
-    "0x99de5c967d8206ef4b75c0afab3df2a59eb02b05c282821db803831008ac25b4",
+    "0xe79f4e3e02ce132f40f39e73220493a802329d3cb6ad7f789e98a78910fc0053",
   WORMHOLE_UPGRADED_STATE_ID:
-    "0xdbca52b9fb4f712e25f61f974586d93ac541bcf8389564f0323bb07215168b5c",
-  PYTH_HERMES_URL: "https://hermes.pyth.network",
+    "0x750da8e6d16b6a363a39fe2eaa8295ac224a1e6fce4e47b58845e2e8746164f0",
+  // Staging api /pyth proxy (holds the Pyth Pro key); public hermes is auth-gated after 2026-07-31.
+  PYTH_HERMES_URL: "https://api-staging.alphalend.xyz/pyth",
 
   // Pyth Lazer (Pyth Pro) Constants. Testnet Pyth's canonical package is still v1 (no _v2), so testnet
   // uses our published v2 verifier harness for the PTB verify call.

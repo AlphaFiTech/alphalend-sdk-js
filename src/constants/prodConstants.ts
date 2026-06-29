@@ -81,7 +81,10 @@ export const prodConstants: Constants = {
     "0x99de5c967d8206ef4b75c0afab3df2a59eb02b05c282821db803831008ac25b4",
   WORMHOLE_UPGRADED_STATE_ID:
     "0xdbca52b9fb4f712e25f61f974586d93ac541bcf8389564f0323bb07215168b5c",
-  PYTH_HERMES_URL: "https://hermes.pyth.network",
+  // Route Pyth Core updates through the alphalend-api /pyth proxy, which injects the Pyth Pro key
+  // server-side. The public hermes.pyth.network becomes auth-gated at the 2026-07-31 Pyth Core upgrade,
+  // and the browser must never hold the key.
+  PYTH_HERMES_URL: "https://api.alphalend.xyz/pyth",
 
   // Pyth Lazer (Pyth Pro) Constants.
   // LAZER_PACKAGE_ID is the package VERSION exposing parse_and_verify_le_ecdsa_update_v2, not the type-origin id.

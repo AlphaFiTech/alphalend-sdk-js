@@ -39,7 +39,7 @@ export async function getPriceInfoObjectIdsWithUpdate(
   pythClient: SuiPythClient,
   pythConnection: HermesClient,
   pythCoreUpgraded = false,
-  pythProxyUrl = "https://hermes.pyth.network",
+  pythProxyUrl = "https://api.alphalend.xyz/pyth",
 ): Promise<string[]> {
   let priceFeedUpdateData: Buffer[];
   if (pythCoreUpgraded) {
