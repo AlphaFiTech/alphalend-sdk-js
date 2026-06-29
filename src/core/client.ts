@@ -1,4 +1,4 @@
-import { SuiClient } from "@mysten/sui/client";
+import { SuiJsonRpcClient } from "@mysten/sui/jsonRpc";
 import {
   SuiPriceServiceConnection,
   SuiPythClient,
@@ -122,7 +122,10 @@ export class AlphalendClient {
         : network === "testnet"
           ? "https://fullnode.testnet.sui.io/"
           : "https://fullnode.devnet.sui.io/";
-    const pythSuiClient = new SuiClient({ url: pythFullnodeUrl });
+    const pythSuiClient = new SuiJsonRpcClient({
+      url: pythFullnodeUrl,
+      network,
+    });
     this.pythClient = new SuiPythClient(
       pythSuiClient,
       this.constants.PYTH_STATE_ID,
@@ -256,25 +259,13 @@ export class AlphalendClient {
   async supply(params: SupplyParams): Promise<Transaction | undefined> {
     const tx = params.tx ?? new Transaction();
 
-    // Get coin object
-    const isSui = params.coinType === this.constants.SUI_COIN_TYPE;
-    let supplyCoinA: TransactionObjectArgument | undefined;
-    if (!isSui) {
-      const coin = await this.getCoinObject(
-        tx,
-        params.coinType,
-        params.address,
-      );
-      if (!coin) {
-        console.error("Coin object not found");
-        return undefined;
-      }
-
-      supplyCoinA = tx.splitCoins(coin, [params.amount]);
-      tx.transferObjects([coin], params.address);
-    } else {
-      supplyCoinA = tx.splitCoins(tx.gas, [params.amount]);
-    }
+    // Source the supply coin from address balance + coin objects (SUI handled inside).
+    const supplyCoinA: TransactionObjectArgument = this.getCoinObject(
+      tx,
+      params.coinType,
+      params.address,
+      BigInt(params.amount),
+    );
 
     if (params.positionCapId) {
       // Build add_collateral transaction
@@ -389,36 +380,20 @@ export class AlphalendClient {
 
     // Edge case: user already has dbUSDC — direct supply, no swap or Deepbook deposit.
     if (this.isDbUsdcInput(params.inputCoinType)) {
-      const coinObject = await this.getCoinObject(
+      coinToSupply = this.getCoinObject(
         tx,
         this.constants.DBUSDC_COIN_TYPE,
         params.address,
-        params.inputAmount,
+        BigInt(params.inputAmount),
       );
-      if (!coinObject) {
-        console.error("Failed to get dbUSDC coin object");
-        return undefined;
-      }
-      coinToSupply = tx.splitCoins(coinObject, [params.inputAmount]);
-      if (coinObject !== tx.gas) {
-        tx.transferObjects([coinObject], params.address);
-      }
     } else if (this.isUsdcInput(params.inputCoinType)) {
-      // Path A: User pays USDC. Get USDC coin and use it for Deepbook deposit.
-      const coinObject = await this.getCoinObject(
+      // Path A: User pays USDC. Source USDC and use it for the Deepbook deposit.
+      usdcCoin = this.getCoinObject(
         tx,
         this.constants.USDC_COIN_TYPE,
         params.address,
-        params.inputAmount,
+        BigInt(params.inputAmount),
       );
-      if (!coinObject) {
-        console.error("Failed to get USDC coin object");
-        return undefined;
-      }
-      usdcCoin = tx.splitCoins(coinObject, [params.inputAmount]);
-      if (coinObject !== tx.gas) {
-        tx.transferObjects([coinObject], params.address);
-      }
     } else {
       // Path B: User pays another token. Swap to USDC via Cetus, then use that for Deepbook.
       const quoteResponse = await this.cetusSwap.getCetusSwapQuote(
@@ -431,23 +406,12 @@ export class AlphalendClient {
         return undefined;
       }
 
-      const coinObject = await this.getCoinObject(
+      const inputCoin = this.getCoinObject(
         tx,
         params.inputCoinType,
         params.address,
         BigInt(quoteResponse.amountIn.toString()),
       );
-      if (!coinObject) {
-        console.error("Failed to get input coin object");
-        return undefined;
-      }
-
-      const inputCoin = tx.splitCoins(coinObject, [
-        quoteResponse.amountIn.toString(),
-      ]);
-      if (coinObject !== tx.gas) {
-        tx.transferObjects([coinObject], params.address);
-      }
 
       const usdcFromSwap = await this.cetusSwap.cetusSwapTokensTxb(
         quoteResponse as RouterDataV3,
@@ -579,27 +543,13 @@ export class AlphalendClient {
       return undefined;
     }
 
-    const coinObject = await this.getCoinObject(
+    // Source the exact swap-input amount from address balance + coin objects.
+    const inputCoin = this.getCoinObject(
       tx,
       params.inputCoinType,
       params.address,
       BigInt(quoteResponse.amountIn.toString()),
     );
-
-    if (!coinObject) {
-      console.error("Failed to get input coin object");
-      return undefined;
-    }
-
-    // Split the exact amount needed for the swap from the coin object
-    const inputCoin = tx.splitCoins(coinObject, [
-      quoteResponse.amountIn.toString(),
-    ]);
-
-    // Transfer the remaining coin back to the user
-    if (coinObject !== tx.gas) {
-      tx.transferObjects([coinObject], params.address);
-    }
 
     const supplyCoin = await this.cetusSwap.cetusSwapTokensTxb(
       quoteResponse as RouterDataV3,
@@ -703,7 +653,7 @@ export class AlphalendClient {
       coin = await this.handlePromise(tx, promise, params.coinType);
     }
     if (coin) {
-      tx.transferObjects([coin], params.address);
+      this.sendCoinToAddressBalance(tx, params.coinType, params.address, coin);
     }
 
     return tx;
@@ -825,7 +775,12 @@ export class AlphalendClient {
       coin,
     );
     if (withdrawCoin) {
-      tx.transferObjects([withdrawCoin], params.address);
+      this.sendCoinToAddressBalance(
+        tx,
+        params.outputCoinType,
+        params.address,
+        withdrawCoin,
+      );
     }
 
     return tx;
@@ -857,34 +812,14 @@ export class AlphalendClient {
       console.error("[AlphaLend SDK] Cetus returned empty quote");
       throw new Error("Failed to get swap quote: Empty response from Cetus");
     }
-    // Check if the input coin is SUI
-    const isInputSui = params.swapFromCoinType === this.constants.SUI_COIN_TYPE;
-    let coinObject: string | TransactionObjectArgument | undefined;
-    let inputCoin;
-
-    if (isInputSui) {
-      // For SUI, split directly from gas
-      inputCoin = tx.splitCoins(tx.gas, [quoteResponse.amountIn.toString()]);
-    } else {
-      // For other coins, get the coin object
-      coinObject = await this.getCoinObject(
-        tx,
-        params.swapFromCoinType,
-        params.address,
-      );
-
-      if (!coinObject) {
-        console.error("Failed to get input coin object");
-        return undefined;
-      }
-
-      // Split the exact amount needed for the swap from the coin object
-      inputCoin = tx.splitCoins(coinObject, [
-        quoteResponse.amountIn.toString(),
-      ]);
-
-      tx.transferObjects([coinObject], params.address);
-    }
+    // Source the exact swap-input amount from address balance + coin objects
+    // (SUI handled inside getCoinObject via the gas coin).
+    const inputCoin = this.getCoinObject(
+      tx,
+      params.swapFromCoinType,
+      params.address,
+      BigInt(quoteResponse.amountIn.toString()),
+    );
 
     // Perform the swap to get the coin for repayment
     let repayCoin;
@@ -921,8 +856,13 @@ export class AlphalendClient {
       ],
     });
 
-    // Transfer remaining coin from repayment back to user
-    tx.transferObjects([remainingCoin], params.address);
+    // Credit remaining coin from repayment back to the user's address balance
+    this.sendCoinToAddressBalance(
+      tx,
+      params.swapToCoinType,
+      params.address,
+      remainingCoin,
+    );
 
     return tx;
   }
@@ -983,7 +923,7 @@ export class AlphalendClient {
         ],
       });
     }
-    tx.transferObjects([coin], params.address);
+    this.sendCoinToAddressBalance(tx, params.coinType, params.address, coin);
 
     return tx;
   }
@@ -1002,25 +942,13 @@ export class AlphalendClient {
   async repay(params: RepayParams): Promise<Transaction | undefined> {
     const tx = params.tx ?? new Transaction();
 
-    // Get coin object
-    // Add 1 to the amount to repay to avoid rounding errors since contract returns the remaining amount.
-    const isSui = params.coinType === this.constants.SUI_COIN_TYPE;
-    let repayCoinA: TransactionObjectArgument | undefined;
-    if (!isSui) {
-      const coin = await this.getCoinObject(
-        tx,
-        params.coinType,
-        params.address,
-      );
-      if (!coin) {
-        console.error("Coin object not found");
-        return undefined;
-      }
-      repayCoinA = tx.splitCoins(coin, [params.amount]);
-      tx.transferObjects([coin], params.address);
-    } else {
-      repayCoinA = tx.splitCoins(tx.gas, [params.amount]);
-    }
+    // Source the repay coin from address balance + coin objects (SUI handled inside).
+    const repayCoinA: TransactionObjectArgument = this.getCoinObject(
+      tx,
+      params.coinType,
+      params.address,
+      BigInt(params.amount),
+    );
 
     // Build repay transaction
     const repayCoin = tx.moveCall({
@@ -1034,7 +962,12 @@ export class AlphalendClient {
         tx.object(this.constants.SUI_CLOCK_OBJECT_ID), // Clock object
       ],
     });
-    tx.transferObjects([repayCoin], params.address);
+    this.sendCoinToAddressBalance(
+      tx,
+      params.coinType,
+      params.address,
+      repayCoin,
+    );
 
     return tx;
   }
@@ -1111,10 +1044,20 @@ export class AlphalendClient {
             }
           } else {
             if (coin2) {
-              tx.transferObjects([coin2], params.address);
+              this.sendCoinToAddressBalance(
+                tx,
+                coinType,
+                params.address,
+                coin2,
+              );
             }
             if (coin1) {
-              tx.transferObjects([coin1], params.address);
+              this.sendCoinToAddressBalance(
+                tx,
+                coinType,
+                params.address,
+                coin1,
+              );
             }
           }
         } else if (coin1) {
@@ -1124,7 +1067,7 @@ export class AlphalendClient {
           ) {
             alphaCoin = this.mergeCoins(tx, alphaCoin, [coin1]);
           } else {
-            tx.transferObjects([coin1], params.address);
+            this.sendCoinToAddressBalance(tx, coinType, params.address, coin1);
           }
         }
       }
@@ -1174,14 +1117,15 @@ export class AlphalendClient {
   ): Promise<Transaction | undefined> {
     const tx = params.tx ?? new Transaction();
 
-    // Ensure SDK is initialized to have access to coin metadata (including prices)
-    await this.ensureInitialized();
-
-    // Get all claimable rewards
-    const rewardInput = await getClaimRewardInput(
-      this.blockchain,
-      params.address,
-    );
+    // ensureInitialized (coin metadata fetch) and getClaimRewardInput (position
+    // + market reads) are independent network round-trips, so run them
+    // concurrently instead of sequentially.
+    const [, rewardInput] = await Promise.all([
+      // Ensure SDK is initialized to have access to coin metadata (including prices)
+      this.ensureInitialized(),
+      // Get all claimable rewards
+      getClaimRewardInput(this.blockchain, params.address),
+    ]);
 
     if (!rewardInput || rewardInput.length === 0) {
       return undefined;
@@ -1345,10 +1289,11 @@ export class AlphalendClient {
       }
     }
 
-    // Handle coins that should be claimed directly to wallet
+    // Handle coins that should be claimed directly to the user's address balance
     if (coinsToClaimDirectly.size > 0) {
-      const coinsToTransfer = Array.from(coinsToClaimDirectly.values());
-      tx.transferObjects(coinsToTransfer, params.address);
+      for (const [coinType, coin] of coinsToClaimDirectly.entries()) {
+        this.sendCoinToAddressBalance(tx, coinType, params.address, coin);
+      }
     }
 
     // If no target coin, all rewards were either too small or claimed directly
@@ -1363,7 +1308,12 @@ export class AlphalendClient {
     }
 
     if (params.transferTargetCoin) {
-      tx.transferObjects([targetCoin], params.address);
+      this.sendCoinToAddressBalance(
+        tx,
+        params.targetCoinType,
+        params.address,
+        targetCoin,
+      );
       return tx;
     }
 
@@ -1382,7 +1332,12 @@ export class AlphalendClient {
       });
 
       // todo - check if remainingCoin is zero and destroy it if it is
-      tx.transferObjects([remainingCoin], params.address);
+      this.sendCoinToAddressBalance(
+        tx,
+        params.targetCoinType,
+        params.address,
+        remainingCoin,
+      );
     } else {
       // Supply the remaining reward coin to the target market
       tx.moveCall({
@@ -1416,20 +1371,21 @@ export class AlphalendClient {
   ): Promise<Transaction | undefined> {
     const tx = params.tx ?? new Transaction();
 
-    // Update prices if specified
-    if (
+    const shouldUpdatePrices =
       this.network === "mainnet" &&
-      params.priceUpdateCoinTypes &&
-      params.priceUpdateCoinTypes.length > 0
-    ) {
-      await this.updatePrices(tx, params.priceUpdateCoinTypes);
-    }
+      !!params.priceUpdateCoinTypes &&
+      params.priceUpdateCoinTypes.length > 0;
 
-    // Get reward input data (markets and coin types)
-    const rewardInput = await getClaimRewardInput(
-      this.blockchain,
-      params.address,
-    );
+    // updatePrices (Pyth fetch + price-update moveCalls) and getClaimRewardInput
+    // (position + market reads) are independent network round-trips, so run them
+    // concurrently. updatePrices still appends its price-update calls before the
+    // reward-collection loop below, preserving transaction ordering.
+    const [, rewardInput] = await Promise.all([
+      shouldUpdatePrices
+        ? this.updatePrices(tx, params.priceUpdateCoinTypes!)
+        : Promise.resolve(),
+      getClaimRewardInput(this.blockchain, params.address),
+    ]);
 
     // Collect rewards for each market and coin type
     const rewardCoinsByType = new Map<string, TransactionObjectArgument[]>();
@@ -1490,8 +1446,7 @@ export class AlphalendClient {
           ],
         });
       } else {
-        // todo - check if remainingCoin is zero and destroy it if it is
-        tx.transferObjects([coin], params.address);
+        this.sendCoinToAddressBalance(tx, coinType, params.address, coin);
       }
     };
 
@@ -1520,7 +1475,12 @@ export class AlphalendClient {
         });
 
         // todo - check if remainingCoin is zero and destroy it if it is
-        tx.transferObjects([remainingCoin], params.address);
+        this.sendCoinToAddressBalance(
+          tx,
+          coinType,
+          params.address,
+          remainingCoin,
+        );
       } else {
         // Not borrowed - supply or transfer
         handleCoin(mergedCoin, coinType, params.supplyMarkets?.get(coinType));
@@ -1807,20 +1767,37 @@ export class AlphalendClient {
    * Gets a coin object suitable for a transaction. Upto 200 coins are merged together and returned.
    *
    * @param tx Transaction to which the coin will be added
-   * @param type Fully qualified coin type to get
-   * @param address Address of the user that owns the coin
-   * @param amount Optional coin amount in mists. Providing this improves efficiency.
-   * Returns a coin with at least the requested amount (if possible by merging up to 200 coins).
-   * If the requested amount isn't available, returns the highest value coin that can be created.
-   * @returns Transaction argument representing the coin or undefined if coin not found
+   * @param type Fully qualified coin type to source
+   * @param address Owner address whose balance/coins are spent (sets tx sender)
+   * @param amount Exact coin amount in base units
+   * @returns Transaction argument representing the exact-amount coin
    */
-  async getCoinObject(
+  getCoinObject(
     tx: Transaction,
     type: string,
     address: string,
-    amount?: bigint,
-  ): Promise<string | TransactionObjectArgument | undefined> {
+    amount: bigint,
+  ): TransactionObjectArgument {
     return this.blockchain.getCoinObject(tx, type, address, amount);
+  }
+
+  /**
+   * Credits a coin to `address`'s address balance (the accumulator) instead of
+   * sending it as a standalone coin object. Used to return withdrawn/borrowed
+   * coins and leftovers back to the user.
+   *
+   * @param tx Transaction to which the move call will be added
+   * @param type Fully qualified coin type being returned
+   * @param address Recipient whose address balance is credited
+   * @param coin The coin to credit (consumed by the call)
+   */
+  sendCoinToAddressBalance(
+    tx: Transaction,
+    type: string,
+    address: string,
+    coin: TransactionObjectArgument | string,
+  ): void {
+    this.blockchain.sendCoinToAddressBalance(tx, type, address, coin);
   }
 
   private async handlePromise(

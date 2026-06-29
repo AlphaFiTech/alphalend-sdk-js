@@ -24,6 +24,19 @@ This SDK provides a comprehensive interface to interact with the AlphaLend lendi
 npm install @alphafi/alphalend-sdk
 ```
 
+## v3.0.0 — Mysten Sui v2 / ESM-only (breaking)
+
+- **`@mysten/sui` v2 peer dependency** (`^2.17.0`). Your app must provide it.
+  Internally `SuiClient`/`getFullnodeUrl` were replaced with v2's
+  `SuiJsonRpcClient`/`getJsonRpcFullnodeUrl` (from `@mysten/sui/jsonRpc`).
+- **ESM-only.** The CommonJS build (`dist/cjs`) and the `require` export were
+  dropped — `require('@alphafi/alphalend-sdk')` no longer works. Import it from
+  an ESM context or via a bundler.
+- **No `postinstall` / patches.** Earlier work-in-progress used a `patch-package`
+  hook to fix `@naviprotocol/lending` under v2; that would have broken consumer
+  installs. The flash-loan helpers are now vendored (`src/vendor/naviFlashloan.ts`),
+  so installing this package runs no lifecycle scripts and pulls no Navi dependency.
+
 ## Getting Started
 
 ### Creating an instance of the AlphaLend client

@@ -6,7 +6,7 @@ import {
   flashloanPTB,
   repayFlashLoanPTB,
   getAllFlashLoanAssets,
-} from "@naviprotocol/lending";
+} from "../vendor/naviFlashloan.js";
 import { Decimal } from "decimal.js";
 import { FlashRepayParams } from "./types.js";
 import type { AlphalendClient } from "./client.js";
@@ -342,8 +342,13 @@ export async function buildFlashRepayTransaction(
     ],
   });
 
-  // Step 10b: Transfer any leftover (after second repay) to user.
-  tx.transferObjects([leftoverCoin], params.address);
+  // Step 10b: Credit any leftover (after second repay) to the user's address balance.
+  client.sendCoinToAddressBalance(
+    tx,
+    params.repayCoinType,
+    params.address,
+    leftoverCoin,
+  );
 
   return tx;
 }

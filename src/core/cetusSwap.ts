@@ -3,7 +3,6 @@ import {
   getProvidersExcluding,
   RouterDataV3,
 } from "@cetusprotocol/aggregator-sdk";
-// import { getFullnodeUrl } from '@mysten/sui/client/network.js';
 import {
   Transaction,
   TransactionObjectArgument,

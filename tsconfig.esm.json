@@ -19,18 +19,12 @@
     // linting
     "strict": true,
     "isolatedModules": true,
-    "isolatedModules": true,
 
     // sources
     "sourceMap": true,
     "declaration": true,
     "declarationMap": true,
-    "inlineSources": true,
-    // Add the baseUrl option
-    "baseUrl": "./", // Specifies the base directory for non-relative module names
-    "paths": {
-      "@mysten/sui/*": ["node_modules/@mysten/sui/dist/esm/*"]
-    }
+    "inlineSources": true
   },
   "include": ["src/**/*"],
   "exclude": ["src/__tests__"]
