@@ -1,33 +1,46 @@
 import { Inputs, Transaction } from "@mysten/sui/transactions";
 import { SUI_CLOCK_OBJECT_ID, fromHex } from "@mysten/sui/utils";
 
+// Per-attempt request timeout (4s). The proxy serves a cached blob, so sub-second is normal; this
+// bounds a wedged proxy whose hung fetch would otherwise never reject, with headroom for a cold
+// mobile connection.
+const LAZER_FETCH_TIMEOUT_MS = 4000;
+const LAZER_FETCH_ATTEMPTS = 3;
+
 export async function fetchLazerUpdateBytes(
   proxyUrl: string,
 ): Promise<Uint8Array> {
   const url = `${proxyUrl.replace(/\/+$/, "")}/lazer/update`;
-  const attempts = 3;
+  let attempt = 0;
   let lastErr: unknown;
-  for (let attempt = 1; attempt <= attempts; attempt++) {
+
+  while (attempt < LAZER_FETCH_ATTEMPTS) {
+    attempt++;
+    const controller = new AbortController();
+    const timeout = setTimeout(
+      () => controller.abort(),
+      LAZER_FETCH_TIMEOUT_MS,
+    );
+
     try {
-      const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error(`Lazer proxy request failed: ${response.status}`);
-      }
-      const { hex } = (await response.json()) as {
-        hex: string;
-      };
-      if (typeof hex !== "string" || hex.length === 0) {
-        throw new Error("Lazer proxy response missing hex");
-      }
+      const res = await fetch(url, { signal: controller.signal });
+      if (!res.ok) throw new Error(`Lazer proxy request failed: ${res.status}`);
+      const { hex } = (await res.json()) as { hex?: string };
+      if (!hex) throw new Error("Lazer proxy response missing hex");
       return fromHex(hex);
-    } catch (e) {
-      lastErr = e;
-      if (attempt < attempts) {
-        const backoffMs = 300 * 2 ** attempt + Math.floor(Math.random() * 150);
-        await new Promise((r) => setTimeout(r, backoffMs));
+    } catch (err) {
+      lastErr = err;
+      if (attempt < LAZER_FETCH_ATTEMPTS) {
+        // exponential backoff + jitter before retrying
+        await new Promise((r) =>
+          setTimeout(r, 300 * 2 ** attempt + Math.floor(Math.random() * 150)),
+        );
       }
+    } finally {
+      clearTimeout(timeout);
     }
   }
+
   throw lastErr;
 }
 

@@ -92,7 +92,10 @@ describe("fetchLazerUpdateBytes", () => {
     const bytes = await fetchLazerUpdateBytes("https://api.example/");
     expect([...bytes]).toEqual([0, 1, 2]);
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(fetchMock).toHaveBeenCalledWith("https://api.example/lazer/update");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.example/lazer/update",
+      expect.objectContaining({ signal: expect.anything() }),
+    );
   });
 
   it("decodes a 0x-prefixed payload", async () => {
@@ -106,7 +109,10 @@ describe("fetchLazerUpdateBytes", () => {
     const fetchMock = installFetch();
     fetchMock.mockResolvedValue(okBody("00"));
     await fetchLazerUpdateBytes("https://api.example///");
-    expect(fetchMock).toHaveBeenCalledWith("https://api.example/lazer/update");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.example/lazer/update",
+      expect.objectContaining({ signal: expect.anything() }),
+    );
   });
 
   it("fails closed when the proxy omits hex", async () => {
@@ -220,7 +226,10 @@ describe("Lazer price refresh", () => {
       client.constants.USDC_COIN_TYPE,
     ]);
 
-    expect(fetchMock).toHaveBeenCalledWith("https://api.example/lazer/update");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.example/lazer/update",
+      expect.objectContaining({ signal: expect.anything() }),
+    );
     expect(client.blockchain.getInitialSharedVersion).toHaveBeenCalledWith(
       client.constants.ALPHAFI_ORACLE_OBJECT_ID,
     );
@@ -235,7 +244,10 @@ describe("Lazer price refresh", () => {
 
     await client.updateAllPrices(tx, [client.constants.SUI_COIN_TYPE]);
 
-    expect(fetchMock).toHaveBeenCalledWith("https://api.example/lazer/update");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.example/lazer/update",
+      expect.objectContaining({ signal: expect.anything() }),
+    );
     expectCompleteLazerRefresh(tx, client.constants, 1);
   });
 
@@ -258,7 +270,10 @@ describe("Lazer price refresh", () => {
 
     await client.updatePrices(tx, [client.constants.SUI_COIN_TYPE]);
 
-    expect(fetchMock).toHaveBeenCalledWith("https://api.example/lazer/update");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.example/lazer/update",
+      expect.objectContaining({ signal: expect.anything() }),
+    );
     expect(fetchMock).not.toHaveBeenCalledWith(
       "https://api.alphalend.xyz/public/graphql",
       expect.anything(),

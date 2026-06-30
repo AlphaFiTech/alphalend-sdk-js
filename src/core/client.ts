@@ -164,6 +164,7 @@ export class AlphalendClient {
   }
 
   async updatePricesLazer(tx: Transaction, coinTypes: string[]): Promise<void> {
+    if (coinTypes.length === 0) return;
     const [bytes, oracleInitialSharedVersion] = await Promise.all([
       fetchLazerUpdateBytes(this.constants.LAZER_PROXY_URL),
       this.blockchain.getInitialSharedVersion(
