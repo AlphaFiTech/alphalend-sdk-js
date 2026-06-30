@@ -7,8 +7,6 @@
   "compilerOptions": {
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
-    "rootDir": ".",
     "noEmit": true
-  },
-  "include": ["src/**/*", "__tests__/**/*"]
+  }
 }

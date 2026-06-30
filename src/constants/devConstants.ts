@@ -70,29 +70,14 @@ export const devConstants: Constants = {
 
   PYTH_PRICE_PATH: "/api/latest_price_feeds",
 
-  // --- Pyth Core in-place upgrade (flip PYTH_CORE_UPGRADED at the 2026-07-31 cutover) ---
-  // Upgraded ids = Pyth's official TESTNET upgrade addresses; flag stays off until staging rehearsal.
-  PYTH_CORE_UPGRADED: false,
-  PYTH_UPGRADED_PACKAGE_ID:
-    "0xd1ac23e1582080e2e5d43dbad1cf463ea2337cdbbb1a9ca669e470cefb74d8fd",
-  PYTH_UPGRADED_STATE_ID:
-    "0x3c48fe392912de6c18087a2b3f5fdbfbfdb4598e180947feff1f12f8e9ea073e",
-  WORMHOLE_UPGRADED_PACKAGE_ID:
-    "0xe79f4e3e02ce132f40f39e73220493a802329d3cb6ad7f789e98a78910fc0053",
-  WORMHOLE_UPGRADED_STATE_ID:
-    "0x750da8e6d16b6a363a39fe2eaa8295ac224a1e6fce4e47b58845e2e8746164f0",
-  // Staging api /pyth proxy (holds the Pyth Pro key); public hermes is auth-gated after 2026-07-31.
-  PYTH_HERMES_URL: "https://api-staging.alphalend.xyz/pyth",
-
-  // Pyth Lazer (Pyth Pro) Constants. Testnet Pyth's canonical package is still v1 (no _v2), so testnet
-  // uses our published v2 verifier harness for the PTB verify call.
+  // Pyth Lazer (Pyth Pro) Constants.
+  // TODO: keep testnet Lazer disabled until Pyth publishes a testnet package with
+  // parse_and_verify_le_ecdsa_update_v2.
   LAZER_PACKAGE_ID:
-    "0xf9686303df959b4b6a000fcac0befe0cc2cee24f2c2ec02dae914b3c525a5639",
+    "0xf5bd2141967507050a91b58de3d95e77c432cd90d1799ee46effc27430a68c21",
   LAZER_STATE_ID:
-    "0x470a1b15fae80369812c0f96f70788321f6f822ff8b8f35884743c175919fc39",
+    "0xe2b9096a5ea341a9f1eef126b2203727e29e73fdb0641ade2e1e32942f97e4d8",
   LAZER_PROXY_URL: "https://api-staging.alphalend.xyz",
-  LAZER_ENABLED: false,
-  LAZER_MAX_PROXY_AGE_MS: 3000,
 
   // Coin Types
   SUI_COIN_TYPE: "0x2::sui::SUI",

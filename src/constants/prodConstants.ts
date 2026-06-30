@@ -71,30 +71,12 @@ export const prodConstants: Constants = {
 
   PYTH_PRICE_PATH: "/api/latest_price_feeds",
 
-  // --- Pyth Core in-place upgrade (flip PYTH_CORE_UPGRADED at the 2026-07-31 cutover) ---
-  PYTH_CORE_UPGRADED: false,
-  PYTH_UPGRADED_PACKAGE_ID:
-    "0x55300367a2d40813727ccac4ecee977a39fb9cdb46f2e6b2c354b9798f5de2c0",
-  PYTH_UPGRADED_STATE_ID:
-    "0x03719fae774ddab3cfcaa53bbc046f0cbe21410019b6280811bf3f9f4b05839d",
-  WORMHOLE_UPGRADED_PACKAGE_ID:
-    "0x99de5c967d8206ef4b75c0afab3df2a59eb02b05c282821db803831008ac25b4",
-  WORMHOLE_UPGRADED_STATE_ID:
-    "0xdbca52b9fb4f712e25f61f974586d93ac541bcf8389564f0323bb07215168b5c",
-  // Route Pyth Core updates through the alphalend-api /pyth proxy, which injects the Pyth Pro key
-  // server-side. The public hermes.pyth.network becomes auth-gated at the 2026-07-31 Pyth Core upgrade,
-  // and the browser must never hold the key.
-  PYTH_HERMES_URL: "https://api.alphalend.xyz/pyth",
-
   // Pyth Lazer (Pyth Pro) Constants.
-  // LAZER_PACKAGE_ID is the package VERSION exposing parse_and_verify_le_ecdsa_update_v2, not the type-origin id.
   LAZER_PACKAGE_ID:
     "0xefbfd064480777699fd9c557a5804d72ace7bc82661fdc8d1f1a44ea6d92ee10",
   LAZER_STATE_ID:
     "0xd0db9c1e9212a98120384bf78d8b8c985d87b9ee6921dffcf9d1394062911573",
   LAZER_PROXY_URL: "https://api.alphalend.xyz",
-  LAZER_ENABLED: false,
-  LAZER_MAX_PROXY_AGE_MS: 3000,
 
   // Coin Types
   SUI_COIN_TYPE: "0x2::sui::SUI",

@@ -1,6 +1,8 @@
 import { SuiJsonRpcClient } from "@mysten/sui/jsonRpc";
-import { SuiPythClient } from "@pythnetwork/pyth-sui-js";
-import { HermesClient } from "@pythnetwork/hermes-client";
+import {
+  SuiPriceServiceConnection,
+  SuiPythClient,
+} from "@pythnetwork/pyth-sui-js";
 import {
   getAlphafiConstants,
   getConstants,
@@ -73,7 +75,7 @@ import { buildFlashRepayTransaction } from "./flashRepay.js";
 
 export class AlphalendClient {
   pythClient: SuiPythClient;
-  pythConnection: HermesClient;
+  pythConnection: SuiPriceServiceConnection;
   network: Network;
   constants: Constants;
   lendingProtocol: LendingProtocol;
@@ -129,14 +131,10 @@ export class AlphalendClient {
     });
     this.pythClient = new SuiPythClient(
       pythSuiClient,
-      this.constants.PYTH_CORE_UPGRADED
-        ? this.constants.PYTH_UPGRADED_STATE_ID
-        : this.constants.PYTH_STATE_ID,
-      this.constants.PYTH_CORE_UPGRADED
-        ? this.constants.WORMHOLE_UPGRADED_STATE_ID
-        : this.constants.WORMHOLE_STATE_ID,
+      this.constants.PYTH_STATE_ID,
+      this.constants.WORMHOLE_STATE_ID,
     );
-    this.pythConnection = new HermesClient(
+    this.pythConnection = new SuiPriceServiceConnection(
       network === "mainnet"
         ? "https://hermes.pyth.network"
         : "https://hermes-beta.pyth.network",
@@ -145,7 +143,7 @@ export class AlphalendClient {
     this.blockchain = new Blockchain(network, graphqlUrl);
     this.sevenKGateway = new SevenKGateway();
     this.cetusSwap = new CetusSwap("mainnet");
-    this.useLazer = this.constants.LAZER_ENABLED;
+    this.useLazer = options?.useLazer ?? false;
 
     // If a coin metadata map is provided, use it and mark as initialized
     if (options?.coinMetadataMap) {
@@ -166,11 +164,7 @@ export class AlphalendClient {
   }
 
   async updatePricesLazer(tx: Transaction, coinTypes: string[]): Promise<void> {
-    await this.ensureInitialized();
-    const bytes = await fetchLazerUpdateBytes(
-      this.constants.LAZER_PROXY_URL,
-      this.constants.LAZER_MAX_PROXY_AGE_MS,
-    );
+    const bytes = await fetchLazerUpdateBytes(this.constants.LAZER_PROXY_URL);
     const oracleInitialSharedVersion =
       await this.blockchain.getInitialSharedVersion(
         this.constants.ALPHAFI_ORACLE_OBJECT_ID,
@@ -223,8 +217,6 @@ export class AlphalendClient {
         updatePriceFeedIds,
         this.pythClient,
         this.pythConnection,
-        this.constants.PYTH_CORE_UPGRADED,
-        this.constants.PYTH_HERMES_URL,
       );
     }
     const oracleInitialSharedVersion =
@@ -265,8 +257,6 @@ export class AlphalendClient {
       updatePriceFeedIds,
       this.pythClient,
       this.pythConnection,
-      this.constants.PYTH_CORE_UPGRADED,
-      this.constants.PYTH_HERMES_URL,
     );
     const oracleInitialSharedVersion =
       await this.blockchain.getInitialSharedVersion(
@@ -2214,12 +2204,7 @@ export class AlphalendClient {
    */
   private async fetchAndCacheCoinMetadata(): Promise<void> {
     try {
-      const env = typeof process !== "undefined" ? process.env : {};
-      const apiUrl =
-        env.ALPHALEND_GRAPHQL_URL ||
-        env.REACT_APP_ALPHALEND_GRAPHQL_URL ||
-        env.REACT_APP_GRAPHQL_URL ||
-        "https://api.alphalend.xyz/public/graphql";
+      const apiUrl = "https://api.alphalend.xyz/public/graphql";
 
       // Extended query to get all the data we need
       const query = `

@@ -35,7 +35,6 @@
   "dependencies": {
     "@7kprotocol/sdk-ts": "^3.4.1",
     "@cetusprotocol/aggregator-sdk": "^1.5.5",
-    "@pythnetwork/hermes-client": "^2.1.0",
     "@pythnetwork/pyth-sui-js": "^2.2.0",
     "@types/bn.js": "^5.2.0",
     "decimal.js": "^10.5.0",

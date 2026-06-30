@@ -20,6 +20,7 @@ import { Decimal } from "decimal.js";
  */
 export interface AlphalendClientOptions {
   coinMetadataMap?: Map<string, CoinMetadata>;
+  useLazer?: boolean;
 }
 
 /**
