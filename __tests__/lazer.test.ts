@@ -210,7 +210,7 @@ describe("price-refresh routing (useLazer)", () => {
 describe("Lazer price refresh", () => {
   it("updatePrices fetches from the proxy and builds verify, ingest, and lending bridge calls", async () => {
     const fetchMock = installFetch();
-    fetchMock.mockResolvedValue(okBody("0x010203", 1));
+    fetchMock.mockResolvedValue(okBody("0x010203"));
     const client = buildLazerClient("https://api.example/");
     const tx = new Transaction();
 
@@ -229,7 +229,7 @@ describe("Lazer price refresh", () => {
 
   it("updateAllPrices uses the same complete Lazer refresh path", async () => {
     const fetchMock = installFetch();
-    fetchMock.mockResolvedValue(okBody("0x0a0b0c", 1));
+    fetchMock.mockResolvedValue(okBody("0x0a0b0c"));
     const client = buildLazerClient("https://api.example");
     const tx = new Transaction();
 
