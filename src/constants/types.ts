@@ -50,6 +50,13 @@ export interface Constants {
 
   PYTH_PRICE_PATH: string;
 
+  // Pyth Lazer (Pyth Pro) constants.
+  LAZER_PACKAGE_ID: string;
+
+  LAZER_STATE_ID: string;
+
+  LAZER_PROXY_URL: string;
+
   // Coin Types
   SUI_COIN_TYPE: string;
 
