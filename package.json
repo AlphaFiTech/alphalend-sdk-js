@@ -12,7 +12,8 @@
   "types": "dist/esm/index.d.ts",
   "exports": {
     ".": {
-      "import": "./dist/esm/index.js"
+      "import": "./dist/esm/index.js",
+      "default": "./dist/esm/index.js"
     }
   },
   "scripts": {
