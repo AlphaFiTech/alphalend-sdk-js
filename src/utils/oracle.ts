@@ -69,6 +69,27 @@ export async function getPriceInfoObjectIdsWithoutUpdate(
   return priceInfoObjectIds;
 }
 
+export function appendOracleToLendingBridge(
+  tx: Transaction,
+  coinType: string,
+  constants: Constants,
+) {
+  const coinTypeName = tx.moveCall({
+    target: `0x1::type_name::get`,
+    typeArguments: [coinType],
+  });
+
+  const oraclePriceInfo = tx.moveCall({
+    target: `${constants.ALPHAFI_LATEST_ORACLE_PACKAGE_ID}::oracle::get_price_info`,
+    arguments: [tx.object(constants.ALPHAFI_ORACLE_OBJECT_ID), coinTypeName],
+  });
+
+  tx.moveCall({
+    target: `${constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::update_price`,
+    arguments: [tx.object(constants.LENDING_PROTOCOL_ID), oraclePriceInfo],
+  });
+}
+
 /**
  * Adds oracle price update instructions to a transaction
  *
@@ -98,18 +119,5 @@ export function updatePriceTransaction(
     ],
   });
 
-  const coinTypeName = tx.moveCall({
-    target: `0x1::type_name::get`,
-    typeArguments: [args.coinType],
-  });
-
-  const oraclePriceInfo = tx.moveCall({
-    target: `${constants.ALPHAFI_LATEST_ORACLE_PACKAGE_ID}::oracle::get_price_info`,
-    arguments: [tx.object(constants.ALPHAFI_ORACLE_OBJECT_ID), coinTypeName],
-  });
-
-  tx.moveCall({
-    target: `${constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::update_price`,
-    arguments: [tx.object(constants.LENDING_PROTOCOL_ID), oraclePriceInfo],
-  });
+  appendOracleToLendingBridge(tx, args.coinType, constants);
 }

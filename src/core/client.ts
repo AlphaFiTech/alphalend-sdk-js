@@ -15,9 +15,11 @@ import {
   TransactionArgument,
 } from "@mysten/sui/transactions";
 import {
+  appendOracleToLendingBridge,
   getPriceInfoObjectIdsWithUpdate,
   updatePriceTransaction,
 } from "../utils/oracle.js";
+import { appendLazerUpdate, fetchLazerUpdateBytes } from "../utils/lazer.js";
 import {
   SupplyParams,
   WithdrawParams,
@@ -80,6 +82,7 @@ export class AlphalendClient {
   blockchain: Blockchain;
   sevenKGateway: SevenKGateway;
   cetusSwap: CetusSwap;
+  useLazer: boolean;
 
   // Dynamic coin metadata properties
   private coinMetadataMap: Map<string, CoinMetadata> = new Map();
@@ -140,6 +143,7 @@ export class AlphalendClient {
     this.blockchain = new Blockchain(network, graphqlUrl);
     this.sevenKGateway = new SevenKGateway();
     this.cetusSwap = new CetusSwap("mainnet");
+    this.useLazer = options?.useLazer ?? false;
 
     // If a coin metadata map is provided, use it and mark as initialized
     if (options?.coinMetadataMap) {
@@ -159,6 +163,28 @@ export class AlphalendClient {
     return this.coinMetadataMap;
   }
 
+  async updatePricesLazer(tx: Transaction, coinTypes: string[]): Promise<void> {
+    if (coinTypes.length === 0) return;
+    const [bytes, oracleInitialSharedVersion] = await Promise.all([
+      fetchLazerUpdateBytes(this.constants.LAZER_PROXY_URL),
+      this.blockchain.getInitialSharedVersion(
+        this.constants.ALPHAFI_ORACLE_OBJECT_ID,
+      ),
+    ]);
+    appendLazerUpdate(
+      tx,
+      this.constants.LAZER_PACKAGE_ID,
+      this.constants.ALPHAFI_LATEST_ORACLE_PACKAGE_ID,
+      this.constants.ALPHAFI_ORACLE_OBJECT_ID,
+      oracleInitialSharedVersion,
+      this.constants.LAZER_STATE_ID,
+      bytes,
+    );
+    for (const coinType of new Set(coinTypes)) {
+      appendOracleToLendingBridge(tx, coinType, this.constants);
+    }
+  }
+
   /**
    * Updates price information for assets from Pyth oracle
    *
@@ -173,6 +199,10 @@ export class AlphalendClient {
    * @returns Transaction object with price update calls
    */
   async updatePrices(tx: Transaction, coinTypes: string[]) {
+    if (this.useLazer) {
+      await this.updatePricesLazer(tx, coinTypes);
+      return;
+    }
     // Auto-initialize market data if needed
     await this.ensureInitialized();
 
@@ -223,6 +253,10 @@ export class AlphalendClient {
   }
 
   async updateAllPrices(tx: Transaction, coinTypes: string[]) {
+    if (this.useLazer) {
+      await this.updatePricesLazer(tx, coinTypes);
+      return;
+    }
     // Auto-initialize market data if needed
     await this.ensureInitialized();
 
