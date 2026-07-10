@@ -1049,6 +1049,7 @@ export class AlphalendClient {
     const rewardInput = await getClaimRewardInput(
       this.blockchain,
       params.address,
+      params.positionCapId,
     );
 
     let alphaCoin: TransactionObjectArgument | undefined = undefined;
@@ -1178,7 +1179,7 @@ export class AlphalendClient {
       // Ensure SDK is initialized to have access to coin metadata (including prices)
       this.ensureInitialized(),
       // Get all claimable rewards
-      getClaimRewardInput(this.blockchain, params.address),
+      getClaimRewardInput(this.blockchain, params.address, params.positionCapId),
     ]);
 
     if (!rewardInput || rewardInput.length === 0) {
@@ -1438,7 +1439,7 @@ export class AlphalendClient {
       shouldUpdatePrices
         ? this.updatePrices(tx, params.priceUpdateCoinTypes!)
         : Promise.resolve(),
-      getClaimRewardInput(this.blockchain, params.address),
+      getClaimRewardInput(this.blockchain, params.address, params.positionCapId),
     ]);
 
     // Collect rewards for each market and coin type
