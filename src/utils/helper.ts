@@ -18,8 +18,14 @@ import {
 export async function getClaimRewardInput(
   blockchain: Blockchain,
   userAddress: string,
+  positionCapId?: string,
 ): Promise<{ marketId: number; coinTypes: string[] }[]> {
-  const position = await getUserPosition(blockchain, userAddress);
+  // When a specific positionCapId is provided, resolve the reward input from
+  // that exact position rather than the user's first cap. Otherwise fall back
+  // to the address-based lookup (first position cap).
+  const position = positionCapId
+    ? await blockchain.getPositionFromPositionCapId(positionCapId)
+    : await getUserPosition(blockchain, userAddress);
   if (!position) return [];
 
   // Fetch every distinct market referenced by the position's reward
