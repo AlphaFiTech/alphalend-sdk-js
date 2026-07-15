@@ -108,9 +108,10 @@ export interface WithdrawParams {
   positionCapId: string;
   /** Address of the user withdrawing collateral */
   address: string;
-  /** Coin types of the coins whose price needs to be updated
-   * (Will have to pass all market coin types that user has supplied or borrowed in and current market coin type in which user is withdrawing) */
-  priceUpdateCoinTypes: string[];
+  /** Optional extra coin types to update prices for, on top of the ones the
+   * client already refreshes automatically (the withdrawn coin plus every
+   * coin type in the user's position that has a supplied or borrowed balance). */
+  priceUpdateCoinTypes?: string[];
 }
 
 /**
@@ -179,9 +180,10 @@ export interface BorrowParams {
   positionCapId: string;
   /** Address of the user borrowing tokens */
   address: string;
-  /** Coin types of the coins whose price needs to be updated
-   * (Will have to pass all market coin types that user has supplied or borrowed in and current market coin type in which user is borrowing) */
-  priceUpdateCoinTypes: string[];
+  /** Optional extra coin types to update prices for, on top of the ones the
+   * client already refreshes automatically (the borrowed coin plus every
+   * coin type in the user's position that has a supplied or borrowed balance). */
+  priceUpdateCoinTypes?: string[];
 }
 
 /**

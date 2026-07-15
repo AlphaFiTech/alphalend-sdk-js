@@ -667,7 +667,8 @@ export class AlphalendClient {
    * @param params.coinType Fully qualified coin type to withdraw (e.g., "0x2::sui::SUI")
    * @param params.positionCapId Object ID of the position capability object
    * @param params.address Address of the user withdrawing collateral
-   * @param params.priceUpdateCoinTypes Array of coin types to update prices for
+   * @param params.priceUpdateCoinTypes Optional extra coin types to refresh prices for,
+   * beyond the ones automatically included (withdrawn coin + all coins in the user's position)
    * @returns Transaction object ready for signing and execution
    */
   async withdraw(params: WithdrawParams): Promise<Transaction> {
@@ -675,7 +676,30 @@ export class AlphalendClient {
 
     // First update prices to ensure latest oracle values
     if (this.network === "mainnet") {
-      await this.updatePrices(tx, params.priceUpdateCoinTypes);
+      // The on-chain health check (position.refresh) verifies price freshness
+      // for every market the user has supplied or borrowed in, not just the
+      // market being withdrawn from — so build the full coin list here rather
+      // than relying on callers to enumerate their whole position themselves.
+      const priceUpdateCoinTypes = new Set(params.priceUpdateCoinTypes);
+      priceUpdateCoinTypes.add(params.coinType);
+
+      const [portfolio, allMarkets] = await Promise.all([
+        this.getUserPortfolioFromPositionCapId(params.positionCapId),
+        this.getAllMarkets(),
+      ]);
+      if (portfolio && allMarkets) {
+        for (const market of allMarkets) {
+          const mId = parseInt(market.marketId);
+          if (
+            portfolio.suppliedAmounts.get(mId)?.gt(0) ||
+            portfolio.borrowedAmounts.get(mId)?.gt(0)
+          ) {
+            priceUpdateCoinTypes.add(market.coinType);
+          }
+        }
+      }
+
+      await this.updatePrices(tx, Array.from(priceUpdateCoinTypes));
     } else {
       await setPrices(tx);
     }
@@ -930,7 +954,8 @@ export class AlphalendClient {
    * @param params.coinType Fully qualified coin type to borrow (e.g., "0x2::sui::SUI")
    * @param params.positionCapId Object ID of the position capability object
    * @param params.address Address of the user borrowing tokens
-   * @param params.priceUpdateCoinTypes Array of coin types to update prices for
+   * @param params.priceUpdateCoinTypes Optional extra coin types to refresh prices for,
+   * beyond the ones automatically included (borrowed coin + all coins in the user's position)
    * @returns Transaction object ready for signing and execution
    */
   async borrow(params: BorrowParams): Promise<Transaction> {
@@ -938,7 +963,30 @@ export class AlphalendClient {
 
     // First update prices to ensure latest oracle values
     if (this.network === "mainnet") {
-      await this.updatePrices(tx, params.priceUpdateCoinTypes);
+      // The on-chain health check (position.refresh) verifies price freshness
+      // for every market the user has supplied or borrowed in, not just the
+      // market being borrowed from — so build the full coin list here rather
+      // than relying on callers to enumerate their whole position themselves.
+      const priceUpdateCoinTypes = new Set(params.priceUpdateCoinTypes);
+      priceUpdateCoinTypes.add(params.coinType);
+
+      const [portfolio, allMarkets] = await Promise.all([
+        this.getUserPortfolioFromPositionCapId(params.positionCapId),
+        this.getAllMarkets(),
+      ]);
+      if (portfolio && allMarkets) {
+        for (const market of allMarkets) {
+          const mId = parseInt(market.marketId);
+          if (
+            portfolio.suppliedAmounts.get(mId)?.gt(0) ||
+            portfolio.borrowedAmounts.get(mId)?.gt(0)
+          ) {
+            priceUpdateCoinTypes.add(market.coinType);
+          }
+        }
+      }
+
+      await this.updatePrices(tx, Array.from(priceUpdateCoinTypes));
     } else {
       await setPrices(tx);
     }
