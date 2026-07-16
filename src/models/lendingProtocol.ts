@@ -12,6 +12,7 @@ import { Network } from "../constants/index.js";
 export class LendingProtocol {
   private blockchain: Blockchain;
   private coinMetadataMap: Map<string, CoinMetadata>;
+  private network: Network;
 
   /**
    * @param network   One of the supported Sui networks.
@@ -20,6 +21,7 @@ export class LendingProtocol {
   constructor(network: Network, graphqlUrl?: string) {
     this.blockchain = new Blockchain(network, graphqlUrl);
     this.coinMetadataMap = new Map();
+    this.network = network;
   }
 
   /**
@@ -80,18 +82,18 @@ export class LendingProtocol {
   async getPositionFromPositionCapId(positionCapId: string): Promise<Position> {
     const position =
       await this.blockchain.getPositionFromPositionCapId(positionCapId);
-    return new Position(position, this.coinMetadataMap);
+    return new Position(position, this.coinMetadataMap, this.network);
   }
 
   async getPosition(positionId: string): Promise<Position> {
     const position = await this.blockchain.getPosition(positionId);
-    return new Position(position, this.coinMetadataMap);
+    return new Position(position, this.coinMetadataMap, this.network);
   }
 
   async getPositions(userAddress: string): Promise<Position[]> {
     const positions = await this.blockchain.getPositionsForUser(userAddress);
     return positions.map(
-      (position) => new Position(position, this.coinMetadataMap),
+      (position) => new Position(position, this.coinMetadataMap, this.network),
     );
   }
 

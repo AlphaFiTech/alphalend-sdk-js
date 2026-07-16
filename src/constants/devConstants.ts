@@ -97,6 +97,15 @@ export const devConstants: Constants = {
   STSUI_COIN_TYPE:
     "0xd1b72982e40348d069bb1ff701e634c117bb5f741f44dff91e472d3b01461e55::stsui::STSUI",
 
+  // SUI -> stSUI reward conversion is mainnet-only; these mirror prod for shape.
+  STSUI_LATEST_PACKAGE_ID:
+    "0x059f94b85c07eb74d2847f8255d8cc0a67c9a8dcc039eabf9f8b9e23a0de2700",
+
+  LST_INFO:
+    "0x1adb343ab351458e151bc392fbf1558b3332467f23bda45ae67cd355a57fd5f5",
+
+  STSUI_MARKET_ID: 2,
+
   ALPHA_COIN_TYPE: "",
 
   SUI_COIN_TYPE_LONG:
