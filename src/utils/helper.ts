@@ -117,7 +117,7 @@ function addClaimableCoinTypes(
           BigInt(userReward.cummulativeRewardsPerShare)) *
           BigInt(userDistributor.share)) /
           BigInt(10 ** 18);
-    } else if (lastUpdated <= parseFloat(marketReward.startTime)) {
+    } else {
       pending =
         (BigInt(marketReward.cummulativeRewardsPerShare) *
           BigInt(userDistributor.share)) /
