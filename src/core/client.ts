@@ -64,7 +64,7 @@ import { buildFlashRepayTransaction } from "./flashRepay.js";
 // Minimum estimated SUI reward (in MIST) to route through liquid_staking::mint.
 // The stSUI contract aborts with EZeroLstMinted when the post-fee amount rounds
 // to zero stSUI, so dust falls back to plain SUI handling.
-const MIN_SUI_STAKE_AMOUNT = 10_000_000n; // 0.01 SUI
+const MIN_SUI_STAKE_AMOUNT = 3n; // 3 mists
 
 /**
  * AlphaLend Client
