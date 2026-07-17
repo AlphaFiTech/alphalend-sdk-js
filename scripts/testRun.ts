@@ -1,11 +1,11 @@
 import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
 import { Transaction } from "@mysten/sui/transactions";
-import { fromB64 } from "@mysten/sui/utils";
+import { fromBase64 } from "@mysten/sui/utils";
 import { getConstants } from "../src/constants/index.js";
 import { AlphalendClient } from "../src/core/client.js";
 import * as dotenv from "dotenv";
 import { setPrices } from "../src/utils/helper.js";
-import { SuiClient } from "@mysten/sui/client";
+import { SuiJsonRpcClient } from "@mysten/sui/jsonRpc";
 import {
   SuiPriceServiceConnection,
   SuiPythClient,
@@ -25,8 +25,9 @@ export function getSuiClient(network?: string) {
     rpcUrl = testnetUrl;
   }
 
-  return new SuiClient({
+  return new SuiJsonRpcClient({
     url: rpcUrl,
+    network: network ?? "mainnet",
   });
 }
 
@@ -38,7 +39,9 @@ export function getExecStuff() {
   }
 
   const b64PrivateKey = process.env.PK_B64 as string;
-  const keypair = Ed25519Keypair.fromSecretKey(fromB64(b64PrivateKey).slice(1));
+  const keypair = Ed25519Keypair.fromSecretKey(
+    fromBase64(b64PrivateKey).slice(1),
+  );
   const address = `${keypair.getPublicKey().toSuiAddress()}`;
 
   if (!process.env.NETWORK) {
@@ -50,8 +53,11 @@ export function getExecStuff() {
   return { address, keypair, suiClient };
 }
 
-export async function dryRunTransactionBlock(txb: Transaction) {
-  const { suiClient, address } = getExecStuff();
+export async function dryRunTransactionBlock(
+  txb: Transaction,
+  address: string,
+) {
+  const { suiClient } = getExecStuff();
   txb.setSender(address);
   txb.setGasBudget(1e9);
   try {
@@ -87,17 +93,18 @@ async function claimRewards() {
   let tx: Transaction | undefined = new Transaction();
   // await addCoinToOracleCaller(tx);
   await setPrices(tx);
+  const address =
+    "0xa511088cc13a632a5e8f9937028a77ae271832465e067360dd13f548fe934d1a";
   const alc = new AlphalendClient("testnet");
   tx = await alc.claimRewards({
-    address:
-      "0xa511088cc13a632a5e8f9937028a77ae271832465e067360dd13f548fe934d1a",
+    address: address,
     positionCapId:
       "0x8465d2416b01d3e76460912cd290e5dd9c4a36cfbe52f348cfe04e8ae769de4e",
     claimAll: false,
     claimAlpha: false,
   });
   if (tx) {
-    dryRunTransactionBlock(tx);
+    dryRunTransactionBlock(tx, address);
   }
 }
 
@@ -140,9 +147,10 @@ async function zapInSupply() {
 
 async function borrow() {
   const alc = new AlphalendClient("testnet");
+  const address =
+    "0x8948f801fa2325eedb4b0ad4eb0a55bfb318acc531f3a2f0cddd8daa9b4a8c94";
   const tx: Transaction | undefined = await alc.borrow({
-    address:
-      "0x8948f801fa2325eedb4b0ad4eb0a55bfb318acc531f3a2f0cddd8daa9b4a8c94",
+    address: address,
     positionCapId:
       "0x04aef463126fea9cc518a37abc8ae8367f68c8eceeef31790b2da6be852d9d4b",
     coinType:
@@ -152,7 +160,7 @@ async function borrow() {
     priceUpdateCoinTypes: [],
   });
   if (tx) {
-    dryRunTransactionBlock(tx);
+    dryRunTransactionBlock(tx, address);
   }
 }
 
@@ -216,26 +224,25 @@ async function getUserPortfolio() {
 
 async function withdraw() {
   const alc = new AlphalendClient("mainnet");
+  const address =
+    "0x8c5c76fa46a645ce5f636342ad6b0514a55f8c1518671920cd92d284695aff78";
   const tx: Transaction | undefined = await alc.withdraw({
-    address:
-      "0xe136f0b6faf27ee707725f38f2aeefc51c6c31cc508222bee5cbc4f5fcf222c3",
+    address: address,
     positionCapId:
-      "0xf9ca35f404dd3c1ea10c381dd3e1fe8a0c4586adf5e186f4eb52307462a5af7d",
+      "0x8de2193d00fe660a90d823125fbd300774dbba553d9eb353e7451c419fe55a8d",
     coinType:
-      "0xd1b72982e40348d069bb1ff701e634c117bb5f741f44dff91e472d3b01461e55::stsui::STSUI",
-    marketId: "2",
-    amount: 100_000_000n,
+      "0x66629328922d609cf15af779719e248ae0e63fe0b9d9739623f763b33a9c97da::esui::ESUI",
+    marketId: "21",
+    amount: 10_000_000_000n,
     priceUpdateCoinTypes: [
-      "0x375f70cf2ae4c00bf37117d0c85a2c71545e6ee05c4a5c7d282cd66a4504b068::usdt::USDT",
+      "0x66629328922d609cf15af779719e248ae0e63fe0b9d9739623f763b33a9c97da::esui::ESUI",
       "0xd1b72982e40348d069bb1ff701e634c117bb5f741f44dff91e472d3b01461e55::stsui::STSUI",
-      "0xdeeb7a4662eec9f2f3def03fb937a663dddaa2e215b8078a284d026b7946c270::deep::DEEP",
-      "0x356a26eb9e012a68958082340d4c4116e7f55615cf27affcff209cf0ae544f59::wal::WAL",
-      "0xe1b45a0e641b9955a20aa0ad1c1f4ad86aad8afb07296d4085e349a50e90bdca::blue::BLUE",
-      "0x4c981f3ff786cdb9e514da897ab8a953647dae2ace9679e8358eec1e3e8871ac::dmc::DMC",
+      "0x7262fb2f7a3a14c888c438a3cd9b912469a58cf60f367352c46584262e8299aa::ika::IKA",
+      "0x2::sui::SUI",
     ],
   });
   if (tx) {
-    dryRunTransactionBlock(tx);
+    dryRunTransactionBlock(tx, address);
   }
 }
 withdraw();
