@@ -61,6 +61,11 @@ import { blockchainCache } from "../utils/blockchainCache.js";
 import { CetusSwap, RouterDataV3 } from "./cetusSwap.js";
 import { buildFlashRepayTransaction } from "./flashRepay.js";
 
+// Minimum estimated SUI reward (in MIST) to route through liquid_staking::mint.
+// The stSUI contract aborts with EZeroLstMinted when the post-fee amount rounds
+// to zero stSUI, so dust falls back to plain SUI handling.
+const MIN_SUI_STAKE_AMOUNT = 3n; // 3 mists
+
 /**
  * AlphaLend Client
  *
@@ -266,7 +271,9 @@ export class AlphalendClient {
 
     // Use dynamic data with fallback to hardcoded
     const updatePriceFeedIds: string[] = Array.from(
-      new Set(uniqueCoinTypes.map((coinType) => this.getPythPriceFeedId(coinType))),
+      new Set(
+        uniqueCoinTypes.map((coinType) => this.getPythPriceFeedId(coinType)),
+      ),
     );
 
     // The Pyth fetch and resolving the oracle's initial shared version are
@@ -1038,6 +1045,11 @@ export class AlphalendClient {
    * @param params.claimAll Whether to claim and deposit all other reward tokens
    * @param params.claimAndDepositAlpha Whether to claim and deposit Alpha token rewards
    * @param params.claimAndDepositAll Whether to claim and deposit all other reward tokens
+   *
+   * On mainnet, SUI rewards are staked into stSUI via `liquid_staking::mint` and
+   * the stSUI is transferred to the user (or supplied to the stSUI market when
+   * `claimAndDepositAll` is set). Dust SUI rewards below 0.01 SUI keep the plain
+   * SUI behavior.
    * @returns Transaction object ready for signing and execution
    */
   async claimRewards(params: ClaimRewardsParams): Promise<Transaction> {
@@ -1046,21 +1058,30 @@ export class AlphalendClient {
       params.claimAndDepositAlpha || params.claimAlpha;
     params.claimAndDepositAll = params.claimAndDepositAll || params.claimAll;
 
-    const rewardInput = await getClaimRewardInput(
+    const { rewardInput, claimableAmounts } = await getClaimRewardInput(
       this.blockchain,
       params.address,
       params.positionCapId,
     );
 
+    const convertSuiToStsui =
+      this.network === "mainnet" &&
+      (claimableAmounts.get(this.constants.SUI_COIN_TYPE) ?? 0n) >=
+        MIN_SUI_STAKE_AMOUNT;
+
     let alphaCoin: TransactionObjectArgument | undefined = undefined;
+    let suiCoin: TransactionObjectArgument | undefined = undefined;
     for (const data of rewardInput) {
       for (let coinType of data.coinTypes) {
         coinType = normalizeCoinType(coinType);
+        const isSuiConversion =
+          convertSuiToStsui && coinType === this.constants.SUI_COIN_TYPE;
         let coin1: TransactionObjectArgument | undefined;
         let promise: TransactionObjectArgument | undefined;
         if (
           params.claimAndDepositAll &&
-          coinType !== this.constants.ALPHA_COIN_TYPE
+          coinType !== this.constants.ALPHA_COIN_TYPE &&
+          !isSuiConversion
         ) {
           [coin1, promise] = tx.moveCall({
             target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::collect_reward_and_deposit`,
@@ -1097,6 +1118,13 @@ export class AlphalendClient {
             if (coin1) {
               alphaCoin = this.mergeCoins(tx, alphaCoin, [coin1]);
             }
+          } else if (isSuiConversion) {
+            if (coin2) {
+              suiCoin = this.mergeCoins(tx, suiCoin, [coin2]);
+            }
+            if (coin1) {
+              suiCoin = this.mergeCoins(tx, suiCoin, [coin1]);
+            }
           } else {
             if (coin2) {
               this.sendCoinToAddressBalance(
@@ -1121,10 +1149,35 @@ export class AlphalendClient {
             coinType === this.constants.ALPHA_COIN_TYPE
           ) {
             alphaCoin = this.mergeCoins(tx, alphaCoin, [coin1]);
+          } else if (isSuiConversion) {
+            suiCoin = this.mergeCoins(tx, suiCoin, [coin1]);
           } else {
             this.sendCoinToAddressBalance(tx, coinType, params.address, coin1);
           }
         }
+      }
+    }
+    if (suiCoin) {
+      const stsuiCoin = this.mintStsui(tx, suiCoin);
+      if (params.claimAndDepositAll) {
+        tx.moveCall({
+          target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::add_collateral`,
+          typeArguments: [this.constants.STSUI_COIN_TYPE],
+          arguments: [
+            tx.object(this.constants.LENDING_PROTOCOL_ID),
+            tx.object(params.positionCapId),
+            tx.pure.u64(this.constants.STSUI_MARKET_ID),
+            stsuiCoin,
+            tx.object(this.constants.SUI_CLOCK_OBJECT_ID),
+          ],
+        });
+      } else {
+        this.sendCoinToAddressBalance(
+          tx,
+          this.constants.STSUI_COIN_TYPE,
+          params.address,
+          stsuiCoin,
+        );
       }
     }
     if (alphaCoin) {
@@ -1132,6 +1185,26 @@ export class AlphalendClient {
     }
 
     return tx;
+  }
+
+  /**
+   * Stakes a SUI coin into stSUI via `liquid_staking::mint`.
+   * Aborts on-chain with EZeroLstMinted if the post-fee amount rounds to zero.
+   */
+  private mintStsui(
+    tx: Transaction,
+    suiCoin: TransactionObjectArgument,
+  ): TransactionObjectArgument {
+    const [stsuiCoin] = tx.moveCall({
+      target: `${this.constants.STSUI_LATEST_PACKAGE_ID}::liquid_staking::mint`,
+      typeArguments: [this.constants.STSUI_COIN_TYPE],
+      arguments: [
+        tx.object(this.constants.LST_INFO),
+        tx.object(this.constants.SUI_SYSTEM_STATE_ID),
+        suiCoin,
+      ],
+    });
+    return stsuiCoin;
   }
 
   /**
@@ -1175,11 +1248,15 @@ export class AlphalendClient {
     // ensureInitialized (coin metadata fetch) and getClaimRewardInput (position
     // + market reads) are independent network round-trips, so run them
     // concurrently instead of sequentially.
-    const [, rewardInput] = await Promise.all([
+    const [, { rewardInput }] = await Promise.all([
       // Ensure SDK is initialized to have access to coin metadata (including prices)
       this.ensureInitialized(),
       // Get all claimable rewards
-      getClaimRewardInput(this.blockchain, params.address, params.positionCapId),
+      getClaimRewardInput(
+        this.blockchain,
+        params.address,
+        params.positionCapId,
+      ),
     ]);
 
     if (!rewardInput || rewardInput.length === 0) {
@@ -1416,6 +1493,10 @@ export class AlphalendClient {
    *
    * Note: reward coin types that are not present in `borrowedCoins` are currently not processed.
    *
+   * On mainnet, SUI rewards are staked into stSUI via `liquid_staking::mint` and
+   * processed as stSUI, so `borrowedCoins`/`supplyMarkets` lookups run against the
+   * stSUI coin type. Dust SUI rewards below 0.01 SUI keep the plain SUI behavior.
+   *
    * On mainnet, optionally updates prices first if `priceUpdateCoinTypes` is provided.
    *
    * @param params ClaimAndSupplyOrRepayParams - claim + repay configuration
@@ -1435,12 +1516,21 @@ export class AlphalendClient {
     // (position + market reads) are independent network round-trips, so run them
     // concurrently. updatePrices still appends its price-update calls before the
     // reward-collection loop below, preserving transaction ordering.
-    const [, rewardInput] = await Promise.all([
+    const [, { rewardInput, claimableAmounts }] = await Promise.all([
       shouldUpdatePrices
         ? this.updatePrices(tx, params.priceUpdateCoinTypes!)
         : Promise.resolve(),
-      getClaimRewardInput(this.blockchain, params.address, params.positionCapId),
+      getClaimRewardInput(
+        this.blockchain,
+        params.address,
+        params.positionCapId,
+      ),
     ]);
+
+    const convertSuiToStsui =
+      this.network === "mainnet" &&
+      (claimableAmounts.get(this.constants.SUI_COIN_TYPE) ?? 0n) >=
+        MIN_SUI_STAKE_AMOUNT;
 
     // Collect rewards for each market and coin type
     const rewardCoinsByType = new Map<string, TransactionObjectArgument[]>();
@@ -1457,13 +1547,18 @@ export class AlphalendClient {
       }
     };
 
+    const suiCoins: TransactionObjectArgument[] = [];
     for (const data of rewardInput) {
       for (let coinType of data.coinTypes) {
         coinType = normalizeCoinType(coinType);
+        // SUI destined for stSUI must be collected without the on-chain
+        // auto-deposit so the coin is available to stake.
+        const isSuiConversion =
+          convertSuiToStsui && coinType === this.constants.SUI_COIN_TYPE;
 
         // Collect reward for this coin type
         const [coin1, promise] = tx.moveCall({
-          target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::collect_reward_and_deposit`,
+          target: `${this.constants.ALPHALEND_LATEST_PACKAGE_ID}::alpha_lending::${isSuiConversion ? "collect_reward" : "collect_reward_and_deposit"}`,
           typeArguments: [coinType],
           arguments: [
             tx.object(this.constants.LENDING_PROTOCOL_ID),
@@ -1476,10 +1571,26 @@ export class AlphalendClient {
         // Handle promise and add coins to map
         if (promise) {
           const coin2 = await this.handlePromise(tx, promise, coinType);
-          if (coin2) addCoinToMap(coinType, coin2);
+          if (coin2) {
+            if (isSuiConversion) suiCoins.push(coin2);
+            else addCoinToMap(coinType, coin2);
+          }
         }
-        if (coin1) addCoinToMap(coinType, coin1);
+        if (coin1) {
+          if (isSuiConversion) suiCoins.push(coin1);
+          else addCoinToMap(coinType, coin1);
+        }
       }
+    }
+
+    // Stake claimed SUI into stSUI and process it under the stSUI coin type
+    if (suiCoins.length > 0) {
+      const mergedSui = this.mergeCoins(tx, undefined, suiCoins);
+      const stsuiCoin = this.mintStsui(tx, mergedSui);
+      addCoinToMap(
+        normalizeCoinType(this.constants.STSUI_COIN_TYPE),
+        stsuiCoin,
+      );
     }
 
     // Function to supply coin to market or transfer to wallet

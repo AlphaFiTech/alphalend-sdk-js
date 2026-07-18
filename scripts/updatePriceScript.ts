@@ -2,7 +2,7 @@ import cron from "node-cron";
 import { AlphalendClient } from "../src/core/client";
 import { Transaction } from "@mysten/sui/transactions";
 import { getExecStuff } from "./testRun";
-import { SuiTransactionBlockResponse } from "@mysten/sui/client";
+import { SuiTransactionBlockResponse } from "@mysten/sui/jsonRpc";
 
 cron.schedule("* * * * *", async () => {
   const { suiClient, keypair } = getExecStuff();

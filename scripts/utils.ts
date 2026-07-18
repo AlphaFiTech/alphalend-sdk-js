@@ -1,6 +1,6 @@
-import { fromB64 } from "@mysten/bcs";
+import { fromBase64 } from "@mysten/bcs";
 import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
-import { SuiClient, getFullnodeUrl } from "@mysten/sui/client";
+import { SuiJsonRpcClient, getJsonRpcFullnodeUrl } from "@mysten/sui/jsonRpc";
 
 import * as dotenv from "dotenv";
 import { Transaction } from "@mysten/sui/transactions";
@@ -13,15 +13,17 @@ export function getExecStuff() {
   }
 
   const b64PrivateKey = process.env.PK_B64 as string;
-  const keypair = Ed25519Keypair.fromSecretKey(fromB64(b64PrivateKey).slice(1));
+  const keypair = Ed25519Keypair.fromSecretKey(
+    fromBase64(b64PrivateKey).slice(1),
+  );
   const address = `${keypair.getPublicKey().toSuiAddress()}`;
 
   if (!process.env.NETWORK) {
     throw new Error("env var NETWORK not configured");
   }
 
-  const suiClient = new SuiClient({
-    url: getFullnodeUrl(
+  const suiClient = new SuiJsonRpcClient({
+    url: getJsonRpcFullnodeUrl(
       process.env.NETWORK as "mainnet" | "testnet" | "devnet" | "localnet",
     ),
   });
