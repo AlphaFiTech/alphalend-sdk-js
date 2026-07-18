@@ -6,7 +6,10 @@
  * address balance (accumulator).
  */
 
-import { Transaction } from "@mysten/sui/transactions";
+import {
+  Transaction,
+  TransactionObjectArgument,
+} from "@mysten/sui/transactions";
 import { graphql } from "@mysten/sui/graphql/schema";
 import { normalizeStructTag, SUI_TYPE_ARG } from "@mysten/sui/utils";
 
@@ -32,6 +35,7 @@ interface CoinObjectRef {
   objectId: string;
   version: number;
   digest: string;
+  coinType: string;
   balance: bigint;
 }
 
@@ -45,48 +49,11 @@ export async function getCoinObjectCounts(
   network: Network,
 ): Promise<CoinTypeCount[]> {
   const blockchain = new Blockchain(network);
-  const query = graphql(`
-    query getOwnedCoinTypes($owner: SuiAddress!, $cursor: String) {
-      address(address: $owner) {
-        objects(filter: { type: "0x2::coin::Coin" }, after: $cursor) {
-          pageInfo {
-            hasNextPage
-            endCursor
-          }
-          nodes {
-            contents {
-              type {
-                repr
-              }
-            }
-          }
-        }
-      }
-    }
-  `);
+  const coins = await getCoinObjects(blockchain, address);
 
   const counts = new Map<string, number>();
-  let cursor: string | null = null;
-  let hasMore = true;
-  while (hasMore) {
-    const variables: { owner: string; cursor: string | null } = {
-      owner: address,
-      cursor,
-    };
-    const response = await blockchain.gqlClient.query({ query, variables });
-    const conn = response.data?.address?.objects;
-    for (const node of conn?.nodes ?? []) {
-      const repr = node?.contents?.type?.repr;
-      if (!repr) continue;
-      // repr is `0x…2::coin::Coin<T>`; extract the inner type T
-      const coinType = repr.slice(repr.indexOf("<") + 1, -1);
-      counts.set(coinType, (counts.get(coinType) ?? 0) + 1);
-    }
-    if (conn?.pageInfo?.hasNextPage && conn.pageInfo.endCursor) {
-      cursor = conn.pageInfo.endCursor;
-    } else {
-      hasMore = false;
-    }
+  for (const coin of coins) {
+    counts.set(coin.coinType, (counts.get(coin.coinType) ?? 0) + 1);
   }
 
   return [...counts.entries()]
@@ -97,15 +64,20 @@ export async function getCoinObjectCounts(
 /**
  * Build a transaction that consolidates all `Coin<coinType>` objects owned by
  * `address` into a single coin object or into the address balance
- * (accumulator). Funds already in the address balance are left untouched.
+ * (accumulator).
+ *
+ * With `coin-object` output any existing address balance is also withdrawn
+ * and merged in, so the full balance ends up in one coin object. With
+ * `address-balance` output the coin objects are sent to the address balance
+ * via `0x2::coin::send_funds`.
  *
  * The sender (and gas payer) is `address` itself. For SUI the largest coin is
- * set as the gas payment: with `coin-object` output the remaining coins merge
- * into the gas coin, and with `address-balance` output the remaining coins
- * are sent to the address balance while the gas coin stays as a coin object.
+ * set as the gas payment (it must cover the gas budget): with `coin-object`
+ * output everything merges into the gas coin, and with `address-balance`
+ * output the gas coin stays as a coin object.
  *
- * At most {@link MAX_COINS_PER_TX} coin objects (largest first) are
- * consolidated per transaction — re-run until one coin object remains.
+ * At most {@link MAX_COINS_PER_TX} coin objects are consolidated per
+ * transaction — re-run until one coin object remains.
  */
 export async function buildMergeCoinsTransaction(
   coinType: string,
@@ -117,21 +89,30 @@ export async function buildMergeCoinsTransaction(
   const normalizedCoinType = normalizeStructTag(coinType);
   const isSui = normalizedCoinType === normalizeStructTag(SUI_TYPE_ARG);
 
-  const coins = (
-    await getCoinObjects(blockchain, address, normalizedCoinType)
-  ).sort((a, b) =>
-    a.balance > b.balance ? -1 : a.balance < b.balance ? 1 : 0,
-  );
+  const coins = await getCoinObjects(blockchain, address, normalizedCoinType);
   const selected = coins.slice(0, MAX_COINS_PER_TX);
+  const addressBalance =
+    output === "coin-object"
+      ? await getAddressBalance(blockchain, address, normalizedCoinType)
+      : 0n;
 
   const tx = new Transaction();
   tx.setSender(address);
 
   if (isSui) {
-    const [gasCoin, ...rest] = selected;
-    if (rest === undefined || rest.length === 0) {
+    if (selected.length === 0) {
       throw new Error(
-        `Nothing to merge: ${address} holds ${selected.length} SUI coin object(s) and one must remain as the gas coin`,
+        `Nothing to merge: ${address} holds no SUI coin objects (one is needed as the gas coin)`,
+      );
+    }
+    // The gas coin must cover the gas budget, so use the largest coin
+    const gasCoin = selected.reduce((a, b) => (b.balance > a.balance ? b : a));
+    const rest = selected.filter((c) => c !== gasCoin);
+    if (rest.length === 0 && addressBalance === 0n) {
+      throw new Error(
+        output === "coin-object"
+          ? `Nothing to merge: ${address} holds a single SUI coin object and no address balance`
+          : `Nothing to merge: ${address} holds a single SUI coin object; it must remain as the gas coin`,
       );
     }
     tx.setGasPayment([
@@ -142,10 +123,17 @@ export async function buildMergeCoinsTransaction(
       },
     ]);
     if (output === "coin-object") {
-      tx.mergeCoins(
-        tx.gas,
-        rest.map((c) => tx.object(c.objectId)),
-      );
+      if (rest.length > 0) {
+        tx.mergeCoins(
+          tx.gas,
+          rest.map((c) => tx.object(c.objectId)),
+        );
+      }
+      if (addressBalance > 0n) {
+        tx.mergeCoins(tx.gas, [
+          withdrawAddressBalance(tx, normalizedCoinType, addressBalance),
+        ]);
+      }
     } else {
       for (const coin of rest) {
         blockchain.sendCoinToAddressBalance(
@@ -160,16 +148,25 @@ export async function buildMergeCoinsTransaction(
   }
 
   if (output === "coin-object") {
-    if (selected.length < 2) {
+    if (selected.length <= 1 && addressBalance === 0n) {
       throw new Error(
-        `Nothing to merge: ${address} holds ${selected.length} coin object(s) of ${normalizedCoinType}`,
+        `Nothing to merge: ${address} holds ${selected.length} coin object(s) of ${normalizedCoinType} and no address balance`,
       );
     }
-    const [target, ...rest] = selected;
-    tx.mergeCoins(
-      tx.object(target.objectId),
-      rest.map((c) => tx.object(c.objectId)),
-    );
+    const withdrawnCoin =
+      addressBalance > 0n
+        ? withdrawAddressBalance(tx, normalizedCoinType, addressBalance)
+        : null;
+    if (selected.length === 0) {
+      // No existing coin object to merge into; the withdrawn coin becomes it
+      tx.transferObjects([withdrawnCoin!], address);
+    } else {
+      const [target, ...rest] = selected;
+      tx.mergeCoins(tx.object(target.objectId), [
+        ...rest.map((c) => tx.object(c.objectId)),
+        ...(withdrawnCoin ? [withdrawnCoin] : []),
+      ]);
+    }
   } else {
     if (selected.length === 0) {
       throw new Error(
@@ -189,14 +186,57 @@ export async function buildMergeCoinsTransaction(
 }
 
 /**
- * Paginated fetch of all `Coin<coinType>` objects owned by `owner`, with the
- * object refs needed for gas payment and the balance for largest-first
- * ordering.
+ * Withdraw `amount` of `coinType` from the sender's address balance and
+ * return it as a `Coin<coinType>` argument.
+ */
+function withdrawAddressBalance(
+  tx: Transaction,
+  coinType: string,
+  amount: bigint,
+): TransactionObjectArgument {
+  const balance = tx.moveCall({
+    target: "0x2::balance::redeem_funds",
+    typeArguments: [coinType],
+    arguments: [tx.withdrawal({ amount, type: coinType })],
+  });
+  return tx.moveCall({
+    target: "0x2::coin::from_balance",
+    typeArguments: [coinType],
+    arguments: [balance],
+  });
+}
+
+/** Fetch the address balance (accumulator) of `coinType` held by `owner`. */
+async function getAddressBalance(
+  blockchain: Blockchain,
+  owner: string,
+  coinType: string,
+): Promise<bigint> {
+  const query = graphql(`
+    query getAddressBalance($owner: SuiAddress!, $coinType: String!) {
+      address(address: $owner) {
+        balance(coinType: $coinType) {
+          addressBalance
+        }
+      }
+    }
+  `);
+  const response = await blockchain.gqlClient.query({
+    query,
+    variables: { owner, coinType },
+  });
+  return BigInt(response.data?.address?.balance?.addressBalance ?? 0);
+}
+
+/**
+ * Paginated fetch of the `Coin<coinType>` objects owned by `owner` (all coin
+ * objects when `coinType` is omitted), with the object refs needed for gas
+ * payment and the balance used to pick the SUI gas coin.
  */
 async function getCoinObjects(
   blockchain: Blockchain,
   owner: string,
-  coinType: string,
+  coinType?: string,
 ): Promise<CoinObjectRef[]> {
   const query = graphql(`
     query getCoinObjectsOfType(
@@ -215,6 +255,9 @@ async function getCoinObjects(
             version
             digest
             contents {
+              type {
+                repr
+              }
               json
             }
           }
@@ -229,18 +272,23 @@ async function getCoinObjects(
   while (hasMore) {
     const variables: { owner: string; type: string; cursor: string | null } = {
       owner,
-      type: `0x2::coin::Coin<${coinType}>`,
+      type: coinType ? `0x2::coin::Coin<${coinType}>` : "0x2::coin::Coin",
       cursor,
     };
     const response = await blockchain.gqlClient.query({ query, variables });
     const conn = response.data?.address?.objects;
     for (const node of conn?.nodes ?? []) {
-      if (!node?.address || node.version == null || !node.digest) continue;
+      const repr = node?.contents?.type?.repr;
+      if (!node?.address || node.version == null || !node.digest || !repr) {
+        continue;
+      }
       const json = node.contents?.json as { balance?: string } | undefined;
       out.push({
         objectId: node.address,
         version: node.version,
         digest: node.digest,
+        // repr is `0x…2::coin::Coin<T>`; extract the inner type T
+        coinType: repr.slice(repr.indexOf("<") + 1, -1),
         balance: BigInt(json?.balance ?? 0),
       });
     }
