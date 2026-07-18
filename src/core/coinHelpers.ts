@@ -36,7 +36,7 @@ interface CoinObjectRef {
   version: number;
   digest: string;
   coinType: string;
-  balance: bigint;
+  balance?: bigint;
 }
 
 /**
@@ -71,13 +71,15 @@ export async function getCoinObjectCounts(
  * `address-balance` output the coin objects are sent to the address balance
  * via `0x2::coin::send_funds`.
  *
- * The sender (and gas payer) is `address` itself. For SUI the largest coin is
- * set as the gas payment (it must cover the gas budget): with `coin-object`
- * output everything merges into the gas coin, and with `address-balance`
- * output the gas coin stays as a coin object.
+ * The sender (and gas payer) is `address` itself. Gas payment must be set
+ * explicitly for SUI because the automatic build-time gas resolution can only
+ * pick SUI coins that are not inputs of the transaction, and here every SUI
+ * coin is one. The largest SUI coin is reserved as the gas coin (it alone
+ * must cover the gas budget): with `coin-object` output everything merges
+ * into it, and with `address-balance` output it stays as a coin object.
  *
- * At most {@link MAX_COINS_PER_TX} coin objects are consolidated per
- * transaction — re-run until one coin object remains.
+ * Consolidates at most {@link MAX_COINS_PER_TX} coin objects per transaction
+ * — re-run until one coin object remains.
  */
 export async function buildMergeCoinsTransaction(
   coinType: string,
@@ -89,8 +91,14 @@ export async function buildMergeCoinsTransaction(
   const normalizedCoinType = normalizeStructTag(coinType);
   const isSui = normalizedCoinType === normalizeStructTag(SUI_TYPE_ARG);
 
-  const coins = await getCoinObjects(blockchain, address, normalizedCoinType);
-  const selected = coins.slice(0, MAX_COINS_PER_TX);
+  // Balances are only needed to pick a gas coin that can cover the budget
+  const withBalance = isSui;
+  const coins = await getCoinObjects(
+    blockchain,
+    address,
+    normalizedCoinType,
+    withBalance,
+  );
   const addressBalance =
     output === "coin-object"
       ? await getAddressBalance(blockchain, address, normalizedCoinType)
@@ -100,14 +108,16 @@ export async function buildMergeCoinsTransaction(
   tx.setSender(address);
 
   if (isSui) {
-    if (selected.length === 0) {
+    if (coins.length === 0) {
       throw new Error(
         `Nothing to merge: ${address} holds no SUI coin objects (one is needed as the gas coin)`,
       );
     }
-    // The gas coin must cover the gas budget, so use the largest coin
-    const gasCoin = selected.reduce((a, b) => (b.balance > a.balance ? b : a));
-    const rest = selected.filter((c) => c !== gasCoin);
+    // The reserved gas coin alone must cover the budget, so use the largest
+    const gasCoin = coins.reduce((a, b) =>
+      (b.balance ?? 0n) > (a.balance ?? 0n) ? b : a,
+    );
+    const rest = coins.filter((c) => c !== gasCoin).slice(0, MAX_COINS_PER_TX);
     if (rest.length === 0 && addressBalance === 0n) {
       throw new Error(
         output === "coin-object"
@@ -147,6 +157,7 @@ export async function buildMergeCoinsTransaction(
     return tx;
   }
 
+  const selected = coins.slice(0, MAX_COINS_PER_TX);
   if (output === "coin-object") {
     if (selected.length <= 1 && addressBalance === 0n) {
       throw new Error(
@@ -231,18 +242,21 @@ async function getAddressBalance(
 /**
  * Paginated fetch of the `Coin<coinType>` objects owned by `owner` (all coin
  * objects when `coinType` is omitted), with the object refs needed for gas
- * payment and the balance used to pick the SUI gas coin.
+ * payment. Coin balances are only fetched when `withBalance` is set (used to
+ * pick a SUI gas coin).
  */
 async function getCoinObjects(
   blockchain: Blockchain,
   owner: string,
   coinType?: string,
+  withBalance = false,
 ): Promise<CoinObjectRef[]> {
   const query = graphql(`
     query getCoinObjectsOfType(
       $owner: SuiAddress!
       $type: String!
       $cursor: String
+      $withBalance: Boolean = false
     ) {
       address(address: $owner) {
         objects(filter: { type: $type }, after: $cursor) {
@@ -258,7 +272,7 @@ async function getCoinObjects(
               type {
                 repr
               }
-              json
+              json @include(if: $withBalance)
             }
           }
         }
@@ -270,10 +284,16 @@ async function getCoinObjects(
   let cursor: string | null = null;
   let hasMore = true;
   while (hasMore) {
-    const variables: { owner: string; type: string; cursor: string | null } = {
+    const variables: {
+      owner: string;
+      type: string;
+      cursor: string | null;
+      withBalance: boolean;
+    } = {
       owner,
       type: coinType ? `0x2::coin::Coin<${coinType}>` : "0x2::coin::Coin",
       cursor,
+      withBalance,
     };
     const response = await blockchain.gqlClient.query({ query, variables });
     const conn = response.data?.address?.objects;
@@ -289,7 +309,7 @@ async function getCoinObjects(
         digest: node.digest,
         // repr is `0x…2::coin::Coin<T>`; extract the inner type T
         coinType: repr.slice(repr.indexOf("<") + 1, -1),
-        balance: BigInt(json?.balance ?? 0),
+        ...(withBalance ? { balance: BigInt(json?.balance ?? 0) } : {}),
       });
     }
     if (conn?.pageInfo?.hasNextPage && conn.pageInfo.endCursor) {
