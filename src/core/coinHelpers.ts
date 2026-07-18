@@ -93,6 +93,11 @@ export async function getCoinObjectCounts(
  *
  * Consolidates at most {@link MAX_COINS_PER_TX} coin objects per transaction
  * — re-run until one coin object remains.
+ *
+ * The address balance is read at build time and withdrawn as an exact amount
+ * (the protocol does not support entire-balance withdrawals yet), so
+ * concurrent accumulator activity between build and execution fails the
+ * transaction with "Invalid withdraw reservation" — rebuild and retry.
  */
 export async function buildMergeCoinsTransaction(
   coinType: string,
@@ -132,14 +137,12 @@ export async function buildMergeCoinsTransaction(
       throw new Error(`Nothing to merge: ${address} holds no SUI coin objects`);
     }
     if (useAddressBalanceGas) {
-      for (const coin of coins.slice(0, MAX_COINS_PER_TX)) {
-        blockchain.sendCoinToAddressBalance(
-          tx,
-          normalizedCoinType,
-          address,
-          coin.objectId,
-        );
-      }
+      sendCoinsToAddressBalance(
+        tx,
+        normalizedCoinType,
+        address,
+        coins.slice(0, MAX_COINS_PER_TX),
+      );
       return tx;
     }
     // The reserved gas coin alone must cover the budget, so use the largest
@@ -178,14 +181,7 @@ export async function buildMergeCoinsTransaction(
         ]);
       }
     } else {
-      for (const coin of rest) {
-        blockchain.sendCoinToAddressBalance(
-          tx,
-          normalizedCoinType,
-          address,
-          coin.objectId,
-        );
-      }
+      sendCoinsToAddressBalance(tx, normalizedCoinType, address, rest);
     }
     return tx;
   }
@@ -217,16 +213,30 @@ export async function buildMergeCoinsTransaction(
         `Nothing to merge: ${address} holds no coin objects of ${normalizedCoinType}`,
       );
     }
-    for (const coin of selected) {
-      blockchain.sendCoinToAddressBalance(
-        tx,
-        normalizedCoinType,
-        address,
-        coin.objectId,
-      );
-    }
+    sendCoinsToAddressBalance(tx, normalizedCoinType, address, selected);
   }
   return tx;
+}
+
+/**
+ * `send_funds` each coin into `address`'s address balance, sharing a single
+ * recipient input across all calls (each `tx.pure` call would otherwise add
+ * a duplicate input).
+ */
+function sendCoinsToAddressBalance(
+  tx: Transaction,
+  coinType: string,
+  address: string,
+  coins: CoinObjectRef[],
+) {
+  const recipient = tx.pure.address(address);
+  for (const coin of coins) {
+    tx.moveCall({
+      target: "0x2::coin::send_funds",
+      typeArguments: [coinType],
+      arguments: [tx.object(coin.objectId), recipient],
+    });
+  }
 }
 
 /**
