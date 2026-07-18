@@ -31,6 +31,13 @@ export interface CoinTypeCount {
  */
 const MAX_COINS_PER_TX = 500;
 
+/**
+ * Min SUI address balance (in MIST) for paying gas from the address balance
+ * instead of reserving a gas coin. 0.1 SUI — well above observed resolved
+ * budgets for full send_funds transactions (~0.0002 SUI for 20 sends).
+ */
+const MIN_ADDRESS_BALANCE_FOR_GAS = 100_000_000n;
+
 interface CoinObjectRef {
   objectId: string;
   version: number;
@@ -77,6 +84,12 @@ export async function getCoinObjectCounts(
  * coin is one. The largest SUI coin is reserved as the gas coin (it alone
  * must cover the gas budget): with `coin-object` output everything merges
  * into it, and with `address-balance` output it stays as a coin object.
+ * Exception: with `address-balance` output, when the pre-existing SUI address
+ * balance already exceeds {@link MIN_ADDRESS_BALANCE_FOR_GAS} no gas coin is
+ * reserved — gas resolves against the address balance and every coin is sent,
+ * leaving none behind. (Funds deposited by this same transaction cannot pay
+ * its gas, so a first run that leaves the gas coin can be re-run once the
+ * address balance is funded.)
  *
  * Consolidates at most {@link MAX_COINS_PER_TX} coin objects per transaction
  * — re-run until one coin object remains.
@@ -91,34 +104,54 @@ export async function buildMergeCoinsTransaction(
   const normalizedCoinType = normalizeStructTag(coinType);
   const isSui = normalizedCoinType === normalizeStructTag(SUI_TYPE_ARG);
 
+  const addressBalance =
+    output === "coin-object" || isSui
+      ? await getAddressBalance(blockchain, address, normalizedCoinType)
+      : 0n;
+  // With enough pre-existing SUI address balance, gas resolves against it
+  // instead of a reserved gas coin, so every coin object can be sent
+  const useAddressBalanceGas =
+    isSui &&
+    output === "address-balance" &&
+    addressBalance >= MIN_ADDRESS_BALANCE_FOR_GAS;
+
   // Balances are only needed to pick a gas coin that can cover the budget
-  const withBalance = isSui;
+  const withBalance = isSui && !useAddressBalanceGas;
   const coins = await getCoinObjects(
     blockchain,
     address,
     normalizedCoinType,
     withBalance,
   );
-  const addressBalance =
-    output === "coin-object"
-      ? await getAddressBalance(blockchain, address, normalizedCoinType)
-      : 0n;
 
   const tx = new Transaction();
   tx.setSender(address);
 
   if (isSui) {
     if (coins.length === 0) {
-      throw new Error(
-        `Nothing to merge: ${address} holds no SUI coin objects (one is needed as the gas coin)`,
-      );
+      throw new Error(`Nothing to merge: ${address} holds no SUI coin objects`);
+    }
+    if (useAddressBalanceGas) {
+      for (const coin of coins.slice(0, MAX_COINS_PER_TX)) {
+        blockchain.sendCoinToAddressBalance(
+          tx,
+          normalizedCoinType,
+          address,
+          coin.objectId,
+        );
+      }
+      return tx;
     }
     // The reserved gas coin alone must cover the budget, so use the largest
     const gasCoin = coins.reduce((a, b) =>
       (b.balance ?? 0n) > (a.balance ?? 0n) ? b : a,
     );
     const rest = coins.filter((c) => c !== gasCoin).slice(0, MAX_COINS_PER_TX);
-    if (rest.length === 0 && addressBalance === 0n) {
+    // For coin-object output a nonzero address balance is still work (it gets
+    // withdrawn into the gas coin); for address-balance output it is not
+    const hasWork =
+      rest.length > 0 || (output === "coin-object" && addressBalance > 0n);
+    if (!hasWork) {
       throw new Error(
         output === "coin-object"
           ? `Nothing to merge: ${address} holds a single SUI coin object and no address balance`
