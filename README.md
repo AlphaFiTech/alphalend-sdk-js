@@ -34,8 +34,13 @@ npm install @alphafi/alphalend-sdk
   an ESM context or via a bundler.
 - **No `postinstall` / patches.** Earlier work-in-progress used a `patch-package`
   hook to fix `@naviprotocol/lending` under v2; that would have broken consumer
-  installs. The flash-loan helpers are now vendored (`src/vendor/naviFlashloan.ts`),
-  so installing this package runs no lifecycle scripts and pulls no Navi dependency.
+  installs. The flash-loan helpers now come from `@naviprotocol/lending@^2`
+  (a runtime dependency), which is `@mysten/sui` v2-native and import-safe — the
+  previous vendored copy has been removed. Installing this package still runs no
+  lifecycle scripts. (NAVI v2's split `.d.ts` don't resolve under
+  `moduleResolution: NodeNext`, so a small local declaration shim,
+  `src/naviprotocol-lending.d.ts`, types the flash-loan helpers; the runtime
+  bundle itself is unaffected.)
 
 ## Getting Started
 
