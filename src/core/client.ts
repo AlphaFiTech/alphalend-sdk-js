@@ -1592,13 +1592,11 @@ export class AlphalendClient {
     }
 
     // Stake claimed SUI into stSUI and process it under the stSUI coin type
+    const stsuiCoinType = normalizeCoinType(this.constants.STSUI_COIN_TYPE);
     if (suiCoins.length > 0) {
       const mergedSui = this.mergeCoins(tx, undefined, suiCoins);
       const stsuiCoin = this.mintStsui(tx, mergedSui);
-      addCoinToMap(
-        normalizeCoinType(this.constants.STSUI_COIN_TYPE),
-        stsuiCoin,
-      );
+      addCoinToMap(stsuiCoinType, stsuiCoin);
     }
 
     // Function to supply coin to market or transfer to wallet
@@ -1656,8 +1654,15 @@ export class AlphalendClient {
           remainingCoin,
         );
       } else {
-        // Not borrowed - supply or transfer
-        handleCoin(mergedCoin, coinType, params.supplyMarkets?.get(coinType));
+        // Not borrowed - supply or transfer. stSUI minted from SUI rewards has
+        // no caller-provided supply market; default to the stSUI market so it
+        // is supplied like other rewards (mirrors collect_reward_and_deposit's
+        // on-chain auto-deposit).
+        let supplyInfo = params.supplyMarkets?.get(coinType);
+        if (!supplyInfo && suiCoins.length > 0 && coinType === stsuiCoinType) {
+          supplyInfo = { marketId: String(this.constants.STSUI_MARKET_ID) };
+        }
+        handleCoin(mergedCoin, coinType, supplyInfo);
       }
     }
     return tx;
