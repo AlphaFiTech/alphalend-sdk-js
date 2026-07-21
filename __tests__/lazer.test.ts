@@ -34,7 +34,7 @@ const errStatus = (status = 503) => ({
 });
 
 function buildLazerClient(proxyUrl: string) {
-  const client = new AlphalendClient("mainnet", undefined, {
+  const client = new AlphalendClient("testnet", undefined, {
     coinMetadataMap: new Map(),
   });
   client.constants.LAZER_PROXY_URL = proxyUrl;
@@ -206,22 +206,6 @@ describe("price-refresh routing", () => {
     await client.updateAllPrices(tx, ["0x2::sui::SUI"]);
     expect(spy).toHaveBeenCalledWith(tx, ["0x2::sui::SUI"]);
   });
-
-  it("keeps the Pyth path on testnet while its Lazer verifier is v1", async () => {
-    const client = new AlphalendClient("testnet", undefined, {
-      coinMetadataMap: new Map(),
-    });
-    const lazerSpy = jest
-      .spyOn(client, "updatePricesLazer")
-      .mockImplementation(async () => {});
-    jest
-      .spyOn(client.blockchain, "getInitialSharedVersion")
-      .mockResolvedValue("123");
-
-    await client.updatePrices(new Transaction(), []);
-
-    expect(lazerSpy).not.toHaveBeenCalled();
-  });
 });
 
 describe("Lazer price refresh", () => {
@@ -270,7 +254,7 @@ describe("Lazer price refresh", () => {
       }
       return okBody("0x010203");
     });
-    const client = new AlphalendClient("mainnet");
+    const client = new AlphalendClient("testnet");
     client.constants.LAZER_PROXY_URL = "https://api.example";
     jest
       .spyOn(client.blockchain, "getInitialSharedVersion")
@@ -318,7 +302,7 @@ describe("Pyth path intact (updatePriceTransaction)", () => {
 
 describe("Lazer fail-closed at the client boundary", () => {
   it("propagates a proxy failure and never falls back to the Pyth path", async () => {
-    const client = new AlphalendClient("mainnet", undefined, {
+    const client = new AlphalendClient("testnet", undefined, {
       coinMetadataMap: new Map(),
     });
     installFetch().mockRejectedValue(new Error("ECONNREFUSED"));
