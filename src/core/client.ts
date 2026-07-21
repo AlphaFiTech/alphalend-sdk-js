@@ -1048,8 +1048,8 @@ export class AlphalendClient {
    *
    * On mainnet, SUI rewards are staked into stSUI via `liquid_staking::mint` and
    * the stSUI is transferred to the user (or supplied to the stSUI market when
-   * `claimAndDepositAll` is set). Dust SUI rewards below 0.01 SUI keep the plain
-   * SUI behavior.
+   * `claimAndDepositAll` is set). Estimated SUI rewards below
+   * `MIN_SUI_STAKE_AMOUNT` keep the plain SUI behavior.
    * @returns Transaction object ready for signing and execution
    */
   async claimRewards(params: ClaimRewardsParams): Promise<Transaction> {
@@ -1495,7 +1495,8 @@ export class AlphalendClient {
    *
    * On mainnet, SUI rewards are staked into stSUI via `liquid_staking::mint` and
    * processed as stSUI, so `borrowedCoins`/`supplyMarkets` lookups run against the
-   * stSUI coin type. Dust SUI rewards below 0.01 SUI keep the plain SUI behavior.
+   * stSUI coin type. Estimated SUI rewards below `MIN_SUI_STAKE_AMOUNT` keep
+   * the plain SUI behavior.
    *
    * On mainnet, optionally updates prices first if `priceUpdateCoinTypes` is provided.
    *
