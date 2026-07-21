@@ -1248,7 +1248,7 @@ export class AlphalendClient {
     // ensureInitialized (coin metadata fetch) and getClaimRewardInput (position
     // + market reads) are independent network round-trips, so run them
     // concurrently instead of sequentially.
-    const [, { rewardInput }] = await Promise.all([
+    const [, { rewardInput, claimableAmounts }] = await Promise.all([
       // Ensure SDK is initialized to have access to coin metadata (including prices)
       this.ensureInitialized(),
       // Get all claimable rewards
@@ -1271,9 +1271,16 @@ export class AlphalendClient {
       await this.updatePrices(tx, params.priceUpdateCoinTypes);
     }
 
+    // Prefer the on-chain-derived claimable estimate over params.rewardAmounts:
+    // callers pass display amounts (e.g. SUI rewards folded into stSUI), which
+    // over-quote the swap and trip the aggregator's slippage check.
+    const getRewardAmount = (coinType: string): string | undefined =>
+      claimableAmounts.get(coinType)?.toString() ??
+      params.rewardAmounts?.get(coinType);
+
     // Helper function to calculate USD value for a coin type
     const calculateUsdValue = (coinType: string): number | null => {
-      const rewardAmount = params.rewardAmounts?.get(coinType);
+      const rewardAmount = getRewardAmount(coinType);
       if (!rewardAmount) return 0;
 
       const coinMetadata = this.coinMetadataMap.get(coinType);
@@ -1399,8 +1406,8 @@ export class AlphalendClient {
           targetCoin = mergedCoin;
         }
       } else {
-        // Use provided reward amount for quote, or fallback to 1 token
-        const quoteAmount = params.rewardAmounts?.get(coinType) || "1000000000";
+        // Use estimated claimable amount for quote, or fallback to 1 token
+        const quoteAmount = getRewardAmount(coinType) || "1000000000";
         const router = await this.cetusSwap.getCetusSwapQuote(
           coinType,
           params.targetCoinType,
