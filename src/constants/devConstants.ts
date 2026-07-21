@@ -72,7 +72,7 @@ export const devConstants: Constants = {
 
   // Pyth Lazer (Pyth Pro) Constants.
   // NOTE: this testnet package is still v1 and lacks parse_and_verify_le_ecdsa_update_v2, so the
-  // Lazer verify call won't resolve on testnet — keep useLazer off here until Pyth ships a v2 testnet package.
+  // SDK keeps Pyth price updates on testnet until Pyth ships a v2 testnet package.
   LAZER_PACKAGE_ID:
     "0xf5bd2141967507050a91b58de3d95e77c432cd90d1799ee46effc27430a68c21",
   LAZER_STATE_ID:

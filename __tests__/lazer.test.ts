@@ -34,9 +34,8 @@ const errStatus = (status = 503) => ({
 });
 
 function buildLazerClient(proxyUrl: string) {
-  const client = new AlphalendClient("testnet", undefined, {
+  const client = new AlphalendClient("mainnet", undefined, {
     coinMetadataMap: new Map(),
-    useLazer: true,
   });
   client.constants.LAZER_PROXY_URL = proxyUrl;
   jest
@@ -187,11 +186,9 @@ describe("appendOracleToLendingBridge", () => {
   });
 });
 
-describe("price-refresh routing (useLazer)", () => {
-  it("updatePrices routes to the Lazer path when useLazer is set", async () => {
-    const client = new AlphalendClient("mainnet", undefined, {
-      useLazer: true,
-    });
+describe("price-refresh routing", () => {
+  it("updatePrices routes to the Lazer path", async () => {
+    const client = new AlphalendClient("mainnet");
     const spy = jest
       .spyOn(client, "updatePricesLazer")
       .mockImplementation(async () => {});
@@ -200,16 +197,30 @@ describe("price-refresh routing (useLazer)", () => {
     expect(spy).toHaveBeenCalledWith(tx, ["0x2::sui::SUI"]);
   });
 
-  it("updateAllPrices routes to the Lazer path when useLazer is set", async () => {
-    const client = new AlphalendClient("mainnet", undefined, {
-      useLazer: true,
-    });
+  it("updateAllPrices routes to the Lazer path", async () => {
+    const client = new AlphalendClient("mainnet");
     const spy = jest
       .spyOn(client, "updatePricesLazer")
       .mockImplementation(async () => {});
     const tx = new Transaction();
     await client.updateAllPrices(tx, ["0x2::sui::SUI"]);
     expect(spy).toHaveBeenCalledWith(tx, ["0x2::sui::SUI"]);
+  });
+
+  it("keeps the Pyth path on testnet while its Lazer verifier is v1", async () => {
+    const client = new AlphalendClient("testnet", undefined, {
+      coinMetadataMap: new Map(),
+    });
+    const lazerSpy = jest
+      .spyOn(client, "updatePricesLazer")
+      .mockImplementation(async () => {});
+    jest
+      .spyOn(client.blockchain, "getInitialSharedVersion")
+      .mockResolvedValue("123");
+
+    await client.updatePrices(new Transaction(), []);
+
+    expect(lazerSpy).not.toHaveBeenCalled();
   });
 });
 
@@ -259,9 +270,7 @@ describe("Lazer price refresh", () => {
       }
       return okBody("0x010203");
     });
-    const client = new AlphalendClient("testnet", undefined, {
-      useLazer: true,
-    });
+    const client = new AlphalendClient("mainnet");
     client.constants.LAZER_PROXY_URL = "https://api.example";
     jest
       .spyOn(client.blockchain, "getInitialSharedVersion")
@@ -307,25 +316,10 @@ describe("Pyth path intact (updatePriceTransaction)", () => {
   });
 });
 
-describe("default price source (no premature cutover)", () => {
-  it("a fresh client defaults to Pyth (useLazer=false) on every network", () => {
-    for (const network of ["mainnet", "testnet", "devnet"] as Network[]) {
-      expect(new AlphalendClient(network).useLazer).toBe(false);
-    }
-  });
-
-  it("lets apps opt into Lazer through client options", () => {
-    expect(
-      new AlphalendClient("mainnet", undefined, { useLazer: true }).useLazer,
-    ).toBe(true);
-  });
-});
-
 describe("Lazer fail-closed at the client boundary", () => {
   it("propagates a proxy failure and never falls back to the Pyth path", async () => {
-    const client = new AlphalendClient("testnet", undefined, {
+    const client = new AlphalendClient("mainnet", undefined, {
       coinMetadataMap: new Map(),
-      useLazer: true,
     });
     installFetch().mockRejectedValue(new Error("ECONNREFUSED"));
 

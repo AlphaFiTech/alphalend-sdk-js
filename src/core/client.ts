@@ -87,7 +87,6 @@ export class AlphalendClient {
   blockchain: Blockchain;
   sevenKGateway: SevenKGateway;
   cetusSwap: CetusSwap;
-  useLazer: boolean;
 
   // Dynamic coin metadata properties
   private coinMetadataMap: Map<string, CoinMetadata> = new Map();
@@ -148,7 +147,6 @@ export class AlphalendClient {
     this.blockchain = new Blockchain(network, graphqlUrl);
     this.sevenKGateway = new SevenKGateway();
     this.cetusSwap = new CetusSwap("mainnet");
-    this.useLazer = options?.useLazer ?? false;
 
     // If a coin metadata map is provided, use it and mark as initialized
     if (options?.coinMetadataMap) {
@@ -190,21 +188,8 @@ export class AlphalendClient {
     }
   }
 
-  /**
-   * Updates price information for assets from Pyth oracle
-   *
-   * This method:
-   * 1. Gathers price feed IDs for the specified coins
-   * 2. Fetches the latest price data from Pyth oracle
-   * 3. Adds price update instructions to the transaction
-   * 4. Updates the protocol with new price information
-   *
-   * @param tx - Transaction object to add price update calls to
-   * @param coinTypes - Array of fully qualified coin types (e.g., "0x2::sui::SUI")
-   * @returns Transaction object with price update calls
-   */
   async updatePrices(tx: Transaction, coinTypes: string[]) {
-    if (this.useLazer) {
+    if (this.network === "mainnet") {
       await this.updatePricesLazer(tx, coinTypes);
       return;
     }
@@ -258,7 +243,7 @@ export class AlphalendClient {
   }
 
   async updateAllPrices(tx: Transaction, coinTypes: string[]) {
-    if (this.useLazer) {
+    if (this.network === "mainnet") {
       await this.updatePricesLazer(tx, coinTypes);
       return;
     }
