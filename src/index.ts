@@ -19,3 +19,8 @@ export {
   getNaviFlashLoanSupportedCoinTypes,
   getNaviFlashLoanFeeForCoinType,
 } from "./core/flashRepay.js";
+export {
+  getCoinObjectCounts,
+  buildMergeCoinsTransaction,
+} from "./core/coinHelpers.js";
+export type { MergeCoinsOutput, CoinTypeCount } from "./core/coinHelpers.js";
