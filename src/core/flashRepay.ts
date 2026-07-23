@@ -6,7 +6,7 @@ import {
   flashloanPTB,
   repayFlashLoanPTB,
   getAllFlashLoanAssets,
-} from "../vendor/naviFlashloan.js";
+} from "@naviprotocol/lending";
 import { Decimal } from "decimal.js";
 import { FlashRepayParams } from "./types.js";
 import type { AlphalendClient } from "./client.js";
