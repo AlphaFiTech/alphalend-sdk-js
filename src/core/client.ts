@@ -16,8 +16,6 @@ import {
 } from "@mysten/sui/transactions";
 import {
   appendOracleToLendingBridge,
-  getPriceInfoObjectIdsWithUpdate,
-  updatePriceTransaction,
 } from "../utils/oracle.js";
 import { appendLazerUpdate, fetchLazerUpdateBytes } from "../utils/lazer.js";
 import {
@@ -87,7 +85,6 @@ export class AlphalendClient {
   blockchain: Blockchain;
   sevenKGateway: SevenKGateway;
   cetusSwap: CetusSwap;
-  useLazer: boolean;
 
   // Dynamic coin metadata properties
   private coinMetadataMap: Map<string, CoinMetadata> = new Map();
@@ -148,7 +145,6 @@ export class AlphalendClient {
     this.blockchain = new Blockchain(network, graphqlUrl);
     this.sevenKGateway = new SevenKGateway();
     this.cetusSwap = new CetusSwap("mainnet");
-    this.useLazer = options?.useLazer ?? false;
 
     // If a coin metadata map is provided, use it and mark as initialized
     if (options?.coinMetadataMap) {
@@ -190,120 +186,12 @@ export class AlphalendClient {
     }
   }
 
-  /**
-   * Updates price information for assets from Pyth oracle
-   *
-   * This method:
-   * 1. Gathers price feed IDs for the specified coins
-   * 2. Fetches the latest price data from Pyth oracle
-   * 3. Adds price update instructions to the transaction
-   * 4. Updates the protocol with new price information
-   *
-   * @param tx - Transaction object to add price update calls to
-   * @param coinTypes - Array of fully qualified coin types (e.g., "0x2::sui::SUI")
-   * @returns Transaction object with price update calls
-   */
   async updatePrices(tx: Transaction, coinTypes: string[]) {
-    if (this.useLazer) {
-      await this.updatePricesLazer(tx, coinTypes);
-      return;
-    }
-    // Auto-initialize market data if needed
-    await this.ensureInitialized();
-
-    // De-duplicate: a coin appearing twice (e.g. supplied and borrowed) would
-    // otherwise add redundant Pyth verify + update_price moveCalls, bloating the
-    // transaction and gas with no benefit. Mirrors updateAllPrices().
-    const uniqueCoinTypes = [...new Set(coinTypes)];
-
-    const updatePriceFeedIds: string[] = [];
-    for (const coinType of uniqueCoinTypes) {
-      if (!this.getPythSponsored(coinType)) {
-        updatePriceFeedIds.push(this.getPythPriceFeedId(coinType));
-      }
-    }
-
-    // The Pyth fetch (Hermes round-trip + price-feed moveCalls) and resolving
-    // the oracle's initial shared version are independent, so run them
-    // concurrently. getInitialSharedVersion only reads (it never mutates tx),
-    // so the Pyth update calls it appends still precede the update_price calls
-    // built in the loop below — transaction ordering is preserved.
-    const [, oracleInitialSharedVersion] = await Promise.all([
-      updatePriceFeedIds.length > 0
-        ? getPriceInfoObjectIdsWithUpdate(
-            tx,
-            updatePriceFeedIds,
-            this.pythClient,
-            this.pythConnection,
-          )
-        : Promise.resolve(),
-      this.blockchain.getInitialSharedVersion(
-        this.constants.ALPHAFI_ORACLE_OBJECT_ID,
-      ),
-    ]);
-
-    for (const coinType of uniqueCoinTypes) {
-      // Use dynamic data from GraphQL API
-      const priceInfoObjectId = this.getPythPriceInfoObjectId(coinType);
-      updatePriceTransaction(
-        tx,
-        {
-          priceInfoObject: priceInfoObjectId,
-          coinType: coinType,
-        },
-        this.constants,
-        oracleInitialSharedVersion,
-      );
-    }
+    await this.updatePricesLazer(tx, coinTypes);
   }
 
   async updateAllPrices(tx: Transaction, coinTypes: string[]) {
-    if (this.useLazer) {
-      await this.updatePricesLazer(tx, coinTypes);
-      return;
-    }
-    // Auto-initialize market data if needed
-    await this.ensureInitialized();
-
-    // De-duplicate so a repeated coin doesn't add redundant update_price
-    // moveCalls in the loop below (the feed-id set was already de-duplicated).
-    const uniqueCoinTypes = [...new Set(coinTypes)];
-
-    // Use dynamic data with fallback to hardcoded
-    const updatePriceFeedIds: string[] = Array.from(
-      new Set(
-        uniqueCoinTypes.map((coinType) => this.getPythPriceFeedId(coinType)),
-      ),
-    );
-
-    // The Pyth fetch and resolving the oracle's initial shared version are
-    // independent; run them concurrently. getInitialSharedVersion only reads
-    // (never mutates tx), so the Pyth update calls still precede the
-    // update_price calls built in the loop below — ordering is preserved.
-    const [, oracleInitialSharedVersion] = await Promise.all([
-      getPriceInfoObjectIdsWithUpdate(
-        tx,
-        updatePriceFeedIds,
-        this.pythClient,
-        this.pythConnection,
-      ),
-      this.blockchain.getInitialSharedVersion(
-        this.constants.ALPHAFI_ORACLE_OBJECT_ID,
-      ),
-    ]);
-
-    for (const coinType of uniqueCoinTypes) {
-      const priceInfoObjectId = this.getPythPriceInfoObjectId(coinType);
-      updatePriceTransaction(
-        tx,
-        {
-          priceInfoObject: priceInfoObjectId,
-          coinType: coinType,
-        },
-        this.constants,
-        oracleInitialSharedVersion,
-      );
-    }
+    await this.updatePricesLazer(tx, coinTypes);
   }
 
   /**
