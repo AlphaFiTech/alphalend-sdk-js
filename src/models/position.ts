@@ -6,6 +6,8 @@ import {
 } from "../utils/parsedTypes.js";
 import { Decimal } from "decimal.js";
 import { Market } from "./market.js";
+import { getConstants } from "../constants/index.js";
+import { normalizeCoinType } from "../utils/parser.js";
 
 export class Position {
   position: PositionType;
@@ -151,6 +153,39 @@ export class Position {
       : new Decimal(0);
 
     const rewardsToClaim = this.calculateRewardsToClaim();
+
+    // TEMP: report SUI rewards as stSUI, converted via the SUI/stSUI price
+    // ratio (mirrors alphalend-sdk-rust#212). Runs before the USD total below
+    // so it stays consistent.
+    const constants = getConstants("mainnet");
+    const suiIdx = rewardsToClaim.findIndex(
+      (reward) =>
+        normalizeCoinType(reward.coinType) === constants.SUI_COIN_TYPE,
+    );
+    if (suiIdx !== -1) {
+      const suiReward = rewardsToClaim[suiIdx];
+      const suiPrice = this.getPrice(suiReward.coinType);
+      const stsuiPrice = this.getPrice(constants.STSUI_COIN_TYPE);
+      if (suiPrice.lte(0) || stsuiPrice.lte(0)) {
+        throw new Error(
+          "Missing SUI or stSUI price for SUI -> stSUI reward conversion",
+        );
+      }
+      const stsuiAmount = suiReward.rewardAmount.mul(suiPrice).div(stsuiPrice);
+      rewardsToClaim.splice(suiIdx, 1);
+      const stsuiReward = rewardsToClaim.find(
+        (reward) =>
+          normalizeCoinType(reward.coinType) === constants.STSUI_COIN_TYPE,
+      );
+      if (stsuiReward) {
+        stsuiReward.rewardAmount = stsuiReward.rewardAmount.add(stsuiAmount);
+      } else {
+        rewardsToClaim.push({
+          coinType: constants.STSUI_COIN_TYPE,
+          rewardAmount: stsuiAmount,
+        });
+      }
+    }
 
     const rewardsToClaimUsd = rewardsToClaim.reduce((acc, reward) => {
       const price = this.getPrice(reward.coinType);

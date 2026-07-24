@@ -70,6 +70,13 @@ export interface Constants {
 
   STSUI_COIN_TYPE: string;
 
+  // stSUI liquid staking (SUI reward -> stSUI conversion)
+  STSUI_LATEST_PACKAGE_ID: string;
+
+  LST_INFO: string;
+
+  STSUI_MARKET_ID: number;
+
   ALPHA_COIN_TYPE: string;
 
   SUI_COIN_TYPE_LONG: string;

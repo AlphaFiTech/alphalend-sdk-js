@@ -35,6 +35,7 @@ export class CetusSwap {
         "METASTABLE",
         "HAEDALHMMV2",
         "HAEDALPMM",
+        "BOLT",
       ]);
 
       const router = await this.client.findRouters({

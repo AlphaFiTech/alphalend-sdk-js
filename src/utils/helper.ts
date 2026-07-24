@@ -3,9 +3,11 @@ import { getAlphafiConstants, getConstants } from "../constants/index.js";
 import { Receipt, ReceiptGql } from "./queryTypes.js";
 import { getUserPosition } from "../models/position/functions.js";
 import { Blockchain } from "../models/blockchain.js";
+import { normalizeCoinType } from "./parser.js";
 import {
   MarketType,
   RewardDistributorType,
+  RewardType,
   UserRewardDistributorType,
   UserRewardType,
 } from "./parsedTypes.js";
@@ -14,19 +16,28 @@ import {
  * Determine which rewards are claimable for the user, grouped by market id.
  * Uses parsed `PositionType` and `MarketType` (GraphQL-backed) — no raw
  * JSON-RPC shapes are consumed.
+ *
+ * `claimableAmounts` maps normalized coin type -> estimated claimable amount
+ * in raw base units. The estimate mirrors the position refresh math, including
+ * a client-side projection of the market-side accrual since the distributor's
+ * last on-chain refresh, so a reward that has accrued but not yet been
+ * checkpointed on-chain still counts toward the estimate.
  */
 export async function getClaimRewardInput(
   blockchain: Blockchain,
   userAddress: string,
   positionCapId?: string,
-): Promise<{ marketId: number; coinTypes: string[] }[]> {
+): Promise<{
+  rewardInput: { marketId: number; coinTypes: string[] }[];
+  claimableAmounts: Map<string, bigint>;
+}> {
   // When a specific positionCapId is provided, resolve the reward input from
   // that exact position rather than the user's first cap. Otherwise fall back
   // to the address-based lookup (first position cap).
   const position = positionCapId
     ? await blockchain.getPositionFromPositionCapId(positionCapId)
     : await getUserPosition(blockchain, userAddress);
-  if (!position) return [];
+  if (!position) return { rewardInput: [], claimableAmounts: new Map() };
 
   // Fetch every distinct market referenced by the position's reward
   // distributors ONCE and in parallel. The previous implementation awaited
@@ -54,6 +65,7 @@ export async function getClaimRewardInput(
 
   const rewardInput: { marketId: number; coinTypes: string[] }[] = [];
   const marketActionMap: Map<number, string[]> = new Map();
+  const claimableAmounts: Map<string, bigint> = new Map();
 
   for (const rewardDistributor of position.rewardDistributors) {
     const marketId = Number(rewardDistributor.marketId);
@@ -70,6 +82,7 @@ export async function getClaimRewardInput(
       rewardDistributor,
       marketRewardDistributor,
       coinTypes,
+      claimableAmounts,
     );
     marketActionMap.set(marketId, [...coinTypes]);
   }
@@ -77,13 +90,14 @@ export async function getClaimRewardInput(
   for (const [marketId, coinTypes] of marketActionMap.entries()) {
     rewardInput.push({ marketId, coinTypes });
   }
-  return rewardInput;
+  return { rewardInput, claimableAmounts };
 }
 
 function addClaimableCoinTypes(
   userDistributor: UserRewardDistributorType,
   marketDistributor: RewardDistributorType,
   coinTypes: Set<string>,
+  claimableAmounts: Map<string, bigint>,
 ): void {
   const lastUpdated = parseFloat(userDistributor.lastUpdated);
   const share = parseFloat(userDistributor.share);
@@ -93,6 +107,32 @@ function addClaimableCoinTypes(
     if (!marketReward) continue;
     const userReward: UserRewardType | null =
       i < userDistributor.rewards.length ? userDistributor.rewards[i] : null;
+
+    // Estimate pending rewards with the same math as Position's
+    // refreshUserRewardDistributor, projecting the market-side accrual since
+    // the distributor's last on-chain refresh — otherwise a reward campaign
+    // that started after that refresh estimates to zero even though the
+    // on-chain claim will accrue and pay it out.
+    const marketCum =
+      BigInt(marketReward.cummulativeRewardsPerShare) +
+      projectedRewardsPerShare(marketReward, marketDistributor);
+    let pending = 0n;
+    if (userReward) {
+      pending =
+        BigInt(userReward.earnedRewards) +
+        ((marketCum - BigInt(userReward.cummulativeRewardsPerShare)) *
+          BigInt(userDistributor.share)) /
+          BigInt(10 ** 18);
+    } else {
+      pending = (marketCum * BigInt(userDistributor.share)) / BigInt(10 ** 18);
+    }
+    if (pending > 0n) {
+      const coinType = normalizeCoinType(marketReward.coinType);
+      claimableAmounts.set(
+        coinType,
+        (claimableAmounts.get(coinType) ?? 0n) + pending,
+      );
+    }
 
     const timeElapsed =
       Math.min(parseFloat(marketReward.endTime), Date.now()) -
@@ -120,6 +160,32 @@ function addClaimableCoinTypes(
       coinTypes.add(marketReward.coinType);
     }
   }
+}
+
+/**
+ * Rewards-per-share (1e18-scaled) accrued since the distributor's last
+ * on-chain refresh, mirroring Market.refreshRewardDistributors and the
+ * on-chain refresh math.
+ */
+function projectedRewardsPerShare(
+  reward: RewardType,
+  distributor: RewardDistributorType,
+): bigint {
+  const now = Date.now();
+  const lastUpdated = parseInt(distributor.lastUpdated);
+  if (distributor.totalXtokens === "0") return 0n;
+  if (parseInt(reward.startTime) >= now) return 0n;
+  if (parseInt(reward.endTime) <= lastUpdated) return 0n;
+
+  const start = Math.max(lastUpdated, parseInt(reward.startTime));
+  const end = Math.min(now, parseInt(reward.endTime));
+  if (end <= start) return 0n;
+
+  const rewardsGenerated =
+    ((BigInt(reward.totalRewards) - BigInt(reward.distributedRewards)) *
+      BigInt(end - start)) /
+    (BigInt(reward.endTime) - BigInt(lastUpdated));
+  return (rewardsGenerated * BigInt(1e18)) / BigInt(distributor.totalXtokens);
 }
 
 export async function setPrices(tx: Transaction) {
