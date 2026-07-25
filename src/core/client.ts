@@ -126,7 +126,7 @@ export class AlphalendClient {
     // uses JSON-RPC). All other reads go through Blockchain (GraphQL).
     const pythFullnodeUrl =
       network === "mainnet"
-        ? "https://fullnode.mainnet.sui.io/"
+        ? "https://alphalen-suimain-ef6f.mainnet.sui.rpcpool.com/"
         : network === "testnet"
           ? "https://fullnode.testnet.sui.io/"
           : "https://fullnode.devnet.sui.io/";
