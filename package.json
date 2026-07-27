@@ -1,7 +1,7 @@
 {
   "name": "@alphafi/alphalend-sdk",
-  "version": "3.0.2",
-  "description": "",
+  "version": "3.1.1",
+  "description": "AlphaLend SDK for JavaScript/TypeScript applications on the Sui blockchain",
   "type": "module",
   "files": [
     "dist",
@@ -26,7 +26,15 @@
     "test": "npm run test:esm",
     "docs": "typedoc"
   },
-  "keywords": [],
+  "keywords": [
+    "sui",
+    "defi",
+    "alphalend",
+    "sdk",
+    "blockchain",
+    "lending",
+    "borrowing"
+  ],
   "author": "",
   "license": "ISC",
   "engines": {
