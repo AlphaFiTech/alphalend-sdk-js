@@ -164,10 +164,14 @@ export class AlphalendClient {
     return this.coinMetadataMap;
   }
 
-  async updatePricesLazer(tx: Transaction, coinTypes: string[]): Promise<void> {
+  async updatePricesLazer(
+    tx: Transaction,
+    coinTypes: string[],
+    updateBytes?: Uint8Array,
+  ): Promise<void> {
     if (coinTypes.length === 0) return;
     const [bytes, oracleInitialSharedVersion] = await Promise.all([
-      fetchLazerUpdateBytes(this.constants.LAZER_PROXY_URL),
+      updateBytes ?? fetchLazerUpdateBytes(this.constants.LAZER_PROXY_URL),
       this.blockchain.getInitialSharedVersion(
         this.constants.ALPHAFI_ORACLE_OBJECT_ID,
       ),
@@ -186,12 +190,20 @@ export class AlphalendClient {
     }
   }
 
-  async updatePrices(tx: Transaction, coinTypes: string[]) {
-    await this.updatePricesLazer(tx, coinTypes);
+  async updatePrices(
+    tx: Transaction,
+    coinTypes: string[],
+    updateBytes?: Uint8Array,
+  ) {
+    await this.updatePricesLazer(tx, coinTypes, updateBytes);
   }
 
-  async updateAllPrices(tx: Transaction, coinTypes: string[]) {
-    await this.updatePricesLazer(tx, coinTypes);
+  async updateAllPrices(
+    tx: Transaction,
+    coinTypes: string[],
+    updateBytes?: Uint8Array,
+  ) {
+    await this.updatePricesLazer(tx, coinTypes, updateBytes);
   }
 
   /**
@@ -570,7 +582,11 @@ export class AlphalendClient {
 
     // First update prices to ensure latest oracle values
     if (this.network === "mainnet") {
-      await this.updatePrices(tx, params.priceUpdateCoinTypes);
+      await this.updatePrices(
+        tx,
+        params.priceUpdateCoinTypes,
+        params.lazerUpdateBytes,
+      );
     } else {
       await setPrices(tx);
     }
@@ -679,7 +695,11 @@ export class AlphalendClient {
 
     // First update prices to ensure latest oracle values
     if (this.network === "mainnet") {
-      await this.updatePrices(tx, params.priceUpdateCoinTypes);
+      await this.updatePrices(
+        tx,
+        params.priceUpdateCoinTypes,
+        params.lazerUpdateBytes,
+      );
     } else {
       await setPrices(tx);
     }
@@ -833,7 +853,11 @@ export class AlphalendClient {
 
     // First update prices to ensure latest oracle values
     if (this.network === "mainnet") {
-      await this.updatePrices(tx, params.priceUpdateCoinTypes);
+      await this.updatePrices(
+        tx,
+        params.priceUpdateCoinTypes,
+        params.lazerUpdateBytes,
+      );
     } else {
       await setPrices(tx);
     }
@@ -1156,7 +1180,11 @@ export class AlphalendClient {
       params.priceUpdateCoinTypes &&
       params.priceUpdateCoinTypes.length > 0
     ) {
-      await this.updatePrices(tx, params.priceUpdateCoinTypes);
+      await this.updatePrices(
+        tx,
+        params.priceUpdateCoinTypes,
+        params.lazerUpdateBytes,
+      );
     }
 
     // Prefer the on-chain-derived claimable estimate over params.rewardAmounts:
@@ -1414,7 +1442,11 @@ export class AlphalendClient {
     // reward-collection loop below, preserving transaction ordering.
     const [, { rewardInput, claimableAmounts }] = await Promise.all([
       shouldUpdatePrices
-        ? this.updatePrices(tx, params.priceUpdateCoinTypes!)
+        ? this.updatePrices(
+            tx,
+            params.priceUpdateCoinTypes!,
+            params.lazerUpdateBytes,
+          )
         : Promise.resolve(),
       getClaimRewardInput(
         this.blockchain,
@@ -1569,9 +1601,17 @@ export class AlphalendClient {
     // First update prices to ensure latest oracle values
     if (this.network === "mainnet") {
       if (params.updateAllPrices) {
-        await this.updateAllPrices(tx, params.priceUpdateCoinTypes);
+        await this.updateAllPrices(
+          tx,
+          params.priceUpdateCoinTypes,
+          params.lazerUpdateBytes,
+        );
       } else {
-        await this.updatePrices(tx, params.priceUpdateCoinTypes);
+        await this.updatePrices(
+          tx,
+          params.priceUpdateCoinTypes,
+          params.lazerUpdateBytes,
+        );
       }
     } else {
       await setPrices(tx);

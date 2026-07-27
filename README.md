@@ -109,6 +109,41 @@ tx.setGasBudget(100_000_000);
 await wallet.signAndExecuteTransaction(tx);
 ```
 
+#### Supplying your own signed Lazer update
+
+By default the SDK fetches a signed Pyth Lazer payload from AlphaLend's proxy. If you have your own,
+hand it over directly — every method that takes `priceUpdateCoinTypes` accepts `lazerUpdateBytes`,
+and `updatePrices` / `updateAllPrices` / `updatePricesLazer` take it as a third argument:
+
+```typescript
+await client.updatePrices(tx, coinTypes, myBytes);
+
+const tx = await client.borrow({
+  /* ...normal params... */
+  priceUpdateCoinTypes: coinTypes,
+  lazerUpdateBytes: myBytes,
+});
+```
+
+Pass the raw signed update as bytes — what sits behind the `hex` field of a Lazer response, and what
+`pyth_lazer::parse_and_verify_le_ecdsa_update_v2` verifies on-chain. With bytes supplied, building a
+transaction makes no request to AlphaLend's proxy, so a browser blocked by CORS or an outage on our
+side doesn't stop you from transacting.
+
+Two things to get right. Lazer is a push stream: you hold one long-lived subscription over a fixed
+set of numeric feed ids and a new signed payload arrives every second, each covering that whole set.
+
+- **Subscribe to at least the coins you transact on.** `oracle::ingest_lazer_update` skips absent
+  feeds rather than failing, so a coin your subscription omits keeps its previous price and shows up
+  later as a staleness abort that points nowhere near the real cause. Feed ids are numeric — read
+  the coin-type mapping on-chain with `oracle::get_lazer_feed_ids_for_coin` against
+  `ALPHAFI_ORACLE_OBJECT_ID`.
+- **Pass the newest payload, not a held one.** Payloads carry a signed timestamp the on-chain
+  verifier bounds against the clock.
+
+On testnet and devnet the high-level methods skip Lazer entirely (the canonical testnet Lazer
+package predates the v2 verifier), so `lazerUpdateBytes` only takes effect there via `updatePrices`.
+
 ### Supply Collateral
 
 ```typescript

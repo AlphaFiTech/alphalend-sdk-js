@@ -1,5 +1,7 @@
 import { jest } from "@jest/globals";
 import { Transaction } from "@mysten/sui/transactions";
+import { fromBase64 } from "@mysten/sui/utils";
+import { bcs } from "@mysten/sui/bcs";
 import {
   appendLazerUpdate,
   fetchLazerUpdateBytes,
@@ -42,6 +44,28 @@ function buildLazerClient(proxyUrl: string) {
     .spyOn(client.blockchain, "getInitialSharedVersion")
     .mockResolvedValue("123");
   return client;
+}
+
+/**
+ * The signed payload the tx actually carries into parse_and_verify_le_ecdsa_update_v2.
+ *
+ * Resolved via the verify call's own argument rather than "the first Pure input" — real call sites
+ * (flashRepay) append pure inputs before the price update.
+ */
+function lazerPayloadOf(tx: Transaction): number[] {
+  const data = tx.getData();
+  const verify = data.commands.find(
+    (command) =>
+      command.MoveCall?.function === "parse_and_verify_le_ecdsa_update_v2",
+  );
+  const arg = verify?.MoveCall?.arguments.at(-1);
+  if (arg?.$kind !== "Input") {
+    throw new Error("transaction carries no Lazer verify call");
+  }
+  const input = data.inputs[arg.Input];
+  if (input.$kind !== "Pure")
+    throw new Error("Lazer payload input is not pure");
+  return [...bcs.vector(bcs.u8()).parse(fromBase64(input.Pure.bytes))];
 }
 
 function expectCompleteLazerRefresh(
@@ -119,9 +143,9 @@ describe("fetchLazerUpdateBytes", () => {
       ok: true,
       json: async () => ({}),
     });
-    await expect(
-      fetchLazerUpdateBytes("https://api.example"),
-    ).rejects.toThrow(/hex/i);
+    await expect(fetchLazerUpdateBytes("https://api.example")).rejects.toThrow(
+      /hex/i,
+    );
   });
 
   it("retries a transient failure, then succeeds", async () => {
@@ -138,14 +162,18 @@ describe("fetchLazerUpdateBytes", () => {
   it("fails closed after exhausting retries (never falls back to Pyth)", async () => {
     const fetchMock = installFetch();
     fetchMock.mockResolvedValue(errStatus(503));
-    await expect(fetchLazerUpdateBytes("https://api.example")).rejects.toThrow();
+    await expect(
+      fetchLazerUpdateBytes("https://api.example"),
+    ).rejects.toThrow();
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
   it("fails closed on a network-level error", async () => {
     const fetchMock = installFetch();
     fetchMock.mockRejectedValue(new Error("ECONNREFUSED"));
-    await expect(fetchLazerUpdateBytes("https://api.example")).rejects.toThrow();
+    await expect(
+      fetchLazerUpdateBytes("https://api.example"),
+    ).rejects.toThrow();
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 });
@@ -194,7 +222,7 @@ describe("price-refresh routing", () => {
       .mockImplementation(async () => {});
     const tx = new Transaction();
     await client.updatePrices(tx, ["0x2::sui::SUI"]);
-    expect(spy).toHaveBeenCalledWith(tx, ["0x2::sui::SUI"]);
+    expect(spy).toHaveBeenCalledWith(tx, ["0x2::sui::SUI"], undefined);
   });
 
   it("updateAllPrices routes to the Lazer path", async () => {
@@ -204,7 +232,7 @@ describe("price-refresh routing", () => {
       .mockImplementation(async () => {});
     const tx = new Transaction();
     await client.updateAllPrices(tx, ["0x2::sui::SUI"]);
-    expect(spy).toHaveBeenCalledWith(tx, ["0x2::sui::SUI"]);
+    expect(spy).toHaveBeenCalledWith(tx, ["0x2::sui::SUI"], undefined);
   });
 });
 
@@ -272,6 +300,63 @@ describe("Lazer price refresh", () => {
       expect.anything(),
     );
     expectCompleteLazerRefresh(tx, client.constants, 1);
+  });
+});
+
+describe("caller-supplied Lazer updates", () => {
+  it("per-call bytes are used as-is, with no provider and no proxy", async () => {
+    const fetchMock = installFetch();
+    const client = buildLazerClient("https://api.example");
+    const tx = new Transaction();
+
+    await client.updatePrices(
+      tx,
+      [client.constants.SUI_COIN_TYPE],
+      new Uint8Array([3, 1, 4]),
+    );
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(lazerPayloadOf(tx)).toEqual([3, 1, 4]);
+    expectCompleteLazerRefresh(tx, client.constants, 1);
+  });
+
+  it("per-call bytes take precedence over an installed provider", async () => {
+    installFetch();
+    const provider = jest.fn(() => new Uint8Array([9, 9, 9]));
+    const client = buildLazerClient("https://api.example", provider);
+    const tx = new Transaction();
+
+    await client.updatePrices(
+      tx,
+      [client.constants.SUI_COIN_TYPE],
+      new Uint8Array([1, 2]),
+    );
+
+    expect(provider).not.toHaveBeenCalled();
+    expect(lazerPayloadOf(tx)).toEqual([1, 2]);
+  });
+
+  it("per-call bytes reach a high-level method (withdraw)", async () => {
+    const fetchMock = installFetch();
+    const client = new AlphalendClient("mainnet", undefined, {
+      coinMetadataMap: new Map(),
+    });
+    jest
+      .spyOn(client.blockchain, "getInitialSharedVersion")
+      .mockResolvedValue("123");
+
+    const tx = await client.withdraw({
+      marketId: "1",
+      amount: 1_000n,
+      coinType: client.constants.SUI_COIN_TYPE,
+      positionCapId: `0x${"1".repeat(64)}`,
+      address: `0x${"2".repeat(64)}`,
+      priceUpdateCoinTypes: [client.constants.SUI_COIN_TYPE],
+      lazerUpdateBytes: new Uint8Array([8, 8]),
+    });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(lazerPayloadOf(tx)).toEqual([8, 8]);
   });
 });
 
