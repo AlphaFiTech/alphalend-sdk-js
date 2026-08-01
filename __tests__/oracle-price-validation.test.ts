@@ -2,9 +2,13 @@
  * Oracle Price Validation Tests
  *
  * Clean, focused tests that show only the root cause of failures.
+ *
+ * Reads the oracle's dynamic fields over Sui GraphQL (JSON-RPC on public
+ * fullnodes was shut down in July 2026).
  */
 
-import { SuiJsonRpcClient } from "@mysten/sui/jsonRpc";
+import { SuiGraphQLClient } from "@mysten/sui/graphql";
+import { graphql } from "@mysten/sui/graphql/schema";
 import { AlphalendClient } from "../src";
 
 // All coin types that have price feed mappings
@@ -24,95 +28,163 @@ const COIN_TYPES = {
     "0xfe3afec26c59e874f3c1d60b8203cb3852d2bb2aa415df9548b8d688e6683f93::alpha::ALPHA",
 } as const;
 
-describe("Oracle Price Validation", () => {
-  let client: AlphalendClient;
-  let suiClient: SuiJsonRpcClient;
-
-  beforeAll(() => {
-    suiClient = new SuiJsonRpcClient({
-      url: "https://fullnode.mainnet.sui.io/",
-      network: "mainnet",
-    });
-    client = new AlphalendClient("mainnet");
-  });
-
-  test("Root cause analysis: Oracle price entries validation", async () => {
-    // Get oracle entries
-    const { getConstants } = await import("../src/constants/index");
-    const constants = getConstants("mainnet");
-
-    const dynamicFields = await suiClient.getDynamicFields({
-      parentId: constants.ALPHAFI_ORACLE_OBJECT_ID,
-    });
-
-    const oraclePriceEntries = new Set<string>();
-
-    for (const field of dynamicFields.data) {
-      try {
-        const fieldObject = await suiClient.getObject({
-          id: field.objectId,
-          options: { showContent: true },
-        });
-
-        if (fieldObject.data?.content && "fields" in fieldObject.data.content) {
-          // The dynamic-field content here is an arbitrary Move struct
-          // whose shape varies per object kind. Probing it with `any`
-          // and optional-chaining is the test's intent — narrowing each
-          // level to a precise type would be more code with no real
-          // safety win in a test.
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const content = fieldObject.data.content as any;
-
-          // Check if this is the Pyth oracle (contains price mappings)
-          if (field.objectType.includes("::oracle::OraclePyth")) {
-            // Extract coin types from the coin_list_map VecMap
-            const coinListMap =
-              content.fields?.value?.fields?.coin_list_map?.fields?.contents;
-            if (coinListMap && Array.isArray(coinListMap)) {
-              for (const entry of coinListMap) {
-                if (entry?.fields?.key?.fields?.name) {
-                  const coinType = entry.fields.key.fields.name;
-                  oraclePriceEntries.add(coinType);
-                }
-              }
-            }
-
-            // Also check identifier_map for additional entries
-            const identifierMap =
-              content.fields?.value?.fields?.identifier_map?.fields?.contents;
-            if (identifierMap && Array.isArray(identifierMap)) {
-              for (const entry of identifierMap) {
-                if (entry?.fields?.value?.fields?.name) {
-                  const coinType = entry.fields.value.fields.name;
-                  oraclePriceEntries.add(coinType);
-                }
-              }
-            }
+const dynamicFieldsQuery = graphql(`
+  query oracleDynamicFields($parentId: SuiAddress!, $cursor: String) {
+    object(address: $parentId) {
+      dynamicFields(after: $cursor) {
+        pageInfo {
+          hasNextPage
+          endCursor
+        }
+        nodes {
+          name {
+            json
           }
-
-          // Check if this is the VecMap that contains type mappings
-          if (
-            field.objectType.includes("vec_map::VecMap") &&
-            field.objectType.includes("type_name::TypeName")
-          ) {
-            const vecMapContents = content.fields?.value?.fields?.contents;
-            if (vecMapContents && Array.isArray(vecMapContents)) {
-              for (const entry of vecMapContents) {
-                // Try to extract type names from key and value
-                if (entry?.fields?.key?.fields?.name) {
-                  const coinType = entry.fields.key.fields.name;
-                  oraclePriceEntries.add(coinType);
+          value {
+            __typename
+            ... on MoveValue {
+              type {
+                repr
+              }
+              json
+            }
+            ... on MoveObject {
+              contents {
+                type {
+                  repr
                 }
-                if (entry?.fields?.value?.fields?.name) {
-                  const coinType = entry.fields.value.fields.name;
-                  oraclePriceEntries.add(coinType);
-                }
+                json
               }
             }
           }
         }
-      } catch {
-        continue;
+      }
+    }
+  }
+`);
+
+/**
+ * One dynamic field of the oracle object, normalized across the
+ * MoveValue/MoveObject union. `nameJson`/`valueJson` are the plain Move JSON
+ * (GraphQL has no JSON-RPC-style `fields` nesting).
+ */
+interface OracleField {
+  nameJson: unknown;
+  valueType: string;
+  valueJson: unknown;
+}
+
+async function fetchOracleDynamicFields(
+  gqlClient: SuiGraphQLClient,
+  parentId: string,
+): Promise<OracleField[]> {
+  const out: OracleField[] = [];
+  let cursor: string | null = null;
+  let hasMore = true;
+  while (hasMore) {
+    const response = await gqlClient.query({
+      query: dynamicFieldsQuery,
+      variables: { parentId, cursor },
+    });
+    const conn = response.data?.object?.dynamicFields;
+    for (const node of conn?.nodes ?? []) {
+      const value = node?.value;
+      const inner = value?.__typename === "MoveObject" ? value.contents : value;
+      out.push({
+        nameJson: node?.name?.json,
+        valueType: inner?.type?.repr ?? "",
+        valueJson: inner?.json,
+      });
+    }
+    if (conn?.pageInfo?.hasNextPage && conn.pageInfo.endCursor) {
+      cursor = conn.pageInfo.endCursor;
+    } else {
+      hasMore = false;
+    }
+  }
+  return out;
+}
+
+describe("Oracle Price Validation", () => {
+  let client: AlphalendClient;
+  let oracleFields: OracleField[];
+
+  beforeAll(async () => {
+    const gqlClient = new SuiGraphQLClient({
+      url: "https://graphql.mainnet.sui.io/graphql",
+    });
+    client = new AlphalendClient("mainnet");
+
+    const { getConstants } = await import("../src/constants/index");
+    const constants = getConstants("mainnet");
+    oracleFields = await fetchOracleDynamicFields(
+      gqlClient,
+      constants.ALPHAFI_ORACLE_OBJECT_ID,
+    );
+  }, 60000);
+
+  test("Root cause analysis: Oracle price entries validation", async () => {
+    const oraclePriceEntries = new Set<string>();
+
+    for (const field of oracleFields) {
+      // The dynamic-field value here is an arbitrary Move struct whose
+      // shape varies per object kind. Probing it with `any` and
+      // optional-chaining is the test's intent — narrowing each level to
+      // a precise type would be more code with no real safety win in a test.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const json = field.valueJson as any;
+      if (!json) continue;
+
+      // GraphQL renders Move TypeName values as plain strings (JSON-RPC
+      // wrapped them in {fields: {name}}); accept both forms.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const typeName = (v: any): string | undefined =>
+        typeof v === "string" ? v : v?.name;
+
+      // Check if this is the Pyth oracle (contains price mappings)
+      if (field.valueType.includes("::oracle::OraclePyth")) {
+        // Extract coin types from the coin_to_identifier VecMap keys
+        const coinToIdentifier = json.coin_to_identifier?.contents;
+        if (coinToIdentifier && Array.isArray(coinToIdentifier)) {
+          for (const entry of coinToIdentifier) {
+            const name = typeName(entry?.key);
+            if (name) {
+              oraclePriceEntries.add(name);
+            }
+          }
+        }
+
+        // Also check identifier_map for additional entries
+        const identifierMap = json.identifier_map?.contents;
+        if (identifierMap && Array.isArray(identifierMap)) {
+          for (const entry of identifierMap) {
+            const name = typeName(entry?.value);
+            if (name) {
+              oraclePriceEntries.add(name);
+            }
+          }
+        }
+      }
+
+      // Check if this is the VecMap that contains type mappings
+      if (
+        field.valueType.includes("vec_map::VecMap") &&
+        field.valueType.includes("type_name::TypeName")
+      ) {
+        const vecMapContents = json.contents;
+        if (vecMapContents && Array.isArray(vecMapContents)) {
+          for (const entry of vecMapContents) {
+            // Try to extract type names from key and value
+            const keyName = typeName(entry?.key);
+            if (keyName) {
+              oraclePriceEntries.add(keyName);
+            }
+            const valueName = typeName(entry?.value);
+            if (valueName) {
+              oraclePriceEntries.add(valueName);
+            }
+          }
+        }
       }
     }
 
@@ -206,61 +278,39 @@ describe("Oracle Price Validation", () => {
         `✅ ${symbol} (${coinType}) - Client ready for dynamic metadata loading`,
       );
 
-      // Check oracle entry
-      const { getConstants } = await import("../src/constants/index");
-      const constants = getConstants("mainnet");
-
-      const dynamicFields = await suiClient.getDynamicFields({
-        parentId: constants.ALPHAFI_ORACLE_OBJECT_ID,
-      });
-
       let hasOracleEntry = false;
-      for (const field of dynamicFields.data) {
-        try {
-          const fieldObject = await suiClient.getObject({
-            id: field.objectId,
-            options: { showContent: true },
-          });
+      for (const field of oracleFields) {
+        // Same arbitrary-Move-struct probe as above.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const nameJson = field.nameJson as any;
+
+        let fieldName = "";
+        if (nameJson?.name) {
+          fieldName = String(nameJson.name);
+        } else if (nameJson != null) {
+          fieldName = String(nameJson);
+        }
+
+        if (fieldName) {
+          // Normalize both entries by removing 0x prefix for comparison
+          const normalizedFieldName = fieldName.startsWith("0x")
+            ? fieldName.slice(2)
+            : fieldName;
+          const normalizedCoinType = coinType.startsWith("0x")
+            ? coinType.slice(2)
+            : coinType;
 
           if (
-            fieldObject.data?.content &&
-            "fields" in fieldObject.data.content
+            normalizedFieldName === normalizedCoinType ||
+            fieldName.includes(coinType) ||
+            coinType.includes(fieldName) ||
+            fieldName.toLowerCase().includes(symbol.toLowerCase()) ||
+            (coinType.includes("::") &&
+              fieldName.includes(coinType.split("::")[0].replace("0x", "")))
           ) {
-            // Same arbitrary-Move-struct probe as above.
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const content = fieldObject.data.content as any;
-
-            let fieldName = "";
-            if (content.fields?.name?.fields?.name) {
-              fieldName = content.fields.name.fields.name;
-            } else if (content.fields?.name) {
-              fieldName = String(content.fields.name);
-            }
-
-            if (fieldName) {
-              // Normalize both entries by removing 0x prefix for comparison
-              const normalizedFieldName = fieldName.startsWith("0x")
-                ? fieldName.slice(2)
-                : fieldName;
-              const normalizedCoinType = coinType.startsWith("0x")
-                ? coinType.slice(2)
-                : coinType;
-
-              if (
-                normalizedFieldName === normalizedCoinType ||
-                fieldName.includes(coinType) ||
-                coinType.includes(fieldName) ||
-                fieldName.toLowerCase().includes(symbol.toLowerCase()) ||
-                (coinType.includes("::") &&
-                  fieldName.includes(coinType.split("::")[0].replace("0x", "")))
-              ) {
-                hasOracleEntry = true;
-                break;
-              }
-            }
+            hasOracleEntry = true;
+            break;
           }
-        } catch {
-          continue;
         }
       }
 
