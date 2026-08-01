@@ -112,7 +112,9 @@ export class AlphalendClient {
    * @param network    One of the supported Sui networks.
    * @param graphqlUrl Optional GraphQL endpoint override. If omitted, a default
    *                   public endpoint for the given `network` is used.
-   * @param options    Optional prebuilt coin metadata map for offline testing.
+   * @param options    Optional prebuilt coin metadata map for offline testing,
+   *                   and an optional `pythFullnodeUrl` JSON-RPC override for
+   *                   the internal Pyth client.
    */
   constructor(
     network: Network,
@@ -125,11 +127,12 @@ export class AlphalendClient {
     // Minimal internal SuiClient ONLY for SuiPythClient (upstream dep still
     // uses JSON-RPC). All other reads go through Blockchain (GraphQL).
     const pythFullnodeUrl =
-      network === "mainnet"
+      options?.pythFullnodeUrl?.trim() ||
+      (network === "mainnet"
         ? "https://alphalen-suimain-ef6f.mainnet.sui.rpcpool.com/"
         : network === "testnet"
           ? "https://fullnode.testnet.sui.io/"
-          : "https://fullnode.devnet.sui.io/";
+          : "https://fullnode.devnet.sui.io/");
     const pythSuiClient = new SuiJsonRpcClient({
       url: pythFullnodeUrl,
       network,

@@ -21,6 +21,11 @@ import { Decimal } from "decimal.js";
 export interface AlphalendClientOptions {
   coinMetadataMap?: Map<string, CoinMetadata>;
   useLazer?: boolean;
+  /**
+   * JSON-RPC endpoint for the internal `SuiPythClient`. Defaults to a per-network
+   * endpoint. Must serve JSON-RPC — a gRPC or GraphQL URL will not work here.
+   */
+  pythFullnodeUrl?: string;
 }
 
 /**
