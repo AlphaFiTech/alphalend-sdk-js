@@ -255,7 +255,11 @@ export async function buildFlashRepayTransaction(
 
   // Step 4: Update oracle prices — refresh on-chain oracle prices for all coins in the position so withdraw/collateral math is correct (mainnet only).
   if (client.network === "mainnet") {
-    await client.updatePrices(tx, priceUpdateCoinTypes);
+    await client.updatePrices(
+      tx,
+      priceUpdateCoinTypes,
+      params.lazerUpdateBytes,
+    );
   }
 
   // Step 5: Withdraw collateral — remove collateral in withdraw-coin (amount = flash loan value + slippage buffer so enough after swap to repay Navi). Uses promise so the withdrawn coin can be used in the next step.
