@@ -20,7 +20,6 @@ import { Decimal } from "decimal.js";
  */
 export interface AlphalendClientOptions {
   coinMetadataMap?: Map<string, CoinMetadata>;
-  useLazer?: boolean;
 }
 
 /**
@@ -111,6 +110,8 @@ export interface WithdrawParams {
   /** Coin types of the coins whose price needs to be updated
    * (Will have to pass all market coin types that user has supplied or borrowed in and current market coin type in which user is withdrawing) */
   priceUpdateCoinTypes: string[];
+  /** Your own signed Lazer update for this transaction; skips the fetch from AlphaLend's proxy. */
+  lazerUpdateBytes?: Uint8Array;
 }
 
 /**
@@ -133,6 +134,8 @@ export interface ZapOutWithdrawParams {
   /** Coin types of the coins whose price needs to be updated
    * (Will have to pass all market coin types that user has supplied or borrowed in and current market coin type in which user is withdrawing) */
   priceUpdateCoinTypes: string[];
+  /** Your own signed Lazer update for this transaction; skips the fetch from AlphaLend's proxy. */
+  lazerUpdateBytes?: Uint8Array;
   /** Slippage for the swap (e.g., 0.01 for 1%) */
   slippage: number;
   /** Withdraw coin type (e.g., "0x2::sui::SUI") */
@@ -182,6 +185,8 @@ export interface BorrowParams {
   /** Coin types of the coins whose price needs to be updated
    * (Will have to pass all market coin types that user has supplied or borrowed in and current market coin type in which user is borrowing) */
   priceUpdateCoinTypes: string[];
+  /** Your own signed Lazer update for this transaction; skips the fetch from AlphaLend's proxy. */
+  lazerUpdateBytes?: Uint8Array;
 }
 
 /**
@@ -256,6 +261,8 @@ export interface ClaimSwapAndSupplyOrRepayOrTransferParams {
   slippage: number;
   /** Coin types of user's supplied assets (for price updates) */
   priceUpdateCoinTypes: string[];
+  /** Your own signed Lazer update for this transaction; skips the fetch from AlphaLend's proxy. */
+  lazerUpdateBytes?: Uint8Array;
   /** Optional map of reward coin types to their amounts in base units; used as fallback when the on-chain claimable estimate is unavailable */
   rewardAmounts?: Map<string, string>;
   /** If true, claims rewards < $0.01 directly to wallet (only swap checkbox case) */
@@ -287,6 +294,8 @@ export interface ClaimAndSupplyOrRepayParams {
   supplyMarkets?: Map<string, MarketInfo>;
   /** Coin types for price updates */
   priceUpdateCoinTypes: string[];
+  /** Your own signed Lazer update for this transaction; skips the fetch from AlphaLend's proxy. */
+  lazerUpdateBytes?: Uint8Array;
 }
 
 /**
@@ -311,6 +320,8 @@ export interface LiquidateParams {
   /** Coin types of the coins whose price needs to be updated
    * (Will have to pass all market coin types that user has supplied or borrowed in and current market coin type in which is being liquidated) */
   priceUpdateCoinTypes: string[];
+  /** Your own signed Lazer update for this transaction; skips the fetch from AlphaLend's proxy. */
+  lazerUpdateBytes?: Uint8Array;
   /** Whether to update all prices */
   updateAllPrices?: boolean;
 }
@@ -459,4 +470,6 @@ export interface FlashRepayParams {
   address: string;
   slippage: number;
   repayAmountBaseUnits?: string;
+  /** Your own signed Lazer update for this transaction; skips the fetch from AlphaLend's proxy. */
+  lazerUpdateBytes?: Uint8Array;
 }
