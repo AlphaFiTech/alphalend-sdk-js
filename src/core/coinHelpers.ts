@@ -43,7 +43,7 @@ export interface CoinTypeCount {
  * transaction. 180 measures ~14.3KB, leaving headroom for the gas coin and
  * address-balance withdrawal the SUI paths add on top.
  */
-const MAX_COINS_PER_TX = 180;
+export const MAX_COINS_PER_TX = 180;
 
 /** Kept low: the public fullnode rate-limits bursts. See {@link withRetry}. */
 const COUNT_CONCURRENCY = 5;
