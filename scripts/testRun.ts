@@ -5,29 +5,25 @@ import { getConstants } from "../src/constants/index.js";
 import { AlphalendClient } from "../src/core/client.js";
 import * as dotenv from "dotenv";
 import { setPrices } from "../src/utils/helper.js";
-import { SuiJsonRpcClient } from "@mysten/sui/jsonRpc";
-import {
-  SuiPriceServiceConnection,
-  SuiPythClient,
-} from "@pythnetwork/pyth-sui-js";
+import { SuiGrpcClient } from "@mysten/sui/grpc";
 
 dotenv.config();
 
 export function getSuiClient(network?: string) {
-  const mainnetUrl = "https://fullnode.mainnet.sui.io/";
-  const testnetUrl = "https://fullnode.testnet.sui.io/";
-  const devnetUrl = "https://fullnode.devnet.sui.io/";
+  const mainnetUrl = "https://fullnode.mainnet.sui.io:443";
+  const testnetUrl = "https://fullnode.testnet.sui.io:443";
+  const devnetUrl = "https://fullnode.devnet.sui.io:443";
 
-  let rpcUrl = devnetUrl;
+  let grpcUrl = devnetUrl;
   if (network === "mainnet") {
-    rpcUrl = mainnetUrl;
+    grpcUrl = mainnetUrl;
   } else if (network === "testnet") {
-    rpcUrl = testnetUrl;
+    grpcUrl = testnetUrl;
   }
 
-  return new SuiJsonRpcClient({
-    url: rpcUrl,
+  return new SuiGrpcClient({
     network: network ?? "mainnet",
+    baseUrl: process.env.SUI_GRPC_URL ?? grpcUrl,
   });
 }
 
@@ -59,20 +55,17 @@ export async function dryRunTransactionBlock(
 ) {
   const { suiClient } = getExecStuff();
   txb.setSender(address);
-  txb.setGasBudget(1e9);
+  txb.setGasBudget(1e8);
   try {
-    const serializedTxb = await txb.build({ client: suiClient });
-    await suiClient
-      .dryRunTransactionBlock({
-        transactionBlock: serializedTxb,
-      })
-      .then((res) => {
-        console.log(JSON.stringify(res, null, 2));
-        // console.log(res.effects.status, res.balanceChanges);
-      })
-      .catch((error) => {
-        console.error(error);
-      });
+    const res = await suiClient.simulateTransaction({
+      transaction: txb,
+      include: {
+        effects: true,
+        balanceChanges: true,
+      },
+    });
+    console.log(JSON.stringify(res, null, 2));
+    // console.log(res.effects.status, res.balanceChanges);
   } catch (e) {
     console.log(e);
   }
@@ -146,53 +139,50 @@ async function zapInSupply() {
 // zapInSupply();
 
 async function borrow() {
-  const alc = new AlphalendClient("testnet");
+  const alc = new AlphalendClient("mainnet");
   const address =
-    "0x8948f801fa2325eedb4b0ad4eb0a55bfb318acc531f3a2f0cddd8daa9b4a8c94";
+    "0xe136f0b6faf27ee707725f38f2aeefc51c6c31cc508222bee5cbc4f5fcf222c3";
   const tx: Transaction | undefined = await alc.borrow({
     address: address,
     positionCapId:
-      "0x04aef463126fea9cc518a37abc8ae8367f68c8eceeef31790b2da6be852d9d4b",
+      "0xf9ca35f404dd3c1ea10c381dd3e1fe8a0c4586adf5e186f4eb52307462a5af7d",
     coinType:
-      "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin2::TESTCOIN2",
-    marketId: "2",
-    amount: 100000000000n,
-    priceUpdateCoinTypes: [],
+      "0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC",
+    marketId: "6",
+    amount: 100_000n,
+    priceUpdateCoinTypes: [
+      "0x44f838219cf67b058f3b37907b655f226153c18e33dfcd0da559a844fea9b1c1::usdsui::USDSUI",
+      "0xd0e89b2af5e4910726fbcd8b8dd37bb79b29e5f83f7491bca830e94f7f226d29::eth::ETH",
+      "0x66629328922d609cf15af779719e248ae0e63fe0b9d9739623f763b33a9c97da::esui::ESUI",
+    ],
   });
   if (tx) {
-    dryRunTransactionBlock(tx, address);
+    // dryRunTransactionBlock(tx, address);
+    await executeTransactionBlock(tx);
   }
 }
+// borrow();
 
-export async function executeTransactionBlock() {
+export async function executeTransactionBlock(tx: Transaction) {
   const { keypair, suiClient } = getExecStuff();
-  const tx = new Transaction();
-  const constants = getConstants("testnet");
-  // removeAlternate(tx);
-  // await removeCoinFromOracle(
-  //   tx,
-  //   constants.ALPHAFI_ORACLE_ADMIN_CAP_ID,
-  //   "0x3a8117ec753fb3c404b3a3762ba02803408b9eccb7e31afb8bbb62596d778e9a::testcoin2::TESTCOIN2",
-  //   "testnet",
-  // );
-  // await setPrice(tx, "0x2::sui::SUI", 10, 10, 1);
-  await suiClient
-    .signAndExecuteTransaction({
+  const constants = getConstants("mainnet");
+  tx.setGasBudget(1e8);
+  try {
+    const res = await suiClient.signAndExecuteTransaction({
       signer: keypair,
       transaction: tx,
-      requestType: "WaitForLocalExecution",
-      options: {
-        showEffects: true,
-        showBalanceChanges: true,
-        showObjectChanges: true,
+      include: {
+        effects: true,
+        balanceChanges: true,
+        objectTypes: true,
       },
-    })
-    .then((res) => {
-      console.log(JSON.stringify(res, null, 2));
-    })
-    .catch((error) => {
-      console.error(error);
     });
+    // Replaces the JSON-RPC "WaitForLocalExecution" request type.
+    await suiClient.waitForTransaction({ result: res });
+    console.log(JSON.stringify(res, null, 2));
+  } catch (error) {
+    console.error(error);
+  }
 }
 // executeTransactionBlock();
 
@@ -211,7 +201,7 @@ async function getUserPortfolio() {
     process.exit(1);
   }
   const result = await client.getUserPortfolioWithCachedMarkets(
-    "0xe66862b7f2656b6b2c0bb580aa4aff561782e7e218bf143433e60efd4bfe179e",
+    "0x8e3ab1581df48a7bdb72fa8d2138877c432420c503a4a9f03b762387f9dcd600",
     markets,
   );
   console.log(result);
@@ -225,30 +215,51 @@ async function getUserPortfolio() {
 async function withdraw() {
   const alc = new AlphalendClient("mainnet");
   const address =
-    "0x8c5c76fa46a645ce5f636342ad6b0514a55f8c1518671920cd92d284695aff78";
+    "0xe136f0b6faf27ee707725f38f2aeefc51c6c31cc508222bee5cbc4f5fcf222c3";
   const tx: Transaction | undefined = await alc.withdraw({
     address: address,
     positionCapId:
-      "0x8de2193d00fe660a90d823125fbd300774dbba553d9eb353e7451c419fe55a8d",
+      "0xf9ca35f404dd3c1ea10c381dd3e1fe8a0c4586adf5e186f4eb52307462a5af7d",
     coinType:
-      "0x66629328922d609cf15af779719e248ae0e63fe0b9d9739623f763b33a9c97da::esui::ESUI",
-    marketId: "21",
-    amount: 10_000_000_000n,
+      "0x356a26eb9e012a68958082340d4c4116e7f55615cf27affcff209cf0ae544f59::wal::WAL",
+    marketId: "7",
+    amount: 1n,
     priceUpdateCoinTypes: [
       "0x66629328922d609cf15af779719e248ae0e63fe0b9d9739623f763b33a9c97da::esui::ESUI",
-      "0xd1b72982e40348d069bb1ff701e634c117bb5f741f44dff91e472d3b01461e55::stsui::STSUI",
-      "0x7262fb2f7a3a14c888c438a3cd9b912469a58cf60f367352c46584262e8299aa::ika::IKA",
-      "0x2::sui::SUI",
+      "0x44f838219cf67b058f3b37907b655f226153c18e33dfcd0da559a844fea9b1c1::usdsui::USDSUI",
+      "0xd0e89b2af5e4910726fbcd8b8dd37bb79b29e5f83f7491bca830e94f7f226d29::eth::ETH",
+      "0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC",
+      "0x356a26eb9e012a68958082340d4c4116e7f55615cf27affcff209cf0ae544f59::wal::WAL",
     ],
   });
   if (tx) {
-    dryRunTransactionBlock(tx, address);
+    // dryRunTransactionBlock(tx, address);
+    executeTransactionBlock(tx);
   }
 }
 withdraw();
 
+async function supply() {
+  const alc = new AlphalendClient("mainnet");
+  const address =
+    "0xe136f0b6faf27ee707725f38f2aeefc51c6c31cc508222bee5cbc4f5fcf222c3";
+  const tx: Transaction | undefined = await alc.supply({
+    address: address,
+    positionCapId:
+      "0xf9ca35f404dd3c1ea10c381dd3e1fe8a0c4586adf5e186f4eb52307462a5af7d",
+    coinType:
+      "0x66629328922d609cf15af779719e248ae0e63fe0b9d9739623f763b33a9c97da::esui::ESUI",
+    marketId: "21",
+    amount: 100_000_000n,
+  });
+  if (tx) {
+    executeTransactionBlock(tx);
+  }
+}
+// supply();
+
 async function run() {
-  const { suiClient, keypair, address } = getExecStuff();
+  const { keypair, address } = getExecStuff();
   // 🔥 TEST FLASH REPAY
   // Choose which test to run:
   // Basic flash repay test (with default 1% slippage)
@@ -260,35 +271,8 @@ async function run() {
   // Other tests (commented out)
   // const { suiClient, keypair, address } = getExecStuff();
   // const tx = new Transaction();
-  const constants = getConstants("mainnet");
-  const pythClient = new SuiPythClient(
-    suiClient,
-    constants.PYTH_STATE_ID,
-    constants.WORMHOLE_STATE_ID,
-  );
-  const pythConnection = new SuiPriceServiceConnection(
-    "https://hermes.pyth.network",
-  );
   // const positionCapId =
   // "0xf9ca35f404dd3c1ea10c381dd3e1fe8a0c4586adf5e186f4eb52307462a5af7d";
-  // await getPriceInfoObjectIdsWithUpdate(
-  //   tx,
-  //   [pythPriceFeedIdMap[coinType]],
-  //   pythClient,
-  //   pythConnection,
-  // );
-  // console.log(pythPriceFeedIdMap[coinType]);
-  const priceInfoObjectIds = await pythClient.getPriceFeedObjectId(
-    "93da3352f9f1d105fdfe4971cfa80e9dd777bfc5d0f683ebb6e1294b92137bb7",
-  );
-  // const priceFeedUpdateData = await pythConnection.getPriceFeedsUpdateData([
-  //   "14890ba9c221092cba3d6ce86846d61f8606cefaf3dfc20bf3e2ab99de2644c0",
-  // ]);
-  // const priceInfoObjectIds = await pythClient.createPriceFeed(
-  //   tx,
-  //   priceFeedUpdateData,
-  // );
-  console.log(priceInfoObjectIds);
   // const tx = await updatePricesCaller();
   // const tx = await alc.supply({
   //   marketId: "1",
@@ -339,5 +323,4 @@ async function run() {
   //   });
   // }
 }
-
 // run();
