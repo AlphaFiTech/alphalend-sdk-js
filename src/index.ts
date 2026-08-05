@@ -22,5 +22,6 @@ export {
 export {
   getCoinObjectCounts,
   buildMergeCoinsTransaction,
+  MAX_COINS_PER_TX,
 } from "./core/coinHelpers.js";
 export type { MergeCoinsOutput, CoinTypeCount } from "./core/coinHelpers.js";

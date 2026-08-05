@@ -1,8 +1,3 @@
-import { SuiJsonRpcClient } from "@mysten/sui/jsonRpc";
-import {
-  SuiPriceServiceConnection,
-  SuiPythClient,
-} from "@pythnetwork/pyth-sui-js";
 import {
   getAlphafiConstants,
   getConstants,
@@ -14,9 +9,7 @@ import {
   TransactionResult,
   TransactionArgument,
 } from "@mysten/sui/transactions";
-import {
-  appendOracleToLendingBridge,
-} from "../utils/oracle.js";
+import { appendOracleToLendingBridge } from "../utils/oracle.js";
 import { appendLazerUpdate, fetchLazerUpdateBytes } from "../utils/lazer.js";
 import {
   SupplyParams,
@@ -69,7 +62,7 @@ const MIN_SUI_STAKE_AMOUNT = 3n; // 3 mists
  *
  * The main entry point for interacting with the AlphaLend protocol:
  * - Provides methods for all protocol actions (supply, borrow, withdraw, repay, claimRewards, liquidate)
- * - Handles connection to the Sui blockchain and Pyth oracle
+ * - Handles connection to the Sui blockchain and the price oracle
  * - Manages transaction building for protocol interactions
  * - Exposes query methods for protocol state, markets, and user positions
  * - Initializes and coordinates price feed updates
@@ -77,8 +70,6 @@ const MIN_SUI_STAKE_AMOUNT = 3n; // 3 mists
  */
 
 export class AlphalendClient {
-  pythClient: SuiPythClient;
-  pythConnection: SuiPriceServiceConnection;
   network: Network;
   constants: Constants;
   lendingProtocol: LendingProtocol;
@@ -101,10 +92,8 @@ export class AlphalendClient {
   /**
    * Creates a new AlphaLend client instance.
    *
-   * The SDK connects to Sui via GraphQL. The only remaining JSON-RPC usage
-   * is an internal, minimal `SuiClient` passed to `@pythnetwork/pyth-sui-js`'s
-   * `SuiPythClient` constructor (that SDK has not yet migrated to GraphQL).
-   * It is never exposed on the public surface.
+   * The SDK connects to Sui via GraphQL and gRPC only; it makes no JSON-RPC
+   * calls.
    *
    * @param network    One of the supported Sui networks.
    * @param graphqlUrl Optional GraphQL endpoint override. If omitted, a default
@@ -119,28 +108,6 @@ export class AlphalendClient {
     this.network = network;
     this.constants = getConstants(network);
 
-    // Minimal internal SuiClient ONLY for SuiPythClient (upstream dep still
-    // uses JSON-RPC). All other reads go through Blockchain (GraphQL).
-    const pythFullnodeUrl =
-      network === "mainnet"
-        ? "https://alphalen-suimain-ef6f.mainnet.sui.rpcpool.com/"
-        : network === "testnet"
-          ? "https://fullnode.testnet.sui.io/"
-          : "https://fullnode.devnet.sui.io/";
-    const pythSuiClient = new SuiJsonRpcClient({
-      url: pythFullnodeUrl,
-      network,
-    });
-    this.pythClient = new SuiPythClient(
-      pythSuiClient,
-      this.constants.PYTH_STATE_ID,
-      this.constants.WORMHOLE_STATE_ID,
-    );
-    this.pythConnection = new SuiPriceServiceConnection(
-      network === "mainnet"
-        ? "https://hermes.pyth.network"
-        : "https://hermes-beta.pyth.network",
-    );
     this.lendingProtocol = new LendingProtocol(network, graphqlUrl);
     this.blockchain = new Blockchain(network, graphqlUrl);
     this.sevenKGateway = new SevenKGateway();
