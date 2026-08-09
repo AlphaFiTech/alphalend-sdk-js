@@ -45,9 +45,7 @@ import { getUserPositionCapId } from "../models/position/functions.js";
 import { LendingProtocol } from "../models/lendingProtocol.js";
 import { Blockchain } from "../models/blockchain.js";
 import { Market } from "../models/market.js";
-import { SevenKGateway } from "./sevenKSwap.js";
 import { Decimal } from "decimal.js";
-import { QuoteResponse } from "@7kprotocol/sdk-ts";
 import { blockchainCache } from "../utils/blockchainCache.js";
 import { CetusSwap, RouterDataV3 } from "./cetusSwap.js";
 import { buildFlashRepayTransaction } from "./flashRepay.js";
@@ -74,7 +72,6 @@ export class AlphalendClient {
   constants: Constants;
   lendingProtocol: LendingProtocol;
   blockchain: Blockchain;
-  sevenKGateway: SevenKGateway;
   cetusSwap: CetusSwap;
 
   // Dynamic coin metadata properties
@@ -110,7 +107,6 @@ export class AlphalendClient {
 
     this.lendingProtocol = new LendingProtocol(network, graphqlUrl);
     this.blockchain = new Blockchain(network, graphqlUrl);
-    this.sevenKGateway = new SevenKGateway();
     this.cetusSwap = new CetusSwap("mainnet");
 
     // If a coin metadata map is provided, use it and mark as initialized
@@ -698,17 +694,19 @@ export class AlphalendClient {
       coin = await this.handlePromise(tx, promise, params.marketCoinType);
     }
 
-    const quoteResponse = await this.sevenKGateway.getQuote(
+    const quoteResponse = await this.cetusSwap.getCetusSwapQuote(
       params.marketCoinType,
       params.outputCoinType,
       swapInAmount,
     );
-    const withdrawCoin = await this.sevenKGateway.getTransactionBlock(
-      tx,
-      params.address,
-      params.slippage,
+    if (!quoteResponse) {
+      throw new Error("Failed to get swap quote: Empty response from Cetus");
+    }
+    const withdrawCoin = await this.cetusSwap.routerSwapWithInputCoin(
       quoteResponse,
-      coin,
+      tx,
+      coin as TransactionObjectArgument,
+      params.slippage,
     );
     if (withdrawCoin) {
       this.sendCoinToAddressBalance(
@@ -2168,16 +2166,16 @@ export class AlphalendClient {
     tx: Transaction,
     address: string,
     slippage: number,
-    quoteResponse: QuoteResponse,
+    quoteResponse: RouterDataV3,
     coinIn?: TransactionObjectArgument,
   ) {
     await this.ensureInitialized();
-    return await this.sevenKGateway.getTransactionBlock(
-      tx,
-      address,
-      slippage,
+    return await this.cetusSwap.cetusSwapTokensTxb(
       quoteResponse,
+      slippage,
       coinIn,
+      address,
+      tx,
     );
   }
 
