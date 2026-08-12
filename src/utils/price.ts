@@ -10,6 +10,11 @@ import { CoinMetadata } from "../core/types.js";
  * it would inflate collateral and liquidation-limit math.
  * Keep in sync with `PEGGED_COIN_TYPES` in alphalend-sdk-rust
  * `src/blockchain/coin_registry.rs`.
+ *
+ * Caveat: a pegged price carries no independent staleness signal. The client
+ * fetches coin metadata once and does not refresh it, so a long-lived client
+ * serves the first mirrored value it saw. The liquidator adds its own
+ * freshness check (`PEGGED_ROW_MAX_AGE_MS`); this SDK does not.
  */
 export const PEGGED_COIN_TYPES: readonly string[] = [
   "0x1a8f4bc33f8ef7fbc851f156857aa65d397a6a6fd27a7ac2ca717b51f2fd9489::alkimi::ALKIMI",
