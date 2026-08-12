@@ -76,8 +76,9 @@ export async function getCoinObjectCounts(
   address: string,
   network: Network,
   grpcUrl?: string,
+  grpcToken?: string,
 ): Promise<CoinTypeCount[]> {
-  const client = grpcClient(network, grpcUrl);
+  const client = grpcClient(network, grpcUrl, grpcToken);
   const coinTypes = await listCoinTypes(client, address);
 
   const counts = await mapWithConcurrency(
@@ -118,6 +119,7 @@ export async function buildMergeCoinsTransaction(
   address: string,
   network: Network,
   grpcUrl?: string,
+  grpcToken?: string,
 ): Promise<Transaction> {
   const blockchain = new Blockchain(network);
   const normalizedCoinType = normalizeStructTag(coinType);
@@ -135,7 +137,7 @@ export async function buildMergeCoinsTransaction(
     addressBalance >= MIN_ADDRESS_BALANCE_FOR_GAS;
 
   const coins = await getCoinObjectsOfType(
-    grpcClient(network, grpcUrl),
+    grpcClient(network, grpcUrl, grpcToken),
     address,
     normalizedCoinType,
   );
@@ -298,11 +300,16 @@ async function getAddressBalance(
   return BigInt(response.data?.address?.balance?.addressBalance ?? 0);
 }
 
-/** gRPC-web over fetch; works in browsers and Node. */
-function grpcClient(network: Network, grpcUrl?: string): SuiGrpcClient {
+/** gRPC-web over fetch; works in browsers and Node. `grpcToken` is sent as `x-token` metadata. */
+function grpcClient(
+  network: Network,
+  grpcUrl?: string,
+  grpcToken?: string,
+): SuiGrpcClient {
   return new SuiGrpcClient({
     network,
     baseUrl: grpcUrl ?? GRPC_URL[network],
+    meta: grpcToken ? { "x-token": grpcToken } : undefined,
   });
 }
 
