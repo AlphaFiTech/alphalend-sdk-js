@@ -39,6 +39,7 @@ import {
   setPrices,
 } from "../utils/helper.js";
 import { normalizeCoinType } from "../utils/parser.js";
+import { resolveCoinPrice } from "../utils/price.js";
 import { Receipt } from "../utils/queryTypes.js";
 import { Constants } from "../constants/types.js";
 import { getUserPositionCapId } from "../models/position/functions.js";
@@ -1175,8 +1176,7 @@ export class AlphalendClient {
       const decimals = coinMetadata.decimals;
       const tokenAmount = Number(rewardAmount) / Math.pow(10, decimals);
 
-      const priceStr = coinMetadata.pythPrice || coinMetadata.coingeckoPrice;
-      const price = priceStr ? parseFloat(priceStr) : 0;
+      const price = resolveCoinPrice(coinMetadata, coinType)?.toNumber() ?? 0;
 
       return tokenAmount * price;
     };
@@ -2001,9 +2001,13 @@ export class AlphalendClient {
       let inputAmountInUSD = 0;
       let outputAmountInUSD = 0;
       let slippage = 0;
-      const priceA = coinIn?.pythPrice || coinIn?.coingeckoPrice;
-      const priceB =
-        coinForOutputUSD?.pythPrice || coinForOutputUSD?.coingeckoPrice;
+      // A pegged 0 stays falsy here, so the USD/slippage estimate is skipped
+      // rather than computed from a substituted market quote.
+      const priceA = resolveCoinPrice(coinIn, tokenIn)?.toNumber();
+      const priceB = resolveCoinPrice(
+        coinForOutputUSD,
+        this.constants.USDC_COIN_TYPE,
+      )?.toNumber();
       if (
         priceA &&
         priceB &&
@@ -2011,12 +2015,11 @@ export class AlphalendClient {
         coinForOutputUSD?.decimals != null
       ) {
         inputAmountInUSD =
-          (Number(amountInBigInt) / Math.pow(10, coinIn.decimals)) *
-          parseFloat(priceA);
+          (Number(amountInBigInt) / Math.pow(10, coinIn.decimals)) * priceA;
         outputAmountInUSD =
           (Number(estimatedAmountOut) /
             Math.pow(10, coinForOutputUSD.decimals)) *
-          parseFloat(priceB);
+          priceB;
         if (inputAmountInUSD > 0)
           slippage = (inputAmountInUSD - outputAmountInUSD) / inputAmountInUSD;
       }
@@ -2119,16 +2122,17 @@ export class AlphalendClient {
     );
 
     let quote: quoteObject;
-    const priceA = coinIn?.pythPrice || coinIn?.coingeckoPrice;
-    const priceB = coinOut?.pythPrice || coinOut?.coingeckoPrice;
+    // A pegged 0 stays falsy here, so the USD/slippage estimate is skipped
+    // rather than computed from a substituted market quote.
+    const priceA = resolveCoinPrice(coinIn, tokenIn)?.toNumber();
+    const priceB = resolveCoinPrice(coinOut, tokenOut)?.toNumber();
     const coinAExpo = coinIn?.decimals;
     const coinBExpo = coinOut?.decimals;
     if (priceA && priceB && coinAExpo && coinBExpo) {
       const inputAmountInUSD =
-        (Number(amount) / Math.pow(10, coinAExpo)) * parseFloat(priceA);
+        (Number(amount) / Math.pow(10, coinAExpo)) * priceA;
       const outputAmountInUSD =
-        (Number(cetusEstimatedAmountOut) / Math.pow(10, coinBExpo)) *
-        parseFloat(priceB);
+        (Number(cetusEstimatedAmountOut) / Math.pow(10, coinBExpo)) * priceB;
 
       const slippage =
         (inputAmountInUSD - outputAmountInUSD) / inputAmountInUSD;

@@ -1,6 +1,7 @@
 import { Decimal } from "decimal.js";
 import { MarketType, RewardDistributorType } from "../utils/parsedTypes.js";
 import { MarketData, CoinMetadata } from "../core/types.js";
+import { resolveCoinPrice } from "../utils/price.js";
 import { httpCache } from "../utils/httpCache.js";
 
 export class Market {
@@ -472,15 +473,14 @@ export class Market {
   };
 
   private getPrice(coinType: string): Decimal {
-    if (this.coinMetadataMap.get(coinType)?.pythPrice) {
-      return new Decimal(this.coinMetadataMap.get(coinType)?.pythPrice ?? 0);
+    const price = resolveCoinPrice(
+      this.coinMetadataMap.get(coinType),
+      coinType,
+    );
+    if (price === null) {
+      console.error(`No price found for coin type: ${coinType}`);
+      return new Decimal(0);
     }
-    if (this.coinMetadataMap.get(coinType)?.coingeckoPrice) {
-      return new Decimal(
-        this.coinMetadataMap.get(coinType)?.coingeckoPrice ?? 0,
-      );
-    }
-    console.error(`No price found for coin type: ${coinType}`);
-    return new Decimal(0);
+    return price;
   }
 }
