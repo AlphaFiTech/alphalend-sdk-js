@@ -1,12 +1,15 @@
 /**
  * Blockchain interface wrapper for Sui network operations using the SuiGraphQLClient.
  *
- * All operations go through GraphQL, including transaction simulation via
- * `gqlClient.core.simulateTransaction`, which builds the transaction, resolves
- * gas, and simulates server-side. No JSON-RPC or gRPC client is used.
+ * All of the SDK's own operations go through GraphQL, including transaction
+ * simulation via `gqlClient.core.simulateTransaction`, which builds the
+ * transaction, resolves gas, and simulates server-side. No JSON-RPC is used.
+ * A `SuiGrpcClient` is also constructed (endpoint/token via the constructor)
+ * so consumers — and future SDK reads — can go over gRPC without re-plumbing.
  */
 
 import { SuiGraphQLClient } from "@mysten/sui/graphql";
+import { SuiGrpcClient } from "@mysten/sui/grpc";
 import { graphql } from "@mysten/sui/graphql/schema";
 import {
   Transaction,
@@ -39,6 +42,12 @@ const GRAPHQL_URL: Record<Network, string> = {
   devnet: "https://graphql.devnet.sui.io/graphql",
 };
 
+const GRPC_URL: Record<Network, string> = {
+  mainnet: "https://fullnode.mainnet.sui.io:443",
+  testnet: "https://fullnode.testnet.sui.io:443",
+  devnet: "https://fullnode.devnet.sui.io:443",
+};
+
 export interface GqlObject<T> {
   address: string;
   contents?: T;
@@ -52,16 +61,34 @@ export interface EarliestTxInfo {
 export class Blockchain {
   network: Network;
   gqlClient: SuiGraphQLClient;
+  /**
+   * gRPC (v2 Core) client. Not used by the SDK's own reads yet — exposed so
+   * consumers can share one configured client, and so future SDK reads can
+   * move to gRPC without a plumbing change.
+   */
+  suiGrpcClient: SuiGrpcClient;
   constants: Constants;
 
   private initialSharedVersionCache: Map<string, string> = new Map();
 
-  constructor(network: Network, graphqlUrl?: string) {
+  constructor(
+    network: Network,
+    graphqlUrl?: string,
+    grpcUrl?: string,
+    grpcToken?: string,
+  ) {
     this.network = network;
     this.constants = getConstants(network);
     this.gqlClient = new SuiGraphQLClient({
       url: graphqlUrl ?? GRAPHQL_URL[network],
       network,
+    });
+    this.suiGrpcClient = new SuiGrpcClient({
+      network: network === "testnet" ? "testnet" : "mainnet",
+      baseUrl: grpcUrl ?? GRPC_URL[network],
+      // Direct property (not a conditional spread) so the option name is
+      // compiler-checked. Sent as x-token gRPC metadata (e.g. a BlockPI key).
+      meta: grpcToken ? { "x-token": grpcToken } : undefined,
     });
   }
 

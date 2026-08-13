@@ -95,7 +95,9 @@ export class AlphalendClient {
    * @param network    One of the supported Sui networks.
    * @param graphqlUrl Optional GraphQL endpoint override. If omitted, a default
    *                   public endpoint for the given `network` is used.
-   * @param options    Optional prebuilt coin metadata map for offline testing.
+   * @param options    Optional prebuilt coin metadata map for offline testing,
+   *                   and/or a gRPC endpoint override + auth token for
+   *                   `blockchain.suiGrpcClient` (see AlphalendClientOptions).
    */
   constructor(
     network: Network,
@@ -106,7 +108,12 @@ export class AlphalendClient {
     this.constants = getConstants(network);
 
     this.lendingProtocol = new LendingProtocol(network, graphqlUrl);
-    this.blockchain = new Blockchain(network, graphqlUrl);
+    this.blockchain = new Blockchain(
+      network,
+      graphqlUrl,
+      options?.grpcUrl,
+      options?.grpcToken,
+    );
     this.cetusSwap = new CetusSwap("mainnet");
 
     // If a coin metadata map is provided, use it and mark as initialized
