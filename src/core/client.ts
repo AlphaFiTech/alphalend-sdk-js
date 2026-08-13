@@ -1175,8 +1175,7 @@ export class AlphalendClient {
 
       const decimals = coinMetadata.decimals;
       const tokenAmount = Number(rewardAmount) / Math.pow(10, decimals);
-
-      const price = resolveCoinPrice(coinMetadata, coinType)?.toNumber() ?? 0;
+      const price = resolveCoinPrice(coinMetadata)?.toNumber() ?? 0;
 
       return tokenAmount * price;
     };
@@ -2003,11 +2002,8 @@ export class AlphalendClient {
       let slippage = 0;
       // A pegged 0 stays falsy here, so the USD/slippage estimate is skipped
       // rather than computed from a substituted market quote.
-      const priceA = resolveCoinPrice(coinIn, tokenIn)?.toNumber();
-      const priceB = resolveCoinPrice(
-        coinForOutputUSD,
-        this.constants.USDC_COIN_TYPE,
-      )?.toNumber();
+      const priceA = resolveCoinPrice(coinIn)?.toNumber();
+      const priceB = resolveCoinPrice(coinForOutputUSD)?.toNumber();
       if (
         priceA &&
         priceB &&
@@ -2124,8 +2120,8 @@ export class AlphalendClient {
     let quote: quoteObject;
     // A pegged 0 stays falsy here, so the USD/slippage estimate is skipped
     // rather than computed from a substituted market quote.
-    const priceA = resolveCoinPrice(coinIn, tokenIn)?.toNumber();
-    const priceB = resolveCoinPrice(coinOut, tokenOut)?.toNumber();
+    const priceA = resolveCoinPrice(coinIn)?.toNumber();
+    const priceB = resolveCoinPrice(coinOut)?.toNumber();
     const coinAExpo = coinIn?.decimals;
     const coinBExpo = coinOut?.decimals;
     if (priceA && priceB && coinAExpo && coinBExpo) {

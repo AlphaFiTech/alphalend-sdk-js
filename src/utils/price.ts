@@ -38,17 +38,20 @@ const toFinite = (value: string | number | null | undefined): number | null => {
  * CoinGecko. A truthiness check on `pythPrice` must never gate this: the
  * runtime value is a number, so a pegged `0` is falsy and would silently
  * fall through to the market quote.
+ *
+ * The peg check reads `coinMetadata.coinType`, not the map key the caller
+ * looked the entry up by. The two differ for the long-form SUI alias, which
+ * is not pegged.
  */
 export function resolveCoinPrice(
-  metadata: Pick<CoinMetadata, "pythPrice" | "coingeckoPrice"> | undefined,
-  coinType: string,
+  coinMetadata: CoinMetadata | undefined,
 ): Decimal | null {
-  if (!metadata) return null;
-  const pyth = toFinite(metadata.pythPrice);
-  if (PEGGED_COIN_TYPES.includes(coinType)) {
+  if (!coinMetadata) return null;
+  const pyth = toFinite(coinMetadata.pythPrice);
+  if (PEGGED_COIN_TYPES.includes(coinMetadata.coinType)) {
     return pyth !== null && pyth >= 0 ? new Decimal(pyth) : null;
   }
   if (pyth !== null && pyth > 0) return new Decimal(pyth);
-  const coingecko = toFinite(metadata.coingeckoPrice);
+  const coingecko = toFinite(coinMetadata.coingeckoPrice);
   return coingecko !== null && coingecko > 0 ? new Decimal(coingecko) : null;
 }

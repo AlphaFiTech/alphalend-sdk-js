@@ -507,10 +507,7 @@ export class Position {
   }
 
   private getPrice(coinType: string): Decimal {
-    const price = resolveCoinPrice(
-      this.coinMetadataMap.get(coinType),
-      coinType,
-    );
+    const price = resolveCoinPrice(this.coinMetadataMap.get(coinType));
     if (price === null) {
       console.error(`No price found for coin type: ${coinType}`);
       return new Decimal(0);

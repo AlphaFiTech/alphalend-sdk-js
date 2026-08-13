@@ -18,107 +18,70 @@ import { MarketType } from "../src/utils/parsedTypes";
 const ALKIMI = PEGGED_COIN_TYPES[0];
 const SUI = "0x2::sui::SUI";
 
+const meta = (
+  coinType: string,
+  pythPrice: number | string | null,
+  coingeckoPrice: number | string | null,
+): CoinMetadata => ({
+  coinType,
+  pythPriceFeedId: null,
+  pythPriceInfoObjectId: null,
+  decimals: 9,
+  pythSponsored: false,
+  symbol: "TEST",
+  // Runtime shape from GraphQL: numbers, despite the string type.
+  coingeckoPrice: coingeckoPrice as unknown as string,
+  pythPrice: pythPrice as unknown as string,
+});
+
 describe("resolveCoinPrice", () => {
   it("keeps a pegged zero and ignores the CoinGecko quote", () => {
-    // Runtime shape from GraphQL: numbers, despite the string type.
-    const metadata = {
-      pythPrice: 0 as unknown as string,
-      coingeckoPrice: 0.0009031 as unknown as string,
-    };
-    expect(resolveCoinPrice(metadata, ALKIMI)).toEqual(new Decimal(0));
+    expect(resolveCoinPrice(meta(ALKIMI, 0, 0.0009031))).toEqual(
+      new Decimal(0),
+    );
   });
 
   it("never uses CoinGecko for a pegged coin, even with no peg mirror", () => {
-    const metadata = {
-      pythPrice: null,
-      coingeckoPrice: 0.0009031 as unknown as string,
-    };
-    expect(resolveCoinPrice(metadata, ALKIMI)).toBeNull();
+    expect(resolveCoinPrice(meta(ALKIMI, null, 0.0009031))).toBeNull();
+  });
+
+  it("reads the peg list from the metadata, not the caller's lookup key", () => {
+    // The map stores the SUI entry under a long-form alias whose object still
+    // carries the short coinType, so the object is the authority.
+    expect(resolveCoinPrice(meta(SUI, 0, 0.687))).toEqual(new Decimal(0.687));
   });
 
   it("keeps the pyth-then-coingecko fallback for non-pegged coins", () => {
-    expect(
-      resolveCoinPrice(
-        {
-          pythPrice: 0.686 as unknown as string,
-          coingeckoPrice: 0.687 as unknown as string,
-        },
-        SUI,
-      ),
-    ).toEqual(new Decimal(0.686));
-    expect(
-      resolveCoinPrice(
-        { pythPrice: null, coingeckoPrice: 0.687 as unknown as string },
-        SUI,
-      ),
-    ).toEqual(new Decimal(0.687));
+    expect(resolveCoinPrice(meta(SUI, 0.686, 0.687))).toEqual(
+      new Decimal(0.686),
+    );
+    expect(resolveCoinPrice(meta(SUI, null, 0.687))).toEqual(
+      new Decimal(0.687),
+    );
     // A zero on a non-pegged coin is unusable, not a valuation.
-    expect(
-      resolveCoinPrice(
-        {
-          pythPrice: 0 as unknown as string,
-          coingeckoPrice: 0.687 as unknown as string,
-        },
-        SUI,
-      ),
-    ).toEqual(new Decimal(0.687));
+    expect(resolveCoinPrice(meta(SUI, 0, 0.687))).toEqual(new Decimal(0.687));
   });
 
   it("accepts string-typed values as declared on CoinMetadata", () => {
-    expect(
-      resolveCoinPrice({ pythPrice: "0", coingeckoPrice: "1.5" }, ALKIMI),
-    ).toEqual(new Decimal(0));
-    expect(
-      resolveCoinPrice({ pythPrice: "0.686", coingeckoPrice: null }, SUI),
-    ).toEqual(new Decimal(0.686));
+    expect(resolveCoinPrice(meta(ALKIMI, "0", "1.5"))).toEqual(new Decimal(0));
+    expect(resolveCoinPrice(meta(SUI, "0.686", null))).toEqual(
+      new Decimal(0.686),
+    );
   });
 
   it("accepts a positive peg and rejects non-finite pegged values", () => {
     // The >= 0 bound must admit a normal positive mirror value...
-    expect(
-      resolveCoinPrice(
-        {
-          pythPrice: 0.5 as unknown as string,
-          coingeckoPrice: 0.4 as unknown as string,
-        },
-        ALKIMI,
-      ),
-    ).toEqual(new Decimal(0.5));
+    expect(resolveCoinPrice(meta(ALKIMI, 0.5, 0.4))).toEqual(new Decimal(0.5));
     // ...and must keep rejecting number-typed NaN/Infinity, with no fallback.
-    expect(
-      resolveCoinPrice(
-        {
-          pythPrice: NaN as unknown as string,
-          coingeckoPrice: 0.4 as unknown as string,
-        },
-        ALKIMI,
-      ),
-    ).toBeNull();
-    expect(
-      resolveCoinPrice(
-        {
-          pythPrice: Infinity as unknown as string,
-          coingeckoPrice: 0.4 as unknown as string,
-        },
-        ALKIMI,
-      ),
-    ).toBeNull();
+    expect(resolveCoinPrice(meta(ALKIMI, NaN, 0.4))).toBeNull();
+    expect(resolveCoinPrice(meta(ALKIMI, Infinity, 0.4))).toBeNull();
   });
 
   it("returns null for missing, non-finite, or negative data", () => {
-    expect(resolveCoinPrice(undefined, SUI)).toBeNull();
-    expect(
-      resolveCoinPrice({ pythPrice: null, coingeckoPrice: null }, SUI),
-    ).toBeNull();
-    expect(
-      resolveCoinPrice({ pythPrice: "NaN", coingeckoPrice: null }, SUI),
-    ).toBeNull();
-    expect(
-      resolveCoinPrice(
-        { pythPrice: -1 as unknown as string, coingeckoPrice: null },
-        ALKIMI,
-      ),
-    ).toBeNull();
+    expect(resolveCoinPrice(undefined)).toBeNull();
+    expect(resolveCoinPrice(meta(SUI, null, null))).toBeNull();
+    expect(resolveCoinPrice(meta(SUI, "NaN", null))).toBeNull();
+    expect(resolveCoinPrice(meta(ALKIMI, -1, null))).toBeNull();
   });
 });
 
@@ -126,22 +89,6 @@ describe("resolveCoinPrice", () => {
 // `Market.getPrice` to truthiness gating stays green on the helper tests but
 // fails here, because the price flows through the real consumer path.
 describe("Market.getMarketData (consumer path)", () => {
-  const coinMetadata = (
-    coinType: string,
-    pythPrice: number | null,
-    coingeckoPrice: number | null,
-  ): CoinMetadata => ({
-    coinType,
-    pythPriceFeedId: null,
-    pythPriceInfoObjectId: null,
-    decimals: 9,
-    pythSponsored: false,
-    symbol: "TEST",
-    // Runtime shape from GraphQL: numbers, despite the string type.
-    coingeckoPrice: coingeckoPrice as unknown as string,
-    pythPrice: pythPrice as unknown as string,
-  });
-
   const emptyDistributor = (marketId: string) => ({
     id: "0xd",
     lastUpdated: "0",
@@ -210,7 +157,7 @@ describe("Market.getMarketData (consumer path)", () => {
 
   it("prices a pegged market at the mirrored zero, not the CoinGecko quote", async () => {
     const map = new Map<string, CoinMetadata>([
-      [ALKIMI, coinMetadata(ALKIMI, 0, 0.0009031)],
+      [ALKIMI, meta(ALKIMI, 0, 0.0009031)],
     ]);
     const market = new Market(marketFixture(ALKIMI), map);
 
@@ -220,9 +167,7 @@ describe("Market.getMarketData (consumer path)", () => {
 
   it("keeps the CoinGecko fallback for a non-pegged market with a zero pyth value", async () => {
     const other = "0xother::x::X";
-    const map = new Map<string, CoinMetadata>([
-      [other, coinMetadata(other, 0, 1.5)],
-    ]);
+    const map = new Map<string, CoinMetadata>([[other, meta(other, 0, 1.5)]]);
     const market = new Market(marketFixture(other), map);
 
     const data = await market.getMarketData();
