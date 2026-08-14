@@ -261,9 +261,15 @@ export class Market {
       return rewardAprs;
     }
 
+    // marketPrice feeds a divisor below; a missing or zero price makes every
+    // reward APR Infinity, so skip reward APRs for this market instead.
     const marketPrice = this.getPrice(this.market.coinType);
-    if (!marketPrice) {
-      throw new Error("Market price not found for " + this.market.coinType);
+    // `!gt(0)` rather than `lte(0)`: a NaN price passes `lte`, but not `gt`.
+    if (!marketPrice.gt(0)) {
+      console.warn(
+        `no usable price for reward-APR market; skipping reward APRs: ${this.market.coinType}`,
+      );
+      return rewardAprs;
     }
     const totalLiquidityValue = totalLiquidity.mul(marketPrice);
 
@@ -290,8 +296,8 @@ export class Market {
       const rewardDecimalDivisor = new Decimal(10).pow(
         this.getDecimals(rewardCoinType),
       );
+      // An unpriced reward coin counts as $0 and still reports a 0% APR.
       const price = this.getPrice(rewardCoinType);
-      if (!price) continue;
 
       const rewardAmount = new Decimal(reward.totalRewards)
         .sub(new Decimal(reward.distributedRewards))
@@ -330,9 +336,15 @@ export class Market {
       return rewardAprs;
     }
 
+    // marketPrice feeds a divisor below; a missing or zero price makes every
+    // reward APR Infinity, so skip reward APRs for this market instead.
     const marketPrice = this.getPrice(this.market.coinType);
-    if (!marketPrice) {
-      throw new Error("Market price not found for " + this.market.coinType);
+    // `!gt(0)` rather than `lte(0)`: a NaN price passes `lte`, but not `gt`.
+    if (!marketPrice.gt(0)) {
+      console.warn(
+        `no usable price for reward-APR market; skipping reward APRs: ${this.market.coinType}`,
+      );
+      return rewardAprs;
     }
     const borrowedAmountValue = borrowedAmount.mul(marketPrice);
 
@@ -358,8 +370,8 @@ export class Market {
       const rewardDecimalDivisor = new Decimal(10).pow(
         this.getDecimals(rewardCoinType),
       );
+      // An unpriced reward coin counts as $0 and still reports a 0% APR.
       const price = this.getPrice(rewardCoinType);
-      if (!price) continue;
 
       const rewardAmount = new Decimal(reward.totalRewards)
         .sub(new Decimal(reward.distributedRewards))

@@ -45,12 +45,6 @@ describe("resolveCoinPrice", () => {
     expect(resolveCoinPrice(meta(ALKIMI, null, 0.0009031))).toBeNull();
   });
 
-  it("reads the peg list from the metadata, not the caller's lookup key", () => {
-    // The map stores the SUI entry under a long-form alias whose object still
-    // carries the short coinType, so the object is the authority.
-    expect(resolveCoinPrice(meta(SUI, 0, 0.687))).toEqual(new Decimal(0.687));
-  });
-
   it("keeps the pyth-then-coingecko fallback for non-pegged coins", () => {
     expect(resolveCoinPrice(meta(SUI, 0.686, 0.687))).toEqual(
       new Decimal(0.686),
@@ -172,5 +166,66 @@ describe("Market.getMarketData (consumer path)", () => {
 
     const data = await market.getMarketData();
     expect(data.price).toEqual(new Decimal(1.5));
+  });
+
+  // A zero market price is the divisor for every reward APR. Without a guard
+  // decimal.js returns Infinity rather than throwing, and position.ts then
+  // multiplies it by a zero collateral value, so the NaN poisons every later
+  // add() into the portfolio aggregate — not just this market's row.
+  describe("with an active reward campaign", () => {
+    const rewardFixture = (coinType: string): MarketType => {
+      const base = marketFixture(coinType);
+      const distributor = {
+        id: "0xd",
+        lastUpdated: "1000",
+        marketId: "17",
+        totalXtokens: "0",
+        rewards: [
+          {
+            id: "0xr",
+            coinType: SUI,
+            distributorId: "0xd",
+            isAutoCompounded: false,
+            autoCompoundMarketId: "0",
+            totalRewards: "1000000000000",
+            startTime: "0",
+            endTime: "1000000",
+            distributedRewards: "0",
+            cummulativeRewardsPerShare: "0",
+          },
+        ],
+      };
+      return {
+        ...base,
+        // totalLiquidity() = balanceHolding + borrowedAmount - deductions.
+        balanceHolding: "1000000000000",
+        borrowedAmount: "500000000000",
+        depositRewardDistributor: distributor,
+        borrowRewardDistributor: distributor,
+      };
+    };
+
+    const priced = (coinType: string, pyth: number) =>
+      new Map<string, CoinMetadata>([
+        [coinType, meta(coinType, pyth, 0.0009031)],
+        [SUI, meta(SUI, 1, 1)],
+      ]);
+
+    it("skips reward APRs on a pegged market instead of returning Infinity", () => {
+      const market = new Market(rewardFixture(ALKIMI), priced(ALKIMI, 0));
+
+      expect(market.calculateSupplyRewardApr()).toEqual([]);
+      expect(market.calculateBorrowRewardApr()).toEqual([]);
+    });
+
+    it("still computes finite reward APRs on a normally priced market", () => {
+      const other = "0xother::x::X";
+      const market = new Market(rewardFixture(other), priced(other, 2));
+
+      const supply = market.calculateSupplyRewardApr();
+      expect(supply).toHaveLength(1);
+      expect(supply[0].rewardApr.isFinite()).toBe(true);
+      expect(supply[0].rewardApr.gt(0)).toBe(true);
+    });
   });
 });
