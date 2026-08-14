@@ -12,6 +12,7 @@ import {
 } from "@mysten/sui/transactions";
 import { graphql } from "@mysten/sui/graphql/schema";
 import { SuiGrpcClient } from "@mysten/sui/grpc";
+import { GrpcWebFetchTransport } from "@protobuf-ts/grpcweb-transport";
 import type { SuiClientTypes } from "@mysten/sui/client";
 import { normalizeStructTag, SUI_TYPE_ARG } from "@mysten/sui/utils";
 
@@ -300,7 +301,13 @@ async function getAddressBalance(
   return BigInt(response.data?.address?.balance?.addressBalance ?? 0);
 }
 
-/** gRPC-web over fetch; works in browsers and Node. `grpcToken` is sent as `x-token` metadata. */
+/**
+ * gRPC-web over fetch; works in browsers and Node. `grpcToken` is sent as
+ * `x-token` metadata. The transport is built explicitly because
+ * SuiGrpcClient's convenience constructor forwards only `baseUrl`/`fetchInit`
+ * to the transport it builds and silently drops `meta` — the token would
+ * never be sent.
+ */
 function grpcClient(
   network: Network,
   grpcUrl?: string,
@@ -308,8 +315,10 @@ function grpcClient(
 ): SuiGrpcClient {
   return new SuiGrpcClient({
     network,
-    baseUrl: grpcUrl ?? GRPC_URL[network],
-    meta: grpcToken ? { "x-token": grpcToken } : undefined,
+    transport: new GrpcWebFetchTransport({
+      baseUrl: grpcUrl ?? GRPC_URL[network],
+      ...(grpcToken ? { meta: { "x-token": grpcToken } } : {}),
+    }),
   });
 }
 
