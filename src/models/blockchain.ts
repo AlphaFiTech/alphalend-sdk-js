@@ -10,6 +10,7 @@
 
 import { SuiGraphQLClient } from "@mysten/sui/graphql";
 import { SuiGrpcClient } from "@mysten/sui/grpc";
+import { GrpcWebFetchTransport } from "@protobuf-ts/grpcweb-transport";
 import { graphql } from "@mysten/sui/graphql/schema";
 import {
   Transaction,
@@ -83,12 +84,19 @@ export class Blockchain {
       url: graphqlUrl ?? GRAPHQL_URL[network],
       network,
     });
+    // SuiGrpcClient's convenience constructor forwards only `baseUrl`/`fetchInit`
+    // to the transport it builds and silently drops `meta`, so the token would
+    // never be sent. Build the transport explicitly — its `defaultOptions.meta`
+    // is merged into every call as gRPC metadata (the `x-token` auth header).
+    // `network` is passed through unchanged: GRPC_URL covers all three
+    // networks, and narrowing devnet to "mainnet" would mislabel the client
+    // for network-keyed resolution (e.g. MVR).
     this.suiGrpcClient = new SuiGrpcClient({
-      network: network === "testnet" ? "testnet" : "mainnet",
-      baseUrl: grpcUrl ?? GRPC_URL[network],
-      // Direct property (not a conditional spread) so the option name is
-      // compiler-checked. Sent as x-token gRPC metadata (e.g. a BlockPI key).
-      meta: grpcToken ? { "x-token": grpcToken } : undefined,
+      network,
+      transport: new GrpcWebFetchTransport({
+        baseUrl: grpcUrl ?? GRPC_URL[network],
+        ...(grpcToken ? { meta: { "x-token": grpcToken } } : {}),
+      }),
     });
   }
 
