@@ -8,6 +8,7 @@ import { Decimal } from "decimal.js";
 import { Market } from "./market.js";
 import { getConstants } from "../constants/index.js";
 import { normalizeCoinType } from "../utils/parser.js";
+import { resolveCoinPrice } from "../utils/price.js";
 
 export class Position {
   position: PositionType;
@@ -506,15 +507,11 @@ export class Position {
   }
 
   private getPrice(coinType: string): Decimal {
-    if (this.coinMetadataMap.get(coinType)?.pythPrice) {
-      return new Decimal(this.coinMetadataMap.get(coinType)?.pythPrice ?? 0);
+    const price = resolveCoinPrice(this.coinMetadataMap.get(coinType));
+    if (price === null) {
+      console.error(`No price found for coin type: ${coinType}`);
+      return new Decimal(0);
     }
-    if (this.coinMetadataMap.get(coinType)?.coingeckoPrice) {
-      return new Decimal(
-        this.coinMetadataMap.get(coinType)?.coingeckoPrice ?? 0,
-      );
-    }
-    console.error(`No price found for coin type: ${coinType}`);
-    return new Decimal(0);
+    return price;
   }
 }

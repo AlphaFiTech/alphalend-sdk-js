@@ -24,6 +24,16 @@ This SDK provides a comprehensive interface to interact with the AlphaLend lendi
 npm install @alphafi/alphalend-sdk
 ```
 
+## Unreleased — coin prices can be exactly zero
+
+The protocol pegs a wound-down market on-chain at a price of 0
+(`oracle::set_fixed_price`), and the SDK now reports that peg — ALKIMI and UP
+today — instead of substituting a CoinGecko market quote. A price of `0` is a
+valuation, not a missing value: let it reach multiplications (a pegged position
+is worth $0), and guard any division with `!price.gt(0)` (a NaN passes
+`lte(0)`). Resolve prices with the exported `resolveCoinPrice(coinMetadata)` —
+never `pythPrice || coingeckoPrice`, which treats the falsy `0` as missing.
+
 ## v3.0.0 — Mysten Sui v2 / ESM-only (breaking)
 
 - **`@mysten/sui` v2 peer dependency** (`^2.17.0`). Your app must provide it.
