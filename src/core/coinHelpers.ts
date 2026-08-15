@@ -12,6 +12,7 @@ import {
 } from "@mysten/sui/transactions";
 import { graphql } from "@mysten/sui/graphql/schema";
 import { SuiGrpcClient } from "@mysten/sui/grpc";
+import { GrpcWebFetchTransport } from "@protobuf-ts/grpcweb-transport";
 import type { SuiClientTypes } from "@mysten/sui/client";
 import { normalizeStructTag, SUI_TYPE_ARG } from "@mysten/sui/utils";
 
@@ -76,8 +77,9 @@ export async function getCoinObjectCounts(
   address: string,
   network: Network,
   grpcUrl?: string,
+  grpcToken?: string,
 ): Promise<CoinTypeCount[]> {
-  const client = grpcClient(network, grpcUrl);
+  const client = grpcClient(network, grpcUrl, grpcToken);
   const coinTypes = await listCoinTypes(client, address);
 
   const counts = await mapWithConcurrency(
@@ -118,6 +120,7 @@ export async function buildMergeCoinsTransaction(
   address: string,
   network: Network,
   grpcUrl?: string,
+  grpcToken?: string,
 ): Promise<Transaction> {
   const blockchain = new Blockchain(network);
   const normalizedCoinType = normalizeStructTag(coinType);
@@ -135,7 +138,7 @@ export async function buildMergeCoinsTransaction(
     addressBalance >= MIN_ADDRESS_BALANCE_FOR_GAS;
 
   const coins = await getCoinObjectsOfType(
-    grpcClient(network, grpcUrl),
+    grpcClient(network, grpcUrl, grpcToken),
     address,
     normalizedCoinType,
   );
@@ -298,11 +301,24 @@ async function getAddressBalance(
   return BigInt(response.data?.address?.balance?.addressBalance ?? 0);
 }
 
-/** gRPC-web over fetch; works in browsers and Node. */
-function grpcClient(network: Network, grpcUrl?: string): SuiGrpcClient {
+/**
+ * gRPC-web over fetch; works in browsers and Node. `grpcToken` is sent as
+ * `x-token` metadata. The transport is built explicitly because
+ * SuiGrpcClient's convenience constructor forwards only `baseUrl`/`fetchInit`
+ * to the transport it builds and silently drops `meta` — the token would
+ * never be sent.
+ */
+function grpcClient(
+  network: Network,
+  grpcUrl?: string,
+  grpcToken?: string,
+): SuiGrpcClient {
   return new SuiGrpcClient({
     network,
-    baseUrl: grpcUrl ?? GRPC_URL[network],
+    transport: new GrpcWebFetchTransport({
+      baseUrl: grpcUrl ?? GRPC_URL[network],
+      ...(grpcToken ? { meta: { "x-token": grpcToken } } : {}),
+    }),
   });
 }
 

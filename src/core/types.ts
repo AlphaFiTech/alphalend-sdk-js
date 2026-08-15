@@ -20,6 +20,10 @@ import { Decimal } from "decimal.js";
  */
 export interface AlphalendClientOptions {
   coinMetadataMap?: Map<string, CoinMetadata>;
+  /** Optional Sui gRPC endpoint override for the client's `blockchain.suiGrpcClient`. */
+  grpcUrl?: string;
+  /** Auth token for the gRPC endpoint, sent as `x-token` metadata (e.g. a BlockPI key). */
+  grpcToken?: string;
 }
 
 /**
