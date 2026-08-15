@@ -119,6 +119,18 @@ export async function buildFlashRepayTransaction(
     );
   }
 
+  // Both prices size a transaction amount below, and withdrawMarket.price is a
+  // divisor. A pegged (zero) price makes the withdraw amount Infinity, which
+  // the supply cap then turns into "withdraw the entire collateral balance".
+  // `!gt(0)` rather than `lte(0)`: a NaN price passes `lte`, but not `gt`.
+  if (!repayMarket.price.gt(0) || !withdrawMarket.price.gt(0)) {
+    throw new Error(
+      `Flash repay needs a usable price for both markets: ` +
+        `${params.repayCoinType}=${repayMarket.price}, ` +
+        `${params.withdrawCoinType}=${withdrawMarket.price}`,
+    );
+  }
+
   const repayMarketIdNum = parseInt(params.repayMarketId);
   const borrowedTokens = portfolio.borrowedAmounts.get(repayMarketIdNum);
 

@@ -13,6 +13,10 @@ export {
 } from "./models/position/functions.js";
 
 // Export caching utilities for advanced users
+// Price resolution. Consumers must use this rather than reading `pythPrice`
+// or `coingeckoPrice` directly: a pegged coin is priced at exactly 0, and a
+// truthiness test on that value silently substitutes the CoinGecko quote.
+export { resolveCoinPrice, PEGGED_COIN_TYPES } from "./utils/price.js";
 export { httpCache } from "./utils/httpCache.js";
 export { blockchainCache } from "./utils/blockchainCache.js";
 export {
